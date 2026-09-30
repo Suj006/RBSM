@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 240" role="img" aria-label="TRADEX">
+  <title>TRADEX</title>
+  <!-- plus mark -->
+  <path fill="#d62a2a" d="M298 82h50v58h-22v-36h-28z"/>
+  <path fill="#3cb54a" d="M350 16h22v36h48v22h-70z"/>
+  <!-- T -->
+  <rect x="12" y="120" width="62" height="24" fill="#d62a2a"/>
+  <rect x="74" y="120" width="44" height="24" fill="#3cb54a"/>
+  <rect x="53" y="144" width="24" height="36" fill="#d62a2a"/>
+  <rect x="53" y="180" width="24" height="42" fill="#3cb54a"/>
+  <!-- R -->
+  <rect x="134" y="120" width="24" height="102" fill="#3cb54a"/>
+  <rect x="158" y="120" width="40" height="24" fill="#dcc72b"/>
+  <path fill="#3cb54a" d="M198 120h8l20 20v38l-14 10 16 34h-26l-14-30h-30v-24h44v-24h-4z"/>
+  <!-- A -->
+  <path fill="#3cb54a" d="M268 120h64v102h-24v-30h-38v30h-24v-76zm2 48h38v-24h-38z"/>
+  <!-- D -->
+  <rect x="352" y="120" width="24" height="54" fill="#dcc72b"/>
+  <path fill="#dcc72b" d="M376 120h42l24 24v14h-24v-14h-42z"/>
+  <path fill="#3cb54a" d="M418 158h24v42l-22 22h-2v-24h0z"/>
+  <path fill="#d62a2a" d="M352 174h24v24h42v24h-66z"/>
+  <!-- E -->
+  <rect x="460" y="120" width="92" height="24" fill="#3cb54a"/>
+  <rect x="460" y="144" width="24" height="78" fill="#3cb54a"/>
+  <rect x="484" y="160" width="58" height="24" fill="#3cb54a"/>
+  <rect x="496" y="184" width="30" height="38" fill="#2ea3e6"/>
+  <rect x="526" y="198" width="26" height="24" fill="#3cb54a"/>
+  <!-- X -->
+  <path fill="#3cb54a" d="M566 120h30l40 51-15 20z"/>
+  <path fill="#d62a2a" d="M658 120h30l-38 51 40 51h-30l-25-33-25 33h-30l40-51 12 -16z"/>
+</svg>

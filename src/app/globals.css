@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* TRADEX brand palette — taken from the TRADEX logo blocks. */
+@theme {
+  --color-brand-50: #eefaf0;
+  --color-brand-100: #d7f2dc;
+  --color-brand-200: #b0e4ba;
+  --color-brand-300: #7dcf8e;
+  --color-brand-400: #4fbd63;
+  --color-brand-500: #3cb54a;
+  --color-brand-600: #2c9a3c;
+  --color-brand-700: #237d32;
+  --color-brand-800: #1e632b;
+  --color-brand-900: #194f25;
+
+  --color-tx-red: #d62a2a;
+  --color-tx-yellow: #dcc72b;
+  --color-tx-blue: #2ea3e6;
+  --color-tx-green: #3cb54a;
+
+  --color-ink: #0f1b2d;
+  --color-canvas: #f6f8f7;
+
+  --font-sans: var(--font-sans-brand), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Four-colour ribbon used under headers, echoing the logo. */
+.tx-ribbon {
+  background: linear-gradient(
+    90deg,
+    var(--color-tx-red) 0 25%,
+    var(--color-tx-yellow) 25% 50%,
+    var(--color-tx-green) 50% 75%,
+    var(--color-tx-blue) 75% 100%
+  );
+}
+
+.tx-grid-bg {
+  background-image:
+    linear-gradient(to right, rgb(15 27 45 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(15 27 45 / 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+  .print-full { margin: 0 !important; padding: 0 !important; max-width: none !important; }
+}

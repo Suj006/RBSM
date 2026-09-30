@@ -1,0 +1,217 @@
+// TRADEX 2.0 — Reverse Buyer Seller Meet (RBSM) portal
+// Phase 1: buyer sign-up, profile, FIEO verification, DIC approval.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  BUYER
+  FIEO
+  DIC
+  ADMIN
+}
+
+// Buyer journey. Each value is the state the buyer record is *in*.
+enum BuyerStatus {
+  SIGNED_UP        // account created, basic details not yet submitted
+  BASIC_SUBMITTED  // basic details waiting for FIEO approval
+  BASIC_RETURNED   // FIEO sent basic details back with a comment
+  BASIC_APPROVED   // FIEO approved; buyer can fill the detailed requirement
+  REQ_SUBMITTED    // detailed requirement waiting for FIEO recommendation
+  REQ_RETURNED     // FIEO sent the requirement back to the buyer with a comment
+  FIEO_RECOMMENDED // waiting for Directorate (DIC) approval
+  DIC_RETURNED     // DIC sent it back to FIEO with a comment for re-verification
+  APPROVED         // DIC approved — on the RBSM buyer list
+}
+
+enum ReviewAction {
+  SIGNED_UP
+  BASIC_SUBMITTED
+  BASIC_APPROVED
+  BASIC_RETURNED
+  REQ_SUBMITTED
+  REQ_RETURNED
+  FIEO_RECOMMENDED
+  DIC_RETURNED
+  DIC_APPROVED
+}
+
+enum DocumentKind {
+  PROFILE
+  CREDENTIALS
+}
+
+enum EmailStatus {
+  SENT
+  LOGGED // SMTP not configured — recorded in the outbox only
+  FAILED
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  username           String    @unique
+  passwordHash       String
+  role               Role
+  displayName        String
+  mustChangePassword Boolean   @default(false)
+  isActive           Boolean   @default(true)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  sessions   Session[]
+  buyer      Buyer?
+  reviewLogs ReviewLog[]
+}
+
+model Session {
+  id        String   @id // random token stored in the cookie (hashed)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Named running counters, e.g. "buyer" (Tradex2027-001 / RBSM-B-001) and
+// "approved-2026" (RBSM-Buyer-2026001).
+model Counter {
+  name  String @id
+  value Int    @default(0)
+}
+
+model Buyer {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  seq   Int    @unique // 1, 2, 3…
+  regNo String @unique // RBSM-B-001
+
+  name        String // buyer / organisation name (from sign-up, editable)
+  country     String
+  signupEmail String @unique
+
+  // Point of contact
+  pocName        String?
+  pocDesignation String?
+  pocEmail       String?
+  pocMobile      String?
+
+  status BuyerStatus @default(SIGNED_UP)
+
+  basicSubmittedAt DateTime?
+  basicApprovedAt  DateTime?
+  reqSubmittedAt   DateTime?
+  recommendedAt    DateTime?
+  approvedAt       DateTime?
+
+  approvedSeq Int?    @unique
+  approvedNo  String? @unique // RBSM-Buyer-2026001
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents   Document[]
+  requirement Requirement?
+  reviewLogs  ReviewLog[]
+
+  @@index([status])
+  @@index([country])
+}
+
+model Document {
+  id           String       @id @default(cuid())
+  buyerId      String
+  buyer        Buyer        @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  kind         DocumentKind
+  originalName String
+  storedName   String
+  mimeType     String
+  size         Int
+  uploadedAt   DateTime     @default(now())
+
+  @@unique([buyerId, kind])
+}
+
+model Sector {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requirementItems RequirementItem[]
+}
+
+model Certification {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Requirement {
+  id      String @id @default(cuid())
+  buyerId String @unique
+  buyer   Buyer  @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  organisationType     String? // Importer, Distributor, Retail chain…
+  procurementInterests String? // free text overview of what they want to source
+  annualSourcingValue  String? // bracket, e.g. "USD 1–5 million"
+  sourcingTimeline     String? // Immediate / 3–6 months / …
+  preferredEngagement  String? // Long-term supply, JV, one-time order…
+
+  items RequirementItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RequirementItem {
+  id             String      @id @default(cuid())
+  requirementId  String
+  requirement    Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  sectorId       String
+  sector         Sector      @relation(fields: [sectorId], references: [id])
+  products       String // comma / newline separated product names
+  specifications String?
+  certifications String @default("[]") // JSON array of certification names
+  quantity       String? // indicative volume
+  sortOrder      Int    @default(0)
+}
+
+model ReviewLog {
+  id        String       @id @default(cuid())
+  buyerId   String
+  buyer     Buyer        @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorRole Role
+  action    ReviewAction
+  comment   String?
+  createdAt DateTime     @default(now())
+
+  @@index([buyerId, createdAt])
+}
+
+model EmailLog {
+  id        String      @id @default(cuid())
+  to        String
+  subject   String
+  body      String
+  status    EmailStatus
+  error     String?
+  createdAt DateTime    @default(now())
+}
