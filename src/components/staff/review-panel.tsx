@@ -3,13 +3,13 @@
 import { useKeepForm } from "@/lib/use-keep-form";
 import { useActionState, useState } from "react";
 import { CheckCircle2, Undo2, Send } from "lucide-react";
-import { reviewAction } from "@/app/actions/review";
+import { basicReviewAction } from "@/app/actions/review";
 import { Alert, Button, Field, Textarea } from "@/components/ui";
 
 export type PanelAction = { decision: string; label: string; variant: "primary" | "success" | "danger"; needsComment: boolean; confirm?: string };
 
 export function ReviewPanel({ buyerId, actions, heading, note }: { buyerId: string; actions: PanelAction[]; heading: string; note?: string }) {
-  const [state, action, pending] = useActionState(reviewAction, undefined);
+  const [state, action, pending] = useActionState(basicReviewAction, undefined);
   const onSubmit = useKeepForm(action);
   const [comment, setComment] = useState("");
   if (state?.ok) return <Alert tone="green" title="Done">{state.message}</Alert>;

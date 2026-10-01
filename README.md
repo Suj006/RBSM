@@ -10,22 +10,28 @@ profiling, verification, matchmaking, meeting scheduling, communication, monitor
 ```
 Buyer sign-up ─► e-mail with login (Tradex2027-NNN / pass@123) ─► forced password change
    ─► Basic details + documents ─► FIEO approves (or returns with comment)
-   ─► Detailed requirement (sectors, products, certifications) ─► FIEO recommends (or returns to buyer)
-   ─► Directorate approves (or returns to FIEO with comment) ─► RBSM buyer list (RBSM-Buyer-2026NNN)
+   ─► Sourcing profile + one requirement per sector
+        each sector separately:  submitted ─► FIEO recommends / returns to buyer
+                                           ─► DIC approves / returns to FIEO
+   ─► first approved sector makes the buyer an approved RBSM buyer (RBSM-Buyer-2026NNN)
+   ─► approved buyers can add sectors or modify approved ones — same approval flow
 ```
+
+FIEO and the Directorate decide each sector on its own (e.g. recommend one sector and return
+another in the same step), with "Recommend all" / "Approve all" shortcuts.
 
 | Number | Format | Assigned |
 |---|---|---|
 | Login ID | `Tradex2027-001` | at sign-up |
 | Registration no. | `RBSM-B-001` | at sign-up |
-| Buyer no. | `RBSM-Buyer-2026001` | on Directorate approval |
+| Buyer no. | `RBSM-Buyer-2026001` | when the first sector is approved by the Directorate |
 
 ## Logins (phase-1 defaults — change before going live)
 
 | Role | User name | Password | Can do |
 |---|---|---|---|
-| FIEO | `fieo` | `pass@123` | See all buyers, approve / return basic details, recommend / return requirements |
-| Directorate | `dic123` | `dic123` | See recommended buyers, approve (adds to RBSM list) / return to FIEO |
+| FIEO | `fieo` | `pass@123` | See all buyers, approve / return basic details, recommend / return each sector |
+| Directorate | `dic123` | `dic123` | See FIEO-recommended sectors, approve each (first approval adds the buyer to the RBSM list) / return to FIEO |
 | Admin | `admin` | `admin` | Sector & certification masters, users, buyer password reset, e-mail outbox, all reports |
 | Buyer | `Tradex2027-NNN` | `pass@123` (must change on first login) | Own profile and requirement |
 
@@ -38,7 +44,7 @@ Staff passwords can be changed from **Admin → Users & logins**.
 - Credential e-mails (SMTP) plus an **E-mail outbox** that records every message
 - Document uploads (PDF/JPG/PNG, 5 MB, content-checked) served only to authorised users
 - Detailed requirement: multiple sectors, products, specifications, volumes, certifications (master + custom)
-- Save draft / submit; return-with-comment loops at FIEO and Directorate stages; full audit trail
+- Sector-wise approval: save draft / submit per sector, return-with-comment at FIEO and Directorate, modify approved sectors or add new ones later; full audit trail
 - Role dashboards: KPIs, pipeline, sign-up trend, top countries, sectors of interest, work queue
 - Reports: buyer list and sector-wise requirement sheet (Excel-ready CSV, filter-aware), printable buyer dossier and RBSM buyer list (Print / Save PDF)
 
@@ -52,7 +58,8 @@ npm run db:seed          # staff logins, sectors, certifications
 npm run dev              # http://localhost:3000
 ```
 
-After updating from an older version, run `npm run db:normalize` once to re-format names already saved.
+After updating from an older version, run `npx prisma migrate deploy` (database changes) and, once,
+`npm run db:normalize` to re-format names already saved.
 
 Production: `npm run build && npm start`. Set `APP_URL` and the `SMTP_*` variables in `.env` so buyers
 receive their credentials by e-mail; without SMTP the e-mails appear only in **Admin → E-mail outbox**

@@ -86,6 +86,33 @@ Your ${what} has been returned for correction with the following comment:
 
 Please sign in, update the details and submit again.${signature}`,
   }),
+  sectorsReturned: (name: string, items: { sector: string; comment: string }[]) => ({
+    subject: `${EVENT.name} ${EVENT.short} — requirement returned for correction`,
+    text: `Dear ${name},
+
+FIEO has returned the following sector requirement${items.length > 1 ? "s" : ""} for correction:
+
+${items.map((i) => `• ${i.sector}: "${i.comment}"`).join("\n")}
+
+Please sign in, update ${items.length > 1 ? "them" : "it"} and submit again. Your other sectors are not affected.${signature}`,
+  }),
+  sectorsApproved: (name: string, approvedNo: string, sectors: string[], firstTime: boolean) => ({
+    subject: firstTime
+      ? `${EVENT.name} ${EVENT.short} — registration approved (${approvedNo})`
+      : `${EVENT.name} ${EVENT.short} — sector requirement approved`,
+    text: `Dear ${name},
+
+${firstTime
+  ? `We are pleased to inform you that your registration has been approved by the Directorate and you have been added to the ${EVENT.short} buyer list.
+
+Your buyer number: ${approvedNo}
+
+`
+  : ""}The following sector requirement${sectors.length > 1 ? "s have" : " has"} been approved:
+${sectors.map((s) => `• ${s}`).join("\n")}
+
+You can add new sectors or modify approved ones at any time from your dashboard; changes go through the same approval.${signature}`,
+  }),
   approved: (name: string, approvedNo: string) => ({
     subject: `${EVENT.name} ${EVENT.short} — registration approved (${approvedNo})`,
     text: `Dear ${name},

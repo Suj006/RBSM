@@ -17,17 +17,24 @@ enum Role {
   ADMIN
 }
 
-// Buyer journey. Each value is the state the buyer record is *in*.
+// Buyer registration stage. Sector requirements are approved one by one
+// (see ItemStatus); the buyer becomes APPROVED with their first approved sector.
 enum BuyerStatus {
-  SIGNED_UP        // account created, basic details not yet submitted
-  BASIC_SUBMITTED  // basic details waiting for FIEO approval
-  BASIC_RETURNED   // FIEO sent basic details back with a comment
-  BASIC_APPROVED   // FIEO approved; buyer can fill the detailed requirement
-  REQ_SUBMITTED    // detailed requirement waiting for FIEO recommendation
-  REQ_RETURNED     // FIEO sent the requirement back to the buyer with a comment
+  SIGNED_UP       // account created, basic details not yet submitted
+  BASIC_SUBMITTED // basic details waiting for FIEO approval
+  BASIC_RETURNED  // FIEO sent basic details back with a comment
+  BASIC_APPROVED  // FIEO approved; buyer adds sector requirements
+  APPROVED        // at least one sector approved by DIC — on the RBSM buyer list
+}
+
+// Approval state of one sector requirement.
+enum ItemStatus {
+  DRAFT            // being prepared (new, or an approved sector being modified)
+  SUBMITTED        // waiting for FIEO recommendation
+  FIEO_RETURNED    // FIEO returned it to the buyer with a comment
   FIEO_RECOMMENDED // waiting for Directorate (DIC) approval
-  DIC_RETURNED     // DIC sent it back to FIEO with a comment for re-verification
-  APPROVED         // DIC approved — on the RBSM buyer list
+  DIC_RETURNED     // DIC returned it to FIEO with a comment for re-verification
+  APPROVED         // approved by DIC
 }
 
 enum ReviewAction {
@@ -40,6 +47,8 @@ enum ReviewAction {
   FIEO_RECOMMENDED
   DIC_RETURNED
   DIC_APPROVED
+  REQ_WITHDRAWN // buyer removed a sector
+  REQ_MODIFIED  // buyer reopened an approved sector for changes
 }
 
 enum DocumentKind {
@@ -190,6 +199,19 @@ model RequirementItem {
   certifications String @default("[]") // JSON array of certification names
   quantity       String? // indicative volume
   sortOrder      Int    @default(0)
+
+  status        ItemStatus @default(DRAFT)
+  submittedAt   DateTime?
+  recommendedAt DateTime?
+  approvedAt    DateTime?
+  everApproved  Boolean    @default(false) // was approved at least once (modified since)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @default(now()) @updatedAt
+
+  reviewLogs ReviewLog[]
+
+  @@unique([requirementId, sectorId])
+  @@index([status])
 }
 
 model ReviewLog {
@@ -200,7 +222,11 @@ model ReviewLog {
   actor     User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
   actorRole Role
   action    ReviewAction
-  comment   String?
+  // Set for sector-level actions; sectorName keeps the label if the row is removed.
+  itemId     String?
+  item       RequirementItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  sectorName String?
+  comment    String?
   createdAt DateTime     @default(now())
 
   @@index([buyerId, createdAt])

@@ -1,41 +1,48 @@
 import type { Metadata } from "next";
-import { ArrowRight, BadgeCheck, Clock, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, BadgeCheck, Clock, AlertTriangle, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireBuyer } from "@/lib/auth";
-import { Alert, ButtonLink, Card, CardHeader, DL, PageHeader } from "@/components/ui";
+import { Alert, Badge, ButtonLink, Card, CardHeader, DL, PageHeader } from "@/components/ui";
 import { JourneyStepper } from "@/components/journey";
 import { Timeline } from "@/components/timeline";
 import { StatusBadge } from "@/components/status-badge";
 import { EVENT } from "@/lib/config";
 import { fmtDate } from "@/lib/format";
+import { ITEM_META } from "@/lib/status";
 import type { BuyerStatus } from "@/generated/prisma/enums";
 
 export const metadata: Metadata = { title: "Buyer dashboard" };
 
-const NEXT_STEP: Record<BuyerStatus, { title: string; body: string; href?: string; cta?: string; tone: "blue" | "amber" | "red" | "green" | "violet" }> = {
+type Step = { title: string; body: string; href?: string; cta?: string; tone: "blue" | "amber" | "red" | "green" };
+
+const BASIC_STEP: Partial<Record<BuyerStatus, Step>> = {
   SIGNED_UP: { title: "Complete your basic details", body: "Add your point of contact and upload your company profile and organisation credentials, then submit them to FIEO.", href: "/buyer/profile", cta: "Fill basic details", tone: "blue" },
   BASIC_RETURNED: { title: "Basic details need correction", body: "FIEO has returned your basic details. Please review the comment, update and submit again.", href: "/buyer/profile", cta: "Update basic details", tone: "red" },
   BASIC_SUBMITTED: { title: "Under FIEO verification", body: "Your basic details are with FIEO. You'll receive an e-mail once they are approved.", tone: "amber" },
-  BASIC_APPROVED: { title: "Submit your detailed requirement", body: "Your basic details are approved. Tell us which sectors and products you want to source.", href: "/buyer/requirement", cta: "Fill detailed requirement", tone: "blue" },
-  REQ_RETURNED: { title: "Requirement needs correction", body: "FIEO has returned your detailed requirement. Please review the comment, update and submit again.", href: "/buyer/requirement", cta: "Update requirement", tone: "red" },
-  REQ_SUBMITTED: { title: "Awaiting FIEO recommendation", body: "FIEO is reviewing your detailed requirement.", tone: "amber" },
-  DIC_RETURNED: { title: "Under re-verification", body: "Your application is being re-verified by FIEO.", tone: "amber" },
-  FIEO_RECOMMENDED: { title: "Awaiting Directorate approval", body: "FIEO has recommended your registration to the Directorate of Industries & Commerce.", tone: "violet" },
-  APPROVED: { title: "You are an approved RBSM buyer", body: "Your registration is complete. Matchmaking and B2B meeting schedules will be shared soon.", tone: "green" },
 };
 
 export default async function BuyerDashboard() {
   const { buyer: b } = await requireBuyer();
   const [logs, requirement, docs] = await Promise.all([
     prisma.reviewLog.findMany({ where: { buyerId: b.id }, orderBy: { createdAt: "desc" }, include: { actor: { select: { displayName: true } } } }),
-    prisma.requirement.findUnique({ where: { buyerId: b.id }, include: { items: { include: { sector: true } } } }),
+    prisma.requirement.findUnique({ where: { buyerId: b.id }, include: { items: { orderBy: { sortOrder: "asc" }, include: { sector: true } } } }),
     prisma.document.count({ where: { buyerId: b.id } }),
   ]);
-  // Buyers see only comments addressed to them (not DIC → FIEO internal notes).
-  const visibleLogs = logs.map((l) => (l.action === "DIC_RETURNED" ? { ...l, comment: null } : l));
-  const lastReturn = logs.find((l) => l.action === "BASIC_RETURNED" || l.action === "REQ_RETURNED");
-  const step = NEXT_STEP[b.status];
-  const Icon = b.status === "APPROVED" ? BadgeCheck : step.tone === "red" ? AlertTriangle : step.href ? ArrowRight : Clock;
+  // Buyers see only comments addressed to them (not internal FIEO ↔ DIC notes).
+  const visibleLogs = logs.map((l) => (l.action === "DIC_RETURNED" || l.action === "FIEO_RECOMMENDED" || l.action === "DIC_APPROVED" ? { ...l, comment: null } : l));
+  const lastBasicReturn = logs.find((l) => l.action === "BASIC_RETURNED");
+  const items = requirement?.items ?? [];
+  const n = (...s: (keyof typeof ITEM_META)[]) => items.filter((i) => s.includes(i.status)).length;
+
+  const step: Step = BASIC_STEP[b.status] ?? (
+    n("FIEO_RETURNED") ? { title: `${n("FIEO_RETURNED")} sector${n("FIEO_RETURNED") > 1 ? "s" : ""} returned for correction`, body: "FIEO has returned some of your sector requirements. Review the comments, update and submit again. Other sectors are not affected.", href: "/buyer/requirement", cta: "Update requirements", tone: "red" }
+    : n("DRAFT") ? { title: `${n("DRAFT")} draft sector${n("DRAFT") > 1 ? "s" : ""} not yet submitted`, body: "Submit your draft sector requirements to FIEO for recommendation.", href: "/buyer/requirement", cta: "Review and submit", tone: "blue" }
+    : !items.length ? { title: "Add your sector requirements", body: "Your basic details are approved. Tell us which sectors and products you want to source — each sector is approved separately.", href: "/buyer/requirement", cta: "Add requirements", tone: "blue" }
+    : n("SUBMITTED", "FIEO_RECOMMENDED", "DIC_RETURNED") ? { title: `${n("SUBMITTED", "FIEO_RECOMMENDED", "DIC_RETURNED")} sector${n("SUBMITTED", "FIEO_RECOMMENDED", "DIC_RETURNED") > 1 ? "s" : ""} under review`, body: b.status === "APPROVED" ? "You are an approved buyer. The sectors below are being reviewed; you'll be notified by e-mail." : "Your sector requirements are with FIEO and the Directorate. You'll be notified by e-mail.", tone: "amber" }
+    : { title: "You are an approved RBSM buyer", body: "All your sectors are approved. You can add new sectors or modify approved ones at any time — changes go through the same approval.", href: "/buyer/requirement", cta: "Manage requirements", tone: "green" }
+  );
+  const Icon = step.tone === "green" ? BadgeCheck : step.tone === "red" ? AlertTriangle : step.href ? ArrowRight : Clock;
 
   return (
     <>
@@ -59,12 +66,31 @@ export default async function BuyerDashboard() {
               </div>
               {step.href && <ButtonLink href={step.href}>{step.cta} <ArrowRight className="size-4" /></ButtonLink>}
             </div>
-            {(b.status === "BASIC_RETURNED" || b.status === "REQ_RETURNED") && lastReturn?.comment && (
+            {b.status === "BASIC_RETURNED" && lastBasicReturn?.comment && (
               <div className="border-t border-slate-100 px-6 py-4">
-                <Alert tone="red" title="Comment from FIEO">{lastReturn.comment}</Alert>
+                <Alert tone="red" title="Comment from FIEO">{lastBasicReturn.comment}</Alert>
               </div>
             )}
           </Card>
+
+          {(b.status === "BASIC_APPROVED" || b.status === "APPROVED") && (
+            <Card>
+              <CardHeader title="My sectors" subtitle="Approval status of each sector requirement"
+                action={<Link href="/buyer/requirement" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:underline"><Plus className="size-4" /> Add / modify</Link>} />
+              <ul className="divide-y divide-slate-100">
+                {items.map((i) => (
+                  <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 px-6 py-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-ink">{i.sector.name}</div>
+                      <div className="truncate text-xs text-slate-500">{i.products}</div>
+                    </div>
+                    <Badge tone={ITEM_META[i.status].tone}>{ITEM_META[i.status].label}</Badge>
+                  </li>
+                ))}
+                {!items.length && <li className="px-6 py-6 text-sm text-slate-500">No sectors added yet.</li>}
+              </ul>
+            </Card>
+          )}
 
           <Card>
             <CardHeader title="Registration summary" />
@@ -74,7 +100,7 @@ export default async function BuyerDashboard() {
                 { label: "Point of contact", value: b.pocName && `${b.pocName}${b.pocDesignation ? `, ${b.pocDesignation}` : ""}` },
                 { label: "Contact e-mail", value: b.pocEmail ?? b.signupEmail },
                 { label: "Documents uploaded", value: `${docs} of 2` },
-                { label: "Sectors of interest", value: requirement?.items.map((i) => i.sector.name).join(", ") },
+                { label: "Approved sectors", value: `${n("APPROVED")} of ${items.length}` },
                 { label: "Registered on", value: fmtDate(b.createdAt) },
               ]} />
             </div>
@@ -83,7 +109,7 @@ export default async function BuyerDashboard() {
 
         <Card>
           <CardHeader title="Activity" />
-          <div className="max-h-[480px] overflow-y-auto p-6"><Timeline logs={visibleLogs} /></div>
+          <div className="max-h-[560px] overflow-y-auto p-6"><Timeline logs={visibleLogs} /></div>
         </Card>
       </div>
     </>

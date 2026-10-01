@@ -3,50 +3,17 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import type { Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
-import { scopeFor } from "@/lib/buyer-query";
+import { itemScope, scopeFor } from "@/lib/buyer-query";
 import { Alert, Card, CardHeader, DL, PageHeader } from "@/components/ui";
 import { StatusBadge } from "@/components/status-badge";
 import { JourneyStepper } from "@/components/journey";
 import { Timeline } from "@/components/timeline";
 import { DocLink } from "@/components/doc-link";
-import { RequirementView } from "@/components/requirement-view";
+import { SourcingProfileView } from "@/components/requirement-view";
 import { PrintButton } from "@/components/print-button";
-import { ReviewPanel, type PanelAction } from "./review-panel";
-import { fmtDateTime } from "@/lib/format";
-
-function panelFor(role: Role, status: string): { heading: string; note?: string; actions: PanelAction[] } | null {
-  if (role === "FIEO" && status === "BASIC_SUBMITTED") {
-    return {
-      heading: "Verify basic details",
-      note: "Check the buyer's identity, contact and documents. Approving lets the buyer fill the detailed requirement.",
-      actions: [
-        { decision: "approve_basic", label: "Approve basic details", variant: "success", needsComment: false },
-        { decision: "return_basic", label: "Return to buyer for correction", variant: "danger", needsComment: true },
-      ],
-    };
-  }
-  if (role === "FIEO" && (status === "REQ_SUBMITTED" || status === "DIC_RETURNED")) {
-    return {
-      heading: status === "DIC_RETURNED" ? "Re-verify and recommend again" : "Recommend to Directorate",
-      note: status === "DIC_RETURNED" ? "The Directorate returned this application — see the comment in the activity log." : "Review the detailed requirement before recommending.",
-      actions: [
-        { decision: "recommend", label: "Recommend to Directorate", variant: "primary", needsComment: false },
-        { decision: "return_requirement", label: "Return to buyer for correction", variant: "danger", needsComment: true },
-      ],
-    };
-  }
-  if (role === "DIC" && status === "FIEO_RECOMMENDED") {
-    return {
-      heading: "Directorate decision",
-      note: "Approving adds the buyer to the RBSM buyer list and generates the buyer number.",
-      actions: [
-        { decision: "dic_approve", label: "Approve & add to RBSM buyer list", variant: "success", needsComment: false, confirm: "Approve this buyer and generate the RBSM buyer number?" },
-        { decision: "dic_return", label: "Return to FIEO for re-verification", variant: "danger", needsComment: true },
-      ],
-    };
-  }
-  return null;
-}
+import { ReviewPanel } from "./review-panel";
+import { ItemReview } from "./item-review";
+import { fmtDateTime, parseCerts } from "@/lib/format";
 
 export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; id: string; base: string; extra?: (buyerId: string) => React.ReactNode }) {
   const b = await prisma.buyer.findFirst({
@@ -54,13 +21,21 @@ export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; i
     include: {
       user: { select: { username: true, lastLoginAt: true } },
       documents: true,
-      requirement: { include: { items: { orderBy: { sortOrder: "asc" }, include: { sector: true } } } },
+      requirement: {
+        include: {
+          items: {
+            where: itemScope(role),
+            orderBy: { sortOrder: "asc" },
+            include: { sector: true, reviewLogs: { orderBy: { createdAt: "desc" } } },
+          },
+        },
+      },
       reviewLogs: { orderBy: { createdAt: "desc" }, include: { actor: { select: { displayName: true } } } },
     },
   });
   if (!b) notFound();
   const doc = (k: "PROFILE" | "CREDENTIALS") => b.documents.find((d) => d.kind === k) ?? null;
-  const panel = panelFor(role, b.status);
+  const basicPending = role === "FIEO" && b.status === "BASIC_SUBMITTED";
 
   return (
     <>
@@ -97,30 +72,44 @@ export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; i
               </div>
             </div>
           </Card>
-
-          {b.requirement ? (
-            <div>
-              <h2 className="mb-3 text-lg font-bold text-ink">Detailed requirement</h2>
-              <RequirementView req={b.requirement} />
-            </div>
-          ) : (
-            <Alert tone="slate">The buyer has not started the detailed requirement yet.</Alert>
-          )}
+          {b.requirement ? <SourcingProfileView req={b.requirement} /> : <Alert tone="slate">The buyer has not started the detailed requirement yet.</Alert>}
         </div>
 
         <div className="space-y-6">
-          {(role === "FIEO" || role === "DIC") && (
-            // Always mounted so the confirmation stays visible after the status moves on.
-            <Card className={panel ? "no-print border-brand-200 p-5 ring-2 ring-brand-100" : "no-print p-5"}>
-              <ReviewPanel buyerId={b.id} {...(panel ?? { heading: "No action pending", note: "This application is not at a stage that needs your decision.", actions: [] })} />
+          {role === "FIEO" && (b.status === "BASIC_SUBMITTED" || b.status === "BASIC_RETURNED" || b.status === "SIGNED_UP") && (
+            // Stays mounted so the confirmation remains visible after the status moves on.
+            <Card className={basicPending ? "no-print border-brand-200 p-5 ring-2 ring-brand-100" : "no-print p-5"}>
+              <ReviewPanel
+                buyerId={b.id}
+                heading={basicPending ? "Verify basic details" : "Basic details"}
+                note={basicPending
+                  ? "Check the buyer's identity, contact and documents. Approving lets the buyer add sector requirements."
+                  : "Waiting for the buyer to submit their basic details."}
+                actions={basicPending ? [
+                  { decision: "approve_basic", label: "Approve basic details", variant: "success", needsComment: false },
+                  { decision: "return_basic", label: "Return to buyer for correction", variant: "danger", needsComment: true },
+                ] : []}
+              />
             </Card>
           )}
           {extra?.(b.id)}
           <Card>
             <CardHeader title="Activity & comments" />
-            <div className="p-5"><Timeline logs={b.reviewLogs} /></div>
+            <div className="max-h-[560px] overflow-y-auto p-5"><Timeline logs={b.reviewLogs} /></div>
           </Card>
         </div>
+      </div>
+
+      <div className="mt-8">
+        <ItemReview
+          buyerId={b.id}
+          role={role}
+          items={(b.requirement?.items ?? []).map((i) => ({
+            id: i.id, sectorName: i.sector.name, status: i.status, everApproved: i.everApproved,
+            products: i.products, specifications: i.specifications, certifications: parseCerts(i.certifications), quantity: i.quantity,
+            history: i.reviewLogs.map((l) => ({ id: l.id, action: l.action, actorRole: l.actorRole, comment: l.comment, at: fmtDateTime(l.createdAt) })),
+          }))}
+        />
       </div>
     </>
   );

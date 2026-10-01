@@ -1,18 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { readUpload } from "@/lib/storage";
-import { DIC_VISIBLE } from "@/lib/status";
+import { DIC_VISIBLE_ITEMS } from "@/lib/status";
 
 export async function GET(_: Request, ctx: RouteContext<"/api/files/[id]">) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorised", { status: 401 });
   const { id } = await ctx.params;
-  const doc = await prisma.document.findUnique({ where: { id }, include: { buyer: true } });
+  const doc = await prisma.document.findUnique({
+    where: { id },
+    include: { buyer: { include: { requirement: { select: { items: { select: { status: true } } } } } } },
+  });
   if (!doc) return new Response("Not found", { status: 404 });
 
   const allowed =
     user.role === "ADMIN" || user.role === "FIEO" ||
-    (user.role === "DIC" && DIC_VISIBLE.includes(doc.buyer.status)) ||
+    (user.role === "DIC" && !!doc.buyer.requirement?.items.some((i) => DIC_VISIBLE_ITEMS.includes(i.status))) ||
     (user.role === "BUYER" && doc.buyer.userId === user.id);
   if (!allowed) return new Response("Forbidden", { status: 403 });
 

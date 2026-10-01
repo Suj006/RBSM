@@ -1,11 +1,11 @@
 import { AppShell } from "@/components/shell/app-shell";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { FIEO_ACTIONABLE } from "@/lib/status";
+import { actionWhere } from "@/lib/buyer-query";
 
 export default async function FieoLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser("FIEO");
-  const pending = await prisma.buyer.count({ where: { status: { in: FIEO_ACTIONABLE } } });
+  const pending = await prisma.buyer.count({ where: actionWhere("FIEO") });
   return (
     <AppShell role="FIEO" user={user} nav={[
       { href: "/fieo", label: "Dashboard", icon: "dashboard", exact: true },

@@ -3,14 +3,14 @@ import type { BuyerStatus } from "@/generated/prisma/enums";
 import { JOURNEY, STATUS_META } from "@/lib/status";
 import { cn } from "@/lib/cn";
 
-const RETURNED: BuyerStatus[] = ["BASIC_RETURNED", "REQ_RETURNED", "DIC_RETURNED"];
+const RETURNED: BuyerStatus[] = ["BASIC_RETURNED"];
 
-/** Horizontal progress through the six registration steps. */
+/** Horizontal progress through the registration steps (buyer level). */
 export function JourneyStepper({ status }: { status: BuyerStatus }) {
   const stage = STATUS_META[status].stage; // index of the current step
   const returned = RETURNED.includes(status);
   return (
-    <ol className="grid grid-cols-3 gap-y-5 sm:grid-cols-6">
+    <ol className="grid grid-cols-3 gap-y-5 sm:grid-cols-5">
       {JOURNEY.map((label, i) => {
         const done = i < stage || status === "APPROVED";
         const current = i === stage && status !== "APPROVED";

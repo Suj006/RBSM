@@ -1,10 +1,11 @@
 import { AppShell } from "@/components/shell/app-shell";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { actionWhere } from "@/lib/buyer-query";
 
 export default async function DicLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser("DIC");
-  const pending = await prisma.buyer.count({ where: { status: "FIEO_RECOMMENDED" } });
+  const pending = await prisma.buyer.count({ where: actionWhere("DIC") });
   return (
     <AppShell role="DIC" user={user} nav={[
       { href: "/dic", label: "Dashboard", icon: "dashboard", exact: true },

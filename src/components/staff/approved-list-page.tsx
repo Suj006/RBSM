@@ -9,7 +9,7 @@ export async function ApprovedListPage({ base }: { base: string }) {
   const rows = await prisma.buyer.findMany({
     where: { status: "APPROVED" },
     orderBy: { approvedSeq: "asc" },
-    include: { requirement: { select: { items: { select: { sector: { select: { name: true } } } } } } },
+    include: { requirement: { select: { items: { where: { status: "APPROVED" }, orderBy: { sortOrder: "asc" }, select: { sector: { select: { name: true } } } } } } },
   });
   return (
     <>
@@ -30,7 +30,7 @@ export async function ApprovedListPage({ base }: { base: string }) {
               <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3">#</th><th className="px-4 py-3">Buyer no.</th><th className="px-4 py-3">Buyer</th>
-                  <th className="px-4 py-3">Country</th><th className="px-4 py-3">Contact</th><th className="px-4 py-3">Sectors</th><th className="px-4 py-3">Approved</th>
+                  <th className="px-4 py-3">Country</th><th className="px-4 py-3">Contact</th><th className="px-4 py-3">Approved sectors</th><th className="px-4 py-3">Approved</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChevronRight, Users } from "lucide-react";
-import type { BuyerStatus } from "@/generated/prisma/enums";
+import type { BuyerStatus, ItemStatus } from "@/generated/prisma/enums";
+import { ItemChips } from "@/components/item-chips";
 import { StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
@@ -9,7 +10,7 @@ export type BuyerRow = {
   id: string; regNo: string; approvedNo: string | null; name: string; country: string; status: BuyerStatus;
   signupEmail: string; pocName: string | null; updatedAt: Date; createdAt: Date;
   user: { username: string };
-  requirement: { items: { sector: { name: string } }[] } | null;
+  requirement: { items: { status: ItemStatus; sector: { name: string } }[] } | null;
 };
 
 export function BuyerTable({ rows, base }: { rows: BuyerRow[]; base: string }) {
@@ -30,7 +31,6 @@ export function BuyerTable({ rows, base }: { rows: BuyerRow[]; base: string }) {
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.map((r) => {
-            const sectors = r.requirement?.items.map((i) => i.sector.name) ?? [];
             return (
               <tr key={r.id} className="group hover:bg-brand-50/40">
                 <td className="px-4 py-3 align-top">
@@ -42,8 +42,8 @@ export function BuyerTable({ rows, base }: { rows: BuyerRow[]; base: string }) {
                   <div className="text-xs text-slate-500">{r.pocName ? `${r.pocName} · ` : ""}{r.signupEmail}</div>
                 </td>
                 <td className="px-4 py-3 align-top text-slate-700">{r.country}</td>
-                <td className="max-w-56 px-4 py-3 align-top text-xs text-slate-600">
-                  {sectors.length ? <>{sectors.slice(0, 2).join(", ")}{sectors.length > 2 && ` +${sectors.length - 2}`}</> : <span className="text-slate-400">—</span>}
+                <td className="max-w-64 px-4 py-3 align-top text-xs text-slate-600">
+                  <ItemChips items={r.requirement?.items ?? []} />
                 </td>
                 <td className="px-4 py-3 align-top"><StatusBadge status={r.status} /></td>
                 <td className="whitespace-nowrap px-4 py-3 align-top text-xs text-slate-500">{fmtDate(r.updatedAt)}</td>

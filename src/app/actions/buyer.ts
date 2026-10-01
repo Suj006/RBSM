@@ -5,7 +5,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireBuyer } from "@/lib/auth";
 import { COUNTRIES } from "@/lib/countries";
-import { canEditBasic, canEditRequirement } from "@/lib/status";
+import { canEditBasic, canWorkOnRequirements, ITEM_EDITABLE } from "@/lib/status";
+import { parseCerts } from "@/lib/format";
 import { deleteUpload, storeUpload, validateUpload } from "@/lib/storage";
 import type { DocumentKind } from "@/generated/prisma/enums";
 import type { FormState } from "./auth";
@@ -114,95 +115,182 @@ export async function saveBasicAction(_: FormState, form: FormData): Promise<For
   };
 }
 
-// ---------------------------------------------------------------- detailed requirement
+// ---------------------------------------------------------------- sourcing profile
 
-const itemSchema = z.object({
-  sectorId: z.string().min(1, "Select a sector."),
-  products: englishText({ min: 2, max: 1000, label: "Products", multiline: true }),
-  specifications: englishText({ max: 2000, label: "Specifications", multiline: true }).optional().default(""),
-  certifications: z.array(englishText({ min: 1, max: 120, label: "Certification" })).max(40).default([]),
-  quantity: englishText({ max: 200, label: "Quantity" }).optional().default(""),
-});
-
-const reqDraft = z.object({
+const profileSchema = z.object({
   organisationType: opt(80, "Organisation type"),
   procurementInterests: englishText({ max: 3000, label: "Procurement interests", multiline: true }).transform((v) => v || null),
   annualSourcingValue: opt(80, "Annual sourcing value"),
   sourcingTimeline: opt(80, "Sourcing timeline"),
   preferredEngagement: opt(120, "Preferred engagement"),
-  items: z.array(itemSchema.partial({ products: true, sectorId: true })).max(25),
 });
 
-const reqSubmit = reqDraft.extend({
-  organisationType: z.string().trim().min(1, "Select the organisation type."),
-  procurementInterests: englishText({ min: 20, max: 3000, label: "Procurement interests", multiline: true }),
-  annualSourcingValue: z.string().trim().min(1, "Select the indicative annual sourcing value."),
-  sourcingTimeline: z.string().trim().min(1, "Select the sourcing timeline."),
-  items: z.array(itemSchema).min(1, "Add at least one sector with products.").max(25),
-});
+/** What is still missing from the sourcing profile before a sector can be submitted. */
+function profileGaps(req: { organisationType: string | null; procurementInterests: string | null; annualSourcingValue: string | null; sourcingTimeline: string | null } | null) {
+  const gaps: string[] = [];
+  if (!req?.organisationType) gaps.push("organisation type");
+  if (!req?.procurementInterests || req.procurementInterests.length < 20) gaps.push("procurement interests (at least 20 characters)");
+  if (!req?.annualSourcingValue) gaps.push("annual sourcing value");
+  if (!req?.sourcingTimeline) gaps.push("sourcing timeline");
+  return gaps;
+}
 
-export async function saveRequirementAction(_: FormState, form: FormData): Promise<FormState> {
-  const { user, buyer } = await requireBuyer();
-  if (!canEditRequirement(buyer.status)) {
-    return { error: "The detailed requirement can be edited only after FIEO approves your basic details, or when it is returned for correction." };
-  }
-  const intent = form.get("intent") === "submit" ? "submit" : "save";
-  let items: unknown = [];
-  try {
-    items = JSON.parse(String(form.get("items") ?? "[]"));
-  } catch {
-    return { error: "Could not read the sector list. Please try again." };
-  }
-  const raw = {
-    organisationType: String(form.get("organisationType") ?? ""),
-    procurementInterests: String(form.get("procurementInterests") ?? ""),
-    annualSourcingValue: String(form.get("annualSourcingValue") ?? ""),
-    sourcingTimeline: String(form.get("sourcingTimeline") ?? ""),
-    preferredEngagement: String(form.get("preferredEngagement") ?? ""),
-    items,
-  };
-  const parsed = (intent === "submit" ? reqSubmit : reqDraft).safeParse(raw);
+async function requireRequirementBuyer() {
+  const ctx = await requireBuyer();
+  if (!canWorkOnRequirements(ctx.buyer.status)) return null;
+  return ctx;
+}
+
+export async function saveProfileAction(_: FormState, form: FormData): Promise<FormState> {
+  const ctx = await requireRequirementBuyer();
+  if (!ctx) return { error: "Sector requirements open after FIEO approves your basic details." };
+  const parsed = profileSchema.safeParse(Object.fromEntries(
+    ["organisationType", "procurementInterests", "annualSourcingValue", "sourcingTimeline", "preferredEngagement"].map((k) => [k, String(form.get(k) ?? "")]),
+  ));
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error), error: "Please correct the highlighted fields." };
+  await prisma.requirement.upsert({
+    where: { buyerId: ctx.buyer.id },
+    create: { buyerId: ctx.buyer.id, ...parsed.data },
+    update: parsed.data,
+  });
+  revalidatePath("/buyer", "layout");
+  const gaps = profileGaps(parsed.data);
+  return { ok: true, message: gaps.length ? `Saved. Still needed before submitting sectors: ${gaps.join(", ")}.` : "Sourcing profile saved." };
+}
 
+// ---------------------------------------------------------------- sector requirements
+
+const itemSchema = z.object({
+  sectorId: z.string().min(1, "Select a sector."),
+  products: englishText({ min: 2, max: 1000, label: "Products", multiline: true }),
+  specifications: englishText({ max: 2000, label: "Specifications", multiline: true }),
+  certifications: z.array(englishText({ min: 1, max: 120, label: "Certification" })).max(40),
+  quantity: englishText({ max: 200, label: "Quantity" }),
+});
+
+const sameContent = (
+  a: { sectorId: string; products: string; specifications: string | null; certifications: string; quantity: string | null },
+  b: z.infer<typeof itemSchema>,
+) =>
+  a.sectorId === b.sectorId && a.products === b.products && (a.specifications ?? "") === b.specifications &&
+  (a.quantity ?? "") === b.quantity && JSON.stringify([...parseCerts(a.certifications)].sort()) === JSON.stringify([...new Set(b.certifications)].sort());
+
+export async function saveItemAction(_: FormState, form: FormData): Promise<FormState> {
+  const ctx = await requireRequirementBuyer();
+  if (!ctx) return { error: "Sector requirements open after FIEO approves your basic details." };
+  const { user, buyer } = ctx;
+  const intent = form.get("intent") === "submit" ? "submit" : "save";
+  const itemId = String(form.get("itemId") ?? "") || null;
+
+  let certifications: unknown = [];
+  try { certifications = JSON.parse(String(form.get("certifications") ?? "[]")); } catch { /* validated below */ }
+  const parsed = itemSchema.safeParse({
+    sectorId: String(form.get("sectorId") ?? ""),
+    products: String(form.get("products") ?? ""),
+    specifications: String(form.get("specifications") ?? ""),
+    quantity: String(form.get("quantity") ?? ""),
+    certifications,
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error), error: "Please correct the highlighted fields." };
   const d = parsed.data;
-  // Drop fully blank rows when saving a draft; make sure sector ids are real.
-  const rows = d.items.filter((i) => i.sectorId || i.products);
-  const sectorIds = [...new Set(rows.map((r) => r.sectorId).filter(Boolean) as string[])];
-  const validSectors = await prisma.sector.count({ where: { id: { in: sectorIds } } });
-  if (validSectors !== sectorIds.length) return { error: "One of the selected sectors is no longer available. Please re-select." };
-  if (rows.some((r) => !r.sectorId)) return { fieldErrors: { items: "Select a sector for every row (or remove the row)." }, error: "Please correct the highlighted fields." };
+
+  const req = await prisma.requirement.upsert({ where: { buyerId: buyer.id }, create: { buyerId: buyer.id }, update: {}, include: { items: true } });
+  const existing = itemId ? req.items.find((i) => i.id === itemId) : null;
+  if (itemId && !existing) return { error: "This requirement no longer exists. Refresh the page." };
+  if (existing && !ITEM_EDITABLE.includes(existing.status)) return { error: "This sector is with a reviewer and cannot be changed now." };
+  if (req.items.some((i) => i.sectorId === d.sectorId && i.id !== itemId)) {
+    return { fieldErrors: { sectorId: "You already have a requirement for this sector — edit that one instead." } };
+  }
+  const sector = await prisma.sector.findUnique({ where: { id: d.sectorId } });
+  if (!sector || (!sector.isActive && existing?.sectorId !== d.sectorId)) return { fieldErrors: { sectorId: "Select a sector from the list." } };
+  if (intent === "submit") {
+    const gaps = profileGaps(req);
+    if (gaps.length) return { error: `Complete your sourcing profile first (missing: ${gaps.join(", ")}).` };
+  }
+
+  const unchanged = existing && sameContent(existing, d);
+  if (existing?.status === "APPROVED" && unchanged) {
+    return { error: "No changes made — this sector is already approved." };
+  }
+
+  const content = {
+    sectorId: d.sectorId,
+    products: d.products,
+    specifications: d.specifications || null,
+    certifications: JSON.stringify([...new Set(d.certifications)]),
+    quantity: d.quantity || null,
+  };
+  const now = new Date();
+  const submit = intent === "submit";
 
   await prisma.$transaction(async (tx) => {
-    const header = {
-      organisationType: d.organisationType, procurementInterests: d.procurementInterests,
-      annualSourcingValue: d.annualSourcingValue, sourcingTimeline: d.sourcingTimeline, preferredEngagement: d.preferredEngagement,
-    };
-    const req = await tx.requirement.upsert({
-      where: { buyerId: buyer.id },
-      create: { buyerId: buyer.id, ...header },
-      update: header,
-    });
-    await tx.requirementItem.deleteMany({ where: { requirementId: req.id } });
-    await tx.requirementItem.createMany({
-      data: rows.map((r, i) => ({
-        requirementId: req.id,
-        sectorId: r.sectorId!,
-        products: r.products ?? "",
-        specifications: r.specifications || null,
-        certifications: JSON.stringify([...new Set(r.certifications ?? [])]),
-        quantity: r.quantity || null,
-        sortOrder: i,
-      })),
-    });
-    if (intent === "submit") {
-      await tx.buyer.update({ where: { id: buyer.id }, data: { status: "REQ_SUBMITTED", reqSubmittedAt: new Date() } });
-      await tx.reviewLog.create({ data: { buyerId: buyer.id, actorId: user.id, actorRole: "BUYER", action: "REQ_SUBMITTED" } });
-    }
+    const reopened = existing?.status === "APPROVED";
+    const status = submit ? "SUBMITTED" : existing?.status === "FIEO_RETURNED" ? "FIEO_RETURNED" : "DRAFT";
+    const item = existing
+      ? await tx.requirementItem.update({
+          where: { id: existing.id },
+          data: { ...content, status, ...(submit ? { submittedAt: now } : {}), ...(reopened ? { everApproved: true, approvedAt: null } : {}) },
+        })
+      : await tx.requirementItem.create({
+          data: { requirementId: req.id, ...content, status, sortOrder: req.items.length, ...(submit ? { submittedAt: now } : {}) },
+        });
+    const log = (action: "REQ_MODIFIED" | "REQ_SUBMITTED") =>
+      tx.reviewLog.create({ data: { buyerId: buyer.id, actorId: user.id, actorRole: "BUYER", action, itemId: item.id, sectorName: sector.name } });
+    if (reopened) await log("REQ_MODIFIED");
+    if (submit) await log("REQ_SUBMITTED");
   });
 
   revalidatePath("/buyer", "layout");
   return {
     ok: true,
-    message: intent === "submit" ? "Detailed requirement submitted to FIEO for recommendation." : "Draft saved.",
+    message: submit
+      ? `${sector.name}: submitted to FIEO for recommendation.`
+      : existing?.status === "APPROVED"
+        ? `${sector.name}: changes saved as a draft. Submit it to send the changes for approval.`
+        : `${sector.name}: draft saved.`,
   };
+}
+
+/** Submits every draft / returned sector in one go. */
+export async function submitAllAction(): Promise<FormState> {
+  const ctx = await requireRequirementBuyer();
+  if (!ctx) return { error: "Sector requirements open after FIEO approves your basic details." };
+  const { user, buyer } = ctx;
+  const req = await prisma.requirement.findUnique({
+    where: { buyerId: buyer.id },
+    include: { items: { where: { status: { in: ["DRAFT", "FIEO_RETURNED"] } }, include: { sector: true } } },
+  });
+  if (!req?.items.length) return { error: "There are no draft or returned sectors to submit." };
+  const gaps = profileGaps(req);
+  if (gaps.length) return { error: `Complete your sourcing profile first (missing: ${gaps.join(", ")}).` };
+  const now = new Date();
+  await prisma.$transaction(async (tx) => {
+    for (const it of req.items) {
+      await tx.requirementItem.update({ where: { id: it.id }, data: { status: "SUBMITTED", submittedAt: now } });
+      await tx.reviewLog.create({ data: { buyerId: buyer.id, actorId: user.id, actorRole: "BUYER", action: "REQ_SUBMITTED", itemId: it.id, sectorName: it.sector.name } });
+    }
+  });
+  revalidatePath("/buyer", "layout");
+  return { ok: true, message: `${req.items.length} sector${req.items.length > 1 ? "s" : ""} submitted to FIEO: ${req.items.map((i) => i.sector.name).join(", ")}.` };
+}
+
+export async function removeItemAction(_: FormState, form: FormData): Promise<FormState> {
+  const ctx = await requireRequirementBuyer();
+  if (!ctx) return { error: "Not allowed." };
+  const { user, buyer } = ctx;
+  const item = await prisma.requirementItem.findFirst({
+    where: { id: String(form.get("itemId") ?? ""), requirement: { buyerId: buyer.id } },
+    include: { sector: true },
+  });
+  if (!item) return { error: "This requirement no longer exists." };
+  if (!ITEM_EDITABLE.includes(item.status)) return { error: "This sector is with a reviewer and cannot be removed now." };
+  await prisma.$transaction(async (tx) => {
+    // Only record removals of sectors a reviewer has seen; plain drafts vanish quietly.
+    if (item.status !== "DRAFT" || item.everApproved || item.submittedAt) {
+      await tx.reviewLog.create({ data: { buyerId: buyer.id, actorId: user.id, actorRole: "BUYER", action: "REQ_WITHDRAWN", sectorName: item.sector.name } });
+    }
+    await tx.requirementItem.delete({ where: { id: item.id } });
+  });
+  revalidatePath("/buyer", "layout");
+  return { ok: true, message: `${item.sector.name} removed.` };
 }
