@@ -1,0 +1,164 @@
+// Fills an EMPTY database with realistic demo buyers at every stage, for
+// trying out dashboards and reports.   npm run db:demo
+// Refuses to run when buyers already exist.
+import "dotenv/config";
+import bcrypt from "bcryptjs";
+import { PrismaClient } from "../src/generated/prisma/client";
+import type { ItemStatus, BuyerStatus } from "../src/generated/prisma/enums";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { approvedBuyerNo, buyerRegNo, buyerUsername } from "../src/lib/config";
+
+const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? "file:./dev.db" }) });
+
+const BUYERS: [string, string, string, string][] = [
+  ["Gulf Fresh Trading LLC", "United Arab Emirates", "Ahmed Al Mansoori", "Head of Procurement"],
+  ["Nordic Spice House AB", "Sweden", "Erik Lindqvist", "Category Manager"],
+  ["Pacific Rim Imports Pty Ltd", "Australia", "Olivia Bennett", "Sourcing Director"],
+  ["Maple Leaf Foods Distribution", "Canada", "Liam Tremblay", "Purchase Manager"],
+  ["Al Noor Hypermarkets", "Qatar", "Fatima Al Thani", "Buying Manager"],
+  ["Rhine Valley Organics GmbH", "Germany", "Lukas Schneider", "Managing Director"],
+  ["Sakura Trading Co", "Japan", "Haruto Sato", "General Manager"],
+  ["Lone Star Home Decor Inc", "United States", "Emily Carter", "Senior Buyer"],
+  ["Thames Textiles Ltd", "United Kingdom", "Oliver Hughes", "Product Developer"],
+  ["Merlion Wellness Pte Ltd", "Singapore", "Wei Ling Tan", "Procurement Lead"],
+  ["Atlas Coffee Roasters", "Morocco", "Youssef El Amrani", "Owner"],
+  ["Baltic Seafood Group", "Latvia", "Janis Berzins", "Import Manager"],
+  ["Sahara Building Supplies", "Egypt", "Omar Hassan", "Commercial Manager"],
+  ["Kiwi Natural Products Ltd", "New Zealand", "Charlotte Wilson", "Founder"],
+  ["Andes Gourmet SAC", "Peru", "Mateo Rojas", "Import Director"],
+  ["Lagos Agro Ventures", "Nigeria", "Chinedu Okafor", "Chief Executive"],
+  ["Riyadh Retail Holdings", "Saudi Arabia", "Khalid Al Saud", "Head of Sourcing"],
+  ["Iberia Fine Foods SL", "Spain", "Lucia Garcia", "Purchase Manager"],
+  ["Danube Handicrafts Kft", "Hungary", "Bence Nagy", "Buyer"],
+  ["Cape Wellness Distributors", "South Africa", "Thandiwe Mokoena", "Category Buyer"],
+  ["Bosphorus Textile AS", "Turkiye", "Emre Yilmaz", "Sourcing Manager"],
+  ["Mekong Trade Partners", "Vietnam", "Nguyen Van An", "Director"],
+  ["Lisbon Coir Imports Lda", "Portugal", "Ricardo Santos", "Procurement Officer"],
+  ["Muscat Food Industries", "Oman", "Salim Al Harthy", "Supply Chain Head"],
+  ["Polar Home Furnishings Oy", "Finland", "Aino Virtanen", "Buyer"],
+  ["Kuwait Gulf Mart", "Kuwait", "Fahad Al Sabah", "Purchase Manager"],
+  ["Seoul Natural Life Co", "South Korea", "Min-jun Kim", "Import Manager"],
+  ["Amsterdam Spice Traders BV", "Netherlands", "Daan de Vries", "Trading Manager"],
+  ["Bahrain Fresh Markets", "Bahrain", "Ali Al Khalifa", "Category Manager"],
+  ["Mombasa Agri Exports", "Kenya", "Wanjiru Kamau", "Sourcing Lead"],
+  ["Milano Design Furniture Srl", "Italy", "Giulia Rossi", "Product Manager"],
+  ["Paris Gourmet Distribution", "France", "Camille Martin", "Acheteur"],
+  ["Dhaka Garments Sourcing", "Bangladesh", "Rahim Uddin", "Merchandiser"],
+  ["Colombo Tea Blenders", "Sri Lanka", "Nimal Perera", "Blending Manager"],
+  ["Toronto Wellness Group", "Canada", "Sophie Martin", "Buyer"],
+  ["Texas Rubber Industries", "United States", "Michael Brown", "Procurement Manager"],
+  ["Sydney Organic Grocers", "Australia", "Jack Thompson", "Owner"],
+  ["Jeddah Building Materials", "Saudi Arabia", "Abdullah Al Ghamdi", "Purchase Head"],
+  ["Hamburg Coffee Kontor", "Germany", "Anna Fischer", "Green Coffee Buyer"],
+  ["Abu Dhabi Hospitality Supplies", "United Arab Emirates", "Mariam Al Hosani", "Sourcing Manager"],
+];
+
+const NEEDS: Record<string, [string, string][]> = {
+  "Spices & Condiments": [["Black pepper, Cardamom, Turmeric powder", "ASTA cleaned, 25 kg PP bags"], ["Cloves, Nutmeg, Mace", "Hand-picked, moisture below 12%"]],
+  "Tea & Coffee": [["Orthodox black tea, Green tea", "FOP grade, 1 kg retail packs"], ["Arabica coffee beans", "Plantation A, screen 17/18"]],
+  "Marine & Seafood Products": [["Frozen shrimp, Squid rings", "Size 16/20, 20% glaze, IQF"], ["Tuna loins", "Sashimi grade, -60 C"]],
+  "Coir & Coir Products": [["Coir mats, Coir pith blocks", "5 kg blocks, low EC"]],
+  "Ayurveda, Herbal & Wellness": [["Ayurvedic oils, Herbal supplements", "GMP certified, private label"]],
+  "Handicrafts & Home Decor": [["Brass lamps, Wooden handicrafts", "Gift packaging"]],
+  "Apparel & Garments": [["Cotton kurtas, Linen shirts", "GOTS certified cotton"]],
+  "Cashew & Dry Fruits": [["Cashew kernels W240, W320", "Vacuum packed tins"]],
+  "Furniture": [["Teak dining sets, Rattan chairs", "Knock-down packing"]],
+  "Rubber & Rubber Products": [["Rubber mats, Industrial gloves", "EN 388 compliant"]],
+  "Building Materials": [["Granite slabs, Ceramic tiles", "Polished, 20 mm"]],
+  "Processed Food & Beverages": [["Ready-to-eat curries, Pickles", "Shelf life 12 months"]],
+};
+const DIAL: Record<string, string> = {
+  "United Arab Emirates": "+971 50", Sweden: "+46 70", Australia: "+61 412", Canada: "+1 416", Qatar: "+974 55", Germany: "+49 151",
+  Japan: "+81 90", "United States": "+1 512", "United Kingdom": "+44 7700", Singapore: "+65 9123", Morocco: "+212 661", Latvia: "+371 2",
+  Egypt: "+20 100", "New Zealand": "+64 21", Peru: "+51 987", Nigeria: "+234 803", "Saudi Arabia": "+966 50", Spain: "+34 612",
+  Hungary: "+36 30", "South Africa": "+27 82", Turkiye: "+90 532", Vietnam: "+84 91", Portugal: "+351 912", Oman: "+968 92",
+  Finland: "+358 40", Kuwait: "+965 66", "South Korea": "+82 10", Netherlands: "+31 6", Bahrain: "+973 36", Kenya: "+254 712",
+  Italy: "+39 347", France: "+33 6", Bangladesh: "+880 171", "Sri Lanka": "+94 77",
+};
+const CERTS = ["ISO 22000 (Food Safety)", "HACCP", "Halal", "FSSAI Licence", "USDA Organic", "GOTS (Organic Textile)", "BRCGS", "ISO 9001 (Quality Management)"];
+const ORG = ["Importer", "Distributor / Wholesaler", "Retail Chain", "E-commerce Platform", "Trading House"];
+const VALUE = ["USD 100,000 - 500,000", "USD 500,000 - 1 million", "USD 1 - 5 million", "USD 5 - 10 million"];
+const TIME = ["Immediate (within 3 months)", "3 - 6 months", "6 - 12 months"];
+
+// Stage per buyer (cycled): basic stages, then sector mixes.
+const PLAN: { status: BuyerStatus; items: ItemStatus[] }[] = [
+  { status: "APPROVED", items: ["APPROVED", "APPROVED"] },
+  { status: "APPROVED", items: ["APPROVED", "SUBMITTED"] },
+  { status: "BASIC_APPROVED", items: ["FIEO_RECOMMENDED", "FIEO_RETURNED"] },
+  { status: "BASIC_APPROVED", items: ["SUBMITTED"] },
+  { status: "APPROVED", items: ["APPROVED", "FIEO_RECOMMENDED", "DRAFT"] },
+  { status: "BASIC_SUBMITTED", items: [] },
+  { status: "BASIC_APPROVED", items: ["DIC_RETURNED", "SUBMITTED"] },
+  { status: "SIGNED_UP", items: [] },
+  { status: "APPROVED", items: ["APPROVED"] },
+  { status: "BASIC_RETURNED", items: [] },
+];
+
+async function main() {
+  if (await prisma.buyer.count()) { console.error("Buyers already exist — demo data is only loaded into an empty database."); process.exit(1); }
+  const sectors = await prisma.sector.findMany();
+  const fieo = await prisma.user.findUniqueOrThrow({ where: { username: "fieo" } });
+  const dic = await prisma.user.findUniqueOrThrow({ where: { username: "dic123" } });
+  const hash = await bcrypt.hash("pass@123", 10);
+  const needSectors = Object.keys(NEEDS).map((n) => sectors.find((s) => s.name === n)).filter(Boolean) as typeof sectors;
+  let approvedSeq = 0;
+  const day = 86400000;
+
+  for (const [i, [name, country, poc, desig]] of BUYERS.entries()) {
+    const seq = i + 1;
+    const plan = PLAN[i % PLAN.length];
+    const created = new Date(Date.now() - (BUYERS.length - i) * day * 0.6);
+    const email = `${poc.split(" ")[0].toLowerCase()}@${name.split(" ")[0].toLowerCase()}.example`;
+    const user = await prisma.user.create({ data: { username: buyerUsername(seq), passwordHash: hash, role: "BUYER", displayName: name, createdAt: created } });
+    const approved = plan.status === "APPROVED";
+    if (approved) approvedSeq++;
+    const basicDone = plan.status !== "SIGNED_UP";
+    const buyer = await prisma.buyer.create({
+      data: {
+        userId: user.id, seq, regNo: buyerRegNo(seq), name, country, signupEmail: email, createdAt: created, status: plan.status,
+        ...(basicDone ? { pocName: poc, pocDesignation: desig, pocEmail: email, pocMobile: `${DIAL[country] ?? "+1 555"} ${String(1000000 + i * 73519).slice(0, 7)}`, basicSubmittedAt: created } : {}),
+        ...(plan.status === "BASIC_APPROVED" || approved ? { basicApprovedAt: new Date(created.getTime() + day / 2) } : {}),
+        ...(approved ? { approvedSeq, approvedNo: approvedBuyerNo(approvedSeq), approvedAt: new Date(created.getTime() + day) } : {}),
+      },
+    });
+    const log = (action: string, actorId: string | null, actorRole: "BUYER" | "FIEO" | "DIC", at: Date, extra: object = {}) =>
+      prisma.reviewLog.create({ data: { buyerId: buyer.id, actorId, actorRole, action: action as never, createdAt: at, ...extra } });
+    await log("SIGNED_UP", user.id, "BUYER", created);
+    if (basicDone) await log("BASIC_SUBMITTED", user.id, "BUYER", created);
+    if (plan.status === "BASIC_RETURNED") await log("BASIC_RETURNED", fieo.id, "FIEO", created, { comment: "Please upload a clearer copy of the trade licence." });
+    if (plan.status === "BASIC_APPROVED" || approved) await log("BASIC_APPROVED", fieo.id, "FIEO", new Date(created.getTime() + day / 2));
+    if (!plan.items.length) continue;
+
+    const req = await prisma.requirement.create({
+      data: {
+        buyerId: buyer.id, organisationType: ORG[i % ORG.length], annualSourcingValue: VALUE[i % VALUE.length], sourcingTimeline: TIME[i % TIME.length],
+        preferredEngagement: "Regular / long-term supply",
+        procurementInterests: `Sourcing quality products from Indian MSMEs for our ${country} customers, with consistent supply and competitive pricing.`,
+      },
+    });
+    for (const [j, st] of plan.items.entries()) {
+      const sector = needSectors[(i + j * 5) % needSectors.length];
+      const [products, spec] = NEEDS[Object.keys(NEEDS).find((k) => sector.name.startsWith(k.slice(0, 10)))!][0];
+      const at = new Date(created.getTime() + day * 0.7);
+      const item = await prisma.requirementItem.create({
+        data: {
+          requirementId: req.id, sectorId: sector.id, products, specifications: spec, quantity: `${1 + (i % 4)} container${i % 4 ? "s" : ""} per quarter`,
+          certifications: JSON.stringify([CERTS[(i + j) % CERTS.length], CERTS[(i + j + 3) % CERTS.length]]), sortOrder: j, status: st,
+          submittedAt: st === "DRAFT" ? null : at, recommendedAt: ["FIEO_RECOMMENDED", "DIC_RETURNED", "APPROVED"].includes(st) ? at : null,
+          approvedAt: st === "APPROVED" ? new Date(created.getTime() + day) : null, everApproved: st === "APPROVED",
+        },
+      });
+      const extra = { itemId: item.id, sectorName: sector.name };
+      if (st !== "DRAFT") await log("REQ_SUBMITTED", user.id, "BUYER", at, extra);
+      if (st === "FIEO_RETURNED") await log("REQ_RETURNED", fieo.id, "FIEO", at, { ...extra, comment: "Please add packaging and quantity details." });
+      if (["FIEO_RECOMMENDED", "DIC_RETURNED", "APPROVED"].includes(st)) await log("FIEO_RECOMMENDED", fieo.id, "FIEO", at, extra);
+      if (st === "DIC_RETURNED") await log("DIC_RETURNED", dic.id, "DIC", at, { ...extra, comment: "Verify the export licence before recommending." });
+      if (st === "APPROVED") await log("DIC_APPROVED", dic.id, "DIC", new Date(created.getTime() + day), extra);
+    }
+  }
+  await prisma.counter.upsert({ where: { name: "buyer" }, create: { name: "buyer", value: BUYERS.length }, update: { value: BUYERS.length } });
+  await prisma.counter.upsert({ where: { name: "approved-2026" }, create: { name: "approved-2026", value: approvedSeq }, update: { value: approvedSeq } });
+  console.log(`Loaded ${BUYERS.length} demo buyers (${approvedSeq} approved). Demo buyer password: pass@123`);
+}
+
+main().finally(() => prisma.$disconnect());

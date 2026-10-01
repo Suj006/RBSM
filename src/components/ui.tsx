@@ -24,7 +24,7 @@ export function ButtonLink({
 }
 
 export function Card({ className, ...p }: ComponentProps<"div">) {
-  return <div className={cn("rounded-2xl border border-slate-200 bg-white shadow-sm", className)} {...p} />;
+  return <div className={cn("min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm", className)} {...p} />;
 }
 
 export function CardHeader({ title, subtitle, action, icon }: { title: ReactNode; subtitle?: ReactNode; action?: ReactNode; icon?: ReactNode }) {

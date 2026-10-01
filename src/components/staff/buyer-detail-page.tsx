@@ -10,7 +10,7 @@ import { JourneyStepper } from "@/components/journey";
 import { Timeline } from "@/components/timeline";
 import { DocLink } from "@/components/doc-link";
 import { SourcingProfileView } from "@/components/requirement-view";
-import { PrintButton } from "@/components/print-button";
+import { DownloadButtons } from "./download-buttons";
 import { ReviewPanel } from "./review-panel";
 import { ItemReview } from "./item-review";
 import { fmtDateTime, parseCerts } from "@/lib/format";
@@ -46,7 +46,7 @@ export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; i
         eyebrow={<>{b.regNo}{b.approvedNo && <> · <span className="text-brand-700">{b.approvedNo}</span></>}</>}
         title={b.name}
         subtitle={`${b.country} · Login ${b.user.username}`}
-        actions={<><StatusBadge status={b.status} /><PrintButton /></>}
+        actions={<><StatusBadge status={b.status} /><DownloadButtons href={`/api/reports/buyer-profile?buyerId=${b.id}`} label="Buyer profile" compact /></>}
       />
       <Card className="mb-6 p-5 sm:p-6"><JourneyStepper status={b.status} /></Card>
 
@@ -95,7 +95,7 @@ export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; i
           {extra?.(b.id)}
           <Card>
             <CardHeader title="Activity & comments" />
-            <div className="max-h-[560px] overflow-y-auto p-5"><Timeline logs={b.reviewLogs} /></div>
+            <div className="max-h-[560px] overflow-y-auto p-5 pb-8 [mask-image:linear-gradient(to_bottom,black_88%,transparent)]"><Timeline logs={b.reviewLogs} /></div>
           </Card>
         </div>
       </div>

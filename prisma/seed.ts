@@ -24,7 +24,7 @@ const SECTORS = [
   "Coir & Coir Products",
   "Handloom & Textiles",
   "Apparel & Garments",
-  "Handicrafts & Home Décor",
+  "Handicrafts & Home Decor",
   "Bamboo & Wood Products",
   "Furniture",
   "Rubber & Rubber Products",

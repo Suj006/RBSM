@@ -46,7 +46,10 @@ Staff passwords can be changed from **Admin → Users & logins**.
 - Detailed requirement: multiple sectors, products, specifications, volumes, certifications (master + custom)
 - Sector-wise approval: save draft / submit per sector, return-with-comment at FIEO and Directorate, modify approved sectors or add new ones later; full audit trail
 - Role dashboards: KPIs, pipeline, sign-up trend, top countries, sectors of interest, work queue
-- Reports: buyer list and sector-wise requirement sheet (Excel-ready CSV, filter-aware), printable buyer dossier and RBSM buyer list (Print / Save PDF)
+- Reports (Reports page for FIEO, Directorate and Admin) — each as a formatted **Excel** workbook and a **PDF**
+  with the TRADEX letterhead, coloured headings, status colours, summary boxes and page numbers:
+  Buyer Registration Register, Sector-wise Requirement Report, RBSM Approved Buyer List, MIS Summary,
+  and a Buyer Profile for any single buyer (from the buyer's page). Filters on the list/report pages apply.
 
 ## Running locally
 
@@ -57,6 +60,9 @@ npx prisma migrate deploy
 npm run db:seed          # staff logins, sectors, certifications
 npm run dev              # http://localhost:3000
 ```
+
+To try the dashboards and reports with sample data, run `npm run db:demo` on an empty database
+(loads 40 demo buyers at every stage; demo buyer password `pass@123`).
 
 After updating from an older version, run `npx prisma migrate deploy` (database changes) and, once,
 `npm run db:normalize` to re-format names already saved.

@@ -1,4 +1,3 @@
-import { FileSpreadsheet } from "lucide-react";
 import type { Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { buyerWhere, itemScope, PAGE_SIZE, scopeFor, type BuyerFilters as F } from "@/lib/buyer-query";
@@ -7,6 +6,7 @@ import { Card, PageHeader } from "@/components/ui";
 import { BuyerFilters } from "./buyer-filters";
 import { BuyerTable } from "./buyer-table";
 import { Pagination } from "./pagination";
+import { DownloadButtons } from "./download-buttons";
 
 export async function BuyerListPage({ role, base, filters, title, subtitle }: {
   role: Role; base: string; filters: F; title: string; subtitle: string;
@@ -38,14 +38,10 @@ export async function BuyerListPage({ role, base, filters, title, subtitle }: {
         title={title}
         subtitle={subtitle}
         actions={
-          <>
-            <a href={`/api/export/buyers?${qs}`} className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-ink ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
-              <FileSpreadsheet className="size-4 text-brand-700" /> Buyers (Excel/CSV)
-            </a>
-            <a href={`/api/export/requirements?${qs}`} className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-ink ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
-              <FileSpreadsheet className="size-4 text-tx-blue" /> Sector-wise requirements
-            </a>
-          </>
+          <div className="flex flex-wrap items-center gap-3">
+            <DownloadButtons href={`/api/reports/${role === "DIC" ? "sector-requirements" : "buyer-register"}${qs ? `?${qs}` : ""}`} label={role === "DIC" ? "Sector report" : "Register"} compact />
+            {role !== "DIC" && <DownloadButtons href={`/api/reports/sector-requirements${qs ? `?${qs}` : ""}`} label="Sector-wise" compact />}
+          </div>
         }
       />
       <Card className="overflow-hidden">

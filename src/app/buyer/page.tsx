@@ -109,7 +109,7 @@ export default async function BuyerDashboard() {
 
         <Card>
           <CardHeader title="Activity" />
-          <div className="max-h-[560px] overflow-y-auto p-6"><Timeline logs={visibleLogs} /></div>
+          <div className="max-h-[560px] overflow-y-auto p-6 pb-8 [mask-image:linear-gradient(to_bottom,black_88%,transparent)]"><Timeline logs={visibleLogs} /></div>
         </Card>
       </div>
     </>

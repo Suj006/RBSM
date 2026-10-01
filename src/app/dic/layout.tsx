@@ -9,8 +9,9 @@ export default async function DicLayout({ children }: { children: React.ReactNod
   return (
     <AppShell role="DIC" user={user} nav={[
       { href: "/dic", label: "Dashboard", icon: "dashboard", exact: true },
-      { href: "/dic/buyers", label: "Recommended buyers", icon: "review", badge: pending },
+      { href: "/dic/buyers", label: "For approval", icon: "review", badge: pending },
       { href: "/dic/approved", label: "RBSM buyer list", icon: "approved" },
+      { href: "/dic/reports", label: "Reports", icon: "reports" },
     ]}>{children}</AppShell>
   );
 }

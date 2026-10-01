@@ -49,10 +49,15 @@ const escape = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 function toHtml(text: string) {
-  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#0f172a;max-width:560px">
-<div style="background:#0b1f3a;color:#fff;padding:16px 20px;border-radius:8px 8px 0 0;font-weight:bold">${EVENT.name} · ${EVENT.programme}</div>
-<div style="border:1px solid #e2e8f0;border-top:0;padding:20px;border-radius:0 0 8px 8px;white-space:pre-line">${escape(text)}</div>
-</div>`;
+  const bar = ["#d62a2a", "#dcc72b", "#3cb54a", "#2ea3e6"]
+    .map((c) => `<td style="height:4px;background:${c};font-size:0;line-height:0">&nbsp;</td>`).join("");
+  return `<div style="background:#f6f8f7;padding:24px 12px;font-family:Arial,Helvetica,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+<tr><td style="padding:0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${bar}</tr></table></td></tr>
+<tr><td style="padding:20px 28px 8px;font-size:11px;font-weight:bold;letter-spacing:1px;color:#237d32">${escape(`${EVENT.name} · ${EVENT.programme}`.toUpperCase())}</td></tr>
+<tr><td style="padding:8px 28px 24px;font-size:14px;line-height:1.65;color:#0f1b2d;white-space:pre-line">${escape(text)}</td></tr>
+<tr><td style="padding:14px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b">${escape(EVENT.organiser)} · This is an automated message from the ${escape(EVENT.name)} ${escape(EVENT.short)} portal.</td></tr>
+</table></div>`;
 }
 
 const signature = `\n\nRegards,\n${EVENT.name} ${EVENT.short} Secretariat\n${APP_URL}`;

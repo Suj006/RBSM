@@ -46,7 +46,7 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
 
   const days = Array.from({ length: DAYS }, (_, i) => { const d = new Date(since); d.setDate(since.getDate() + i); return d; });
   const trend = days.map((d) => ({
-    day: d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+    day: fmtDate(d).slice(0, 6),
     value: recent.filter((r) => r.createdAt.toDateString() === d.toDateString()).length,
   }));
 
