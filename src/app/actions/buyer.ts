@@ -9,29 +9,33 @@ import { canEditBasic, canEditRequirement } from "@/lib/status";
 import { deleteUpload, storeUpload, validateUpload } from "@/lib/storage";
 import type { DocumentKind } from "@/generated/prisma/enums";
 import type { FormState } from "./auth";
+import { designation, emailField, firstErrors, englishText, mobileField, orgName, personName } from "@/lib/text";
 
-const fieldErrors = (e: z.ZodError) =>
-  Object.fromEntries(e.issues.map((i) => [i.path.join("."), i.message]));
+const fieldErrors = (e: z.ZodError) => firstErrors(e, true);
 
-const opt = (max: number) => z.string().trim().max(max).transform((v) => v || null);
-const phone = z.string().trim().regex(/^\+?[0-9][0-9 ()-]{6,19}$/, "Enter a valid mobile number with country code, e.g. +971 50 123 4567.");
+/** Empty input → null (draft), otherwise validated by `field` with its own messages. */
+const optional = <T extends z.ZodType<string, string>>(field: T) =>
+  z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? null : v), field.nullable());
+const opt = (max: number, label: string) =>
+  englishText({ max, label }).transform((v) => v || null);
 
 // ---------------------------------------------------------------- basic details
 
+// Every text field is English-only; names are stored in Title Case.
 const basicDraft = z.object({
-  name: z.string().trim().min(2, "Enter the buyer / organisation name.").max(160),
+  name: orgName(),
   country: z.string().refine((c) => COUNTRIES.includes(c), "Select a country from the list."),
-  pocName: opt(120),
-  pocDesignation: opt(120),
-  pocEmail: z.union([z.literal(""), z.email("Enter a valid e-mail address.").max(160)]).transform((v) => v || null),
-  pocMobile: z.union([z.literal(""), phone]).transform((v) => v || null),
+  pocName: optional(personName("Contact name")),
+  pocDesignation: optional(designation()),
+  pocEmail: optional(emailField()),
+  pocMobile: optional(mobileField()),
 });
 
 const basicSubmit = basicDraft.extend({
-  pocName: z.string().trim().min(2, "Enter the contact person's name.").max(120),
-  pocDesignation: z.string().trim().min(2, "Enter the designation.").max(120),
-  pocEmail: z.email("Enter a valid e-mail address.").trim().max(160),
-  pocMobile: phone,
+  pocName: personName("Contact name"),
+  pocDesignation: designation(),
+  pocEmail: emailField(),
+  pocMobile: mobileField(),
 });
 
 const FILE_FIELDS: [string, DocumentKind][] = [["profileFile", "PROFILE"], ["credentialsFile", "CREDENTIALS"]];
@@ -114,24 +118,24 @@ export async function saveBasicAction(_: FormState, form: FormData): Promise<For
 
 const itemSchema = z.object({
   sectorId: z.string().min(1, "Select a sector."),
-  products: z.string().trim().min(2, "List the products you want to source.").max(1000),
-  specifications: z.string().trim().max(2000).optional().default(""),
-  certifications: z.array(z.string().max(120)).max(40).default([]),
-  quantity: z.string().trim().max(200).optional().default(""),
+  products: englishText({ min: 2, max: 1000, label: "Products", multiline: true }),
+  specifications: englishText({ max: 2000, label: "Specifications", multiline: true }).optional().default(""),
+  certifications: z.array(englishText({ min: 1, max: 120, label: "Certification" })).max(40).default([]),
+  quantity: englishText({ max: 200, label: "Quantity" }).optional().default(""),
 });
 
 const reqDraft = z.object({
-  organisationType: opt(80),
-  procurementInterests: opt(3000),
-  annualSourcingValue: opt(80),
-  sourcingTimeline: opt(80),
-  preferredEngagement: opt(120),
+  organisationType: opt(80, "Organisation type"),
+  procurementInterests: englishText({ max: 3000, label: "Procurement interests", multiline: true }).transform((v) => v || null),
+  annualSourcingValue: opt(80, "Annual sourcing value"),
+  sourcingTimeline: opt(80, "Sourcing timeline"),
+  preferredEngagement: opt(120, "Preferred engagement"),
   items: z.array(itemSchema.partial({ products: true, sectorId: true })).max(25),
 });
 
 const reqSubmit = reqDraft.extend({
   organisationType: z.string().trim().min(1, "Select the organisation type."),
-  procurementInterests: z.string().trim().min(20, "Describe your procurement interests (at least 20 characters).").max(3000),
+  procurementInterests: englishText({ min: 20, max: 3000, label: "Procurement interests", multiline: true }),
   annualSourcingValue: z.string().trim().min(1, "Select the indicative annual sourcing value."),
   sourcingTimeline: z.string().trim().min(1, "Select the sourcing timeline."),
   items: z.array(itemSchema).min(1, "Add at least one sector with products.").max(25),

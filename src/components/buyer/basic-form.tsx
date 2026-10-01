@@ -31,9 +31,9 @@ export function BasicForm({ buyer, docs, accept }: {
       {state?.ok && <Alert tone="green">{state.message}</Alert>}
 
       <Card>
-        <CardHeader title="Buyer" subtitle="Captured at sign-up — you can correct it here." />
+        <CardHeader title="Buyer" subtitle="Captured at sign-up — you can correct it here. All details must be in English." />
         <div className="grid gap-5 p-6 sm:grid-cols-2">
-          <Field label="Name of the buyer" htmlFor="name" required error={fe.name}>
+          <Field label="Name of the buyer" htmlFor="name" required error={fe.name} hint="English letters, numbers and . , & ' ( ) / -">
             <Input id="name" name="name" defaultValue={v("name")} required maxLength={160} />
           </Field>
           <Field label="Country" htmlFor="country" required error={fe.country}>
@@ -47,10 +47,10 @@ export function BasicForm({ buyer, docs, accept }: {
       <Card>
         <CardHeader title="Point of contact" subtitle="The person FIEO and the Directorate will correspond with." />
         <div className="grid gap-5 p-6 sm:grid-cols-2">
-          <Field label="Name" htmlFor="pocName" required error={fe.pocName}>
+          <Field label="Name" htmlFor="pocName" required error={fe.pocName} hint="English letters and spaces only">
             <Input id="pocName" name="pocName" defaultValue={v("pocName")} maxLength={120} autoComplete="name" />
           </Field>
-          <Field label="Designation" htmlFor="pocDesignation" required error={fe.pocDesignation}>
+          <Field label="Designation" htmlFor="pocDesignation" required error={fe.pocDesignation} hint="e.g. Head of Procurement">
             <Input id="pocDesignation" name="pocDesignation" defaultValue={v("pocDesignation")} maxLength={120} autoComplete="organization-title" />
           </Field>
           <Field label="E-mail ID" htmlFor="pocEmail" required error={fe.pocEmail}>

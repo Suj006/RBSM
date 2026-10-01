@@ -49,7 +49,7 @@ export function SignupForm() {
           {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
         </Select>
       </Field>
-      <Field label="Name of the buyer" htmlFor="name" required error={fe.name} hint="Organisation / company name">
+      <Field label="Name of the buyer" htmlFor="name" required error={fe.name} hint="Organisation / company name, in English">
         <Input id="name" name="name" required maxLength={160} defaultValue={state?.data?.name} autoComplete="organization" />
       </Field>
       <Field label="E-mail address" htmlFor="email" required error={fe.email} hint="Your login credentials will be sent to this address.">

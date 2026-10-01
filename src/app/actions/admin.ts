@@ -7,10 +7,11 @@ import { hashPassword, requireUser } from "@/lib/auth";
 import { EVENT } from "@/lib/config";
 import { mailTemplates, sendMail } from "@/lib/mail";
 import type { FormState } from "./auth";
+import { englishText, firstErrors } from "@/lib/text";
 
 const masterSchema = z.object({
-  name: z.string().trim().min(2, "Enter a name.").max(120),
-  description: z.string().trim().max(500).transform((v) => v || null),
+  name: englishText({ min: 2, max: 120, label: "Name" }),
+  description: englishText({ max: 500, label: "Description" }).transform((v) => v || null),
   sortOrder: z.coerce.number().int().min(0).max(9999).default(0),
 });
 
@@ -23,7 +24,7 @@ export async function saveMasterAction(_: FormState, form: FormData): Promise<Fo
   const parsed = masterSchema.safeParse({
     name: form.get("name") ?? "", description: form.get("description") ?? "", sortOrder: form.get("sortOrder") || 0,
   });
-  if (!parsed.success) return { fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
+  if (!parsed.success) return { fieldErrors: firstErrors(parsed.error) };
   const { name, description, sortOrder } = parsed.data;
 
   try {

@@ -41,17 +41,17 @@ export const ORGANISATION_TYPES = [
 
 export const SOURCING_VALUES = [
   "Below USD 100,000",
-  "USD 100,000 – 500,000",
-  "USD 500,000 – 1 million",
-  "USD 1 – 5 million",
-  "USD 5 – 10 million",
+  "USD 100,000 - 500,000",
+  "USD 500,000 - 1 million",
+  "USD 1 - 5 million",
+  "USD 5 - 10 million",
   "Above USD 10 million",
 ] as const;
 
 export const SOURCING_TIMELINES = [
   "Immediate (within 3 months)",
-  "3 – 6 months",
-  "6 – 12 months",
+  "3 - 6 months",
+  "6 - 12 months",
   "More than 12 months",
   "Exploratory",
 ] as const;

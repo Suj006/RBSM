@@ -9,6 +9,7 @@ import { EVENT, buyerRegNo, buyerUsername } from "@/lib/config";
 import { mailTemplates, sendMail, isMailConfigured } from "@/lib/mail";
 import { nextSeq } from "@/lib/sequence";
 import { ROLE_HOME } from "@/lib/status";
+import { emailField, firstErrors, orgName } from "@/lib/text";
 
 export type FormState = {
   error?: string;
@@ -18,8 +19,7 @@ export type FormState = {
   data?: Record<string, string>;
 } | undefined;
 
-const fieldErrors = (e: z.ZodError) =>
-  Object.fromEntries(e.issues.map((i) => [String(i.path[0]), i.message]));
+const fieldErrors = (e: z.ZodError) => firstErrors(e);
 
 // ---------------------------------------------------------------- login
 
@@ -51,8 +51,8 @@ export async function logoutAction() {
 
 const signupSchema = z.object({
   country: z.string().refine((c) => COUNTRIES.includes(c), "Select your country from the list."),
-  name: z.string().trim().min(2, "Enter the buyer / organisation name.").max(160),
-  email: z.email("Enter a valid e-mail address, e.g. name@company.com.").trim().toLowerCase().max(160),
+  name: orgName(),
+  email: emailField(),
 });
 
 export async function signupAction(_: FormState, form: FormData): Promise<FormState> {

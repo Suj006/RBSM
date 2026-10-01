@@ -33,7 +33,7 @@ export function RequirementForm({ header, items: initialItems, sectors, certific
       <input type="hidden" name="items" value={JSON.stringify(items)} />
 
       <Card>
-        <CardHeader title="Sourcing profile" subtitle="Helps us match you with the right MSME suppliers." />
+        <CardHeader title="Sourcing profile" subtitle="Helps us match you with the right MSME suppliers. Please write all details in English." />
         <div className="grid gap-5 p-6 sm:grid-cols-2">
           <Field label="Organisation type" htmlFor="organisationType" required error={fe.organisationType}>
             <Select id="organisationType" name="organisationType" defaultValue={header.organisationType}>
@@ -110,14 +110,19 @@ function SectorRow({ index, item, sectors, certifications, errors, onChange, onR
   errors: Record<string, string>; onChange: (p: Partial<ReqItem>) => void; onRemove?: () => void;
 }) {
   const [other, setOther] = useState("");
+  const [otherError, setOtherError] = useState("");
   const err = (k: string) => errors[`items.${index}.${k}`];
+  const certError = Object.entries(errors).find(([k]) => k.startsWith(`items.${index}.certifications`))?.[1];
   const toggle = (c: string) =>
     onChange({ certifications: item.certifications.includes(c) ? item.certifications.filter((x) => x !== c) : [...item.certifications, c] });
   const custom = item.certifications.filter((c) => !certifications.includes(c));
   const addOther = () => {
-    const v = other.trim();
-    if (v && !item.certifications.includes(v)) onChange({ certifications: [...item.certifications, v] });
+    const v = other.replace(/\s+/g, " ").trim();
+    if (!v) return;
+    if (!/^[\x20-\x7E]+$/.test(v)) { setOtherError("Use English characters only."); return; }
+    if (!item.certifications.includes(v)) onChange({ certifications: [...item.certifications, v] });
     setOther("");
+    setOtherError("");
   };
 
   return (
@@ -174,6 +179,7 @@ function SectorRow({ index, item, sectors, certifications, errors, onChange, onR
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addOther(); } }} aria-label="Other certification" />
           <Button type="button" variant="secondary" onClick={addOther}>Add</Button>
         </div>
+        {(otherError || certError) && <p className="mt-1 text-xs font-medium text-tx-red">{otherError || certError}</p>}
       </div>
     </div>
   );

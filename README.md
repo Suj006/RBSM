@@ -34,6 +34,7 @@ Staff passwords can be changed from **Admin → Users & logins**.
 ## Features
 
 - Sign-up with full world country list, e-mail format check and duplicate check
+- English-only input everywhere; names and designations saved in Title Case (e.g. "sujith hdhd" → "Sujith Hdhd"); contact names accept letters and spaces only
 - Credential e-mails (SMTP) plus an **E-mail outbox** that records every message
 - Document uploads (PDF/JPG/PNG, 5 MB, content-checked) served only to authorised users
 - Detailed requirement: multiple sectors, products, specifications, volumes, certifications (master + custom)
@@ -50,6 +51,8 @@ npx prisma migrate deploy
 npm run db:seed          # staff logins, sectors, certifications
 npm run dev              # http://localhost:3000
 ```
+
+After updating from an older version, run `npm run db:normalize` once to re-format names already saved.
 
 Production: `npm run build && npm start`. Set `APP_URL` and the `SMTP_*` variables in `.env` so buyers
 receive their credentials by e-mail; without SMTP the e-mails appear only in **Admin → E-mail outbox**

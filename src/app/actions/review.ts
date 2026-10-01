@@ -8,6 +8,7 @@ import { nextSeq } from "@/lib/sequence";
 import { approvedBuyerNo, EVENT } from "@/lib/config";
 import type { BuyerStatus, ReviewAction, Role } from "@/generated/prisma/enums";
 import type { FormState } from "./auth";
+import { englishText } from "@/lib/text";
 
 type Decision =
   | "approve_basic" | "return_basic"       // FIEO, on basic details
@@ -29,7 +30,9 @@ export async function reviewAction(_: FormState, form: FormData): Promise<FormSt
   if (!rule) return { error: "Unknown action." };
   const user = await requireUser(rule.role);
   const buyerId = String(form.get("buyerId") ?? "");
-  const comment = String(form.get("comment") ?? "").trim().slice(0, 2000) || null;
+  const parsedComment = englishText({ max: 2000, label: "Comment", multiline: true }).safeParse(String(form.get("comment") ?? ""));
+  if (!parsedComment.success) return { fieldErrors: { comment: parsedComment.error.issues[0].message } };
+  const comment = parsedComment.data || null;
   if (rule.needsComment && (!comment || comment.length < 5)) {
     return { fieldErrors: { comment: "A comment (at least 5 characters) is required when returning." } };
   }
