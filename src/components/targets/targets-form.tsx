@@ -50,7 +50,7 @@ export function TargetsForm({ initial, districts, approved }: {
         <CardHeader title="District-wise approved seller targets"
           subtitle="Each District Industries Centre sees its own target on its dashboard."
           action={<Button type="button" variant="secondary" onClick={distribute}><Shuffle className="size-4" /> Distribute {overall} evenly</Button>} />
-        <div className="relative overflow-x-auto">
+        <div className="table-scroll relative overflow-x-auto">
           <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>

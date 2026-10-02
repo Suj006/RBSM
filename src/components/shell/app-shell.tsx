@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { LogOut, KeyRound } from "lucide-react";
 import type { Role } from "@/generated/prisma/enums";
 import { Logo } from "@/components/logo";
 import { logoutAction } from "@/app/actions/auth";
-import { ROLE_BADGE } from "@/lib/status";
+import { ROLE_BADGE, ROLE_HOME } from "@/lib/status";
+import { NavTracker } from "@/components/nav/back-link";
 import { NavLinks, type NavItem } from "./nav-links";
 
 export function AppShell({ role, user, nav, children }: {
@@ -14,9 +16,10 @@ export function AppShell({ role, user, nav, children }: {
 }) {
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[264px_1fr]">
+      <Suspense><NavTracker /></Suspense>
       <aside className="no-print sticky top-0 hidden h-dvh flex-col border-r border-slate-200 bg-white lg:flex">
         <div className="tx-ribbon h-1" />
-        <Link href="/" className="px-5 py-5"><Logo /></Link>
+        <Link href={ROLE_HOME[role]} className="px-5 py-5" aria-label="Dashboard"><Logo /></Link>
         <div className="px-5 pb-3">
           <span className="rounded-md bg-ink px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white">{ROLE_BADGE[role]}</span>
         </div>
@@ -42,12 +45,17 @@ export function AppShell({ role, user, nav, children }: {
         <header className="no-print sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur lg:hidden">
           <div className="tx-ribbon h-1" />
           <div className="flex items-center justify-between px-4 py-3">
-            <Link href="/"><Logo withText={false} /></Link>
+            <Link href={ROLE_HOME[role]} aria-label="Dashboard"><Logo withText={false} /></Link>
+            <div className="flex items-center gap-2">
+            <Link href="/change-password" aria-label="Change password" className="inline-grid size-9 place-items-center rounded-lg text-slate-600 ring-1 ring-slate-200">
+              <KeyRound className="size-3.5" />
+            </Link>
             <form action={logoutAction}>
               <button className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-tx-red ring-1 ring-red-100">
                 <LogOut className="size-3.5" /> Sign out
               </button>
             </form>
+            </div>
           </div>
           <nav className="overflow-x-auto px-2 pb-2"><NavLinks items={nav} horizontal /></nav>
         </header>

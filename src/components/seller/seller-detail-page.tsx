@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
+import { backFor } from "@/components/nav/back-target";
 import type { User } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sellerScope } from "@/lib/seller-query";
+import { sellerScope, sellerWhere } from "@/lib/seller-query";
 import { localBodyLabel } from "@/lib/config";
 import { fmtDateTime } from "@/lib/format";
 import { fmtMobile } from "@/lib/text";
@@ -34,13 +34,15 @@ export async function SellerDetailPage({ user, id, base, done }: { user: User; i
   const lastReturn = s.logs.find((l) => l.action === "RETURNED");
   const districtCan = user.role === "DISTRICT" && SELLER_DISTRICT_EDITABLE.includes(s.status);
   const dicCan = user.role === "DIC" && s.status === "RECOMMENDED";
+  const next = user.role === "DISTRICT" || user.role === "DIC"
+    ? await prisma.seller.findFirst({ where: { AND: [sellerWhere(user, { status: "action" }), { id: { not: s.id } }] }, orderBy: { updatedAt: "asc" }, select: { id: true } })
+    : null;
+  const nav = { next: next ? `${base}/${next.id}` : null, list: `${base}?status=action`, listLabel: "Needs my action" };
 
   return (
     <>
-      <Link href={base} className="no-print mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-ink">
-        <ArrowLeft className="size-4" /> Back to sellers
-      </Link>
       <PageHeader
+        back={backFor(base, "Back to sellers")}
         eyebrow={<>{s.regNo}{s.approvedNo && <> · <span className="text-brand-700">{s.approvedNo}</span></>}</>}
         title={s.name}
         subtitle={`${s.district} · ${s.taluk} · ${s.udyamNo}`}
@@ -93,7 +95,7 @@ export async function SellerDetailPage({ user, id, base, done }: { user: User; i
             <CardHeader title="Registration" />
             <div className="p-6">
               <DL cols={3} items={[
-                { label: "Source", value: s.source === "SELF" ? "Self-registered on the portal" : s.source === "BULK" ? "Bulk upload by DIC" : "Entered by DIC" },
+                { label: "Source", value: s.source === "SELF" ? "Self-registered on the portal" : s.source === "BULK" ? "Bulk upload by district centre" : "Entered by district centre" },
                 { label: "Registered on", value: fmtDateTime(s.createdAt) },
                 { label: "Recommended on", value: fmtDateTime(s.recommendedAt) },
                 { label: "Approved on", value: fmtDateTime(s.approvedAt) },
@@ -108,11 +110,11 @@ export async function SellerDetailPage({ user, id, base, done }: { user: User; i
           {(user.role === "DISTRICT" || user.role === "DIC") && (
             <Card className={cn("no-print p-5", (districtCan || dicCan) && "border-brand-200 ring-2 ring-brand-100")}>
               {districtCan ? (
-                <SellerDecision sellerId={s.id} options={DISTRICT_OPTIONS}
+                <SellerDecision sellerId={s.id} options={DISTRICT_OPTIONS} nav={nav}
                   heading={s.status === "RETURNED" ? "Correct and recommend again" : "Recommend to Directorate"}
                   note="Verify the Udyam number and contact details before recommending." />
               ) : dicCan ? (
-                <SellerDecision sellerId={s.id} options={DIRECTORATE_OPTIONS} heading="Directorate decision"
+                <SellerDecision sellerId={s.id} options={DIRECTORATE_OPTIONS} nav={nav} heading="Directorate decision"
                   note="Approving adds the seller to the RBSM seller list and e-mails a login to the contact person." />
               ) : (
                 <SellerDecision sellerId={s.id} options={[]} heading="No action pending" note="This seller is not at a stage that needs your decision." />

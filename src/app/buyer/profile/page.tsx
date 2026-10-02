@@ -26,7 +26,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageHeader eyebrow={b.regNo} title="Basic details" subtitle="Submitted to FIEO for verification before you can register your sourcing requirement." actions={<StatusBadge status={b.status} />} />
+      <PageHeader back={{ href: "/buyer", label: "Back to dashboard" }} eyebrow={b.regNo} title="Basic details" subtitle="Submitted to FIEO for verification before you can register your sourcing requirement." actions={<StatusBadge status={b.status} />} />
       {welcome && editable && (
         <Alert tone="green" className="mb-6" title="Password changed">Now complete your basic details and submit them to FIEO.</Alert>
       )}

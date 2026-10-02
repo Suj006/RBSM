@@ -10,6 +10,7 @@ export default async function FieoLayout({ children }: { children: React.ReactNo
     <AppShell role="FIEO" user={user} nav={[
       { href: "/fieo", label: "Dashboard", icon: "dashboard", exact: true },
       { href: "/fieo/buyers", label: "Buyer applications", icon: "buyers", badge: pending },
+      { href: "/fieo/requirements", label: "Sector requirements", icon: "requirement" },
       { href: "/fieo/approved", label: "RBSM buyer list", icon: "approved" },
       { href: "/fieo/sellers", label: "Approved sellers", icon: "sellers" },
       { href: "/fieo/demand", label: "Sector demand", icon: "demand" },

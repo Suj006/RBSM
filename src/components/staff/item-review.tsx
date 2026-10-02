@@ -10,6 +10,7 @@ import { useKeepForm } from "@/lib/use-keep-form";
 import { cn } from "@/lib/cn";
 import { SectorContent } from "@/components/changes";
 import type { ItemSnapshot } from "@/lib/item-snapshot";
+import { NextUp, type NextUpLinks } from "@/components/nav/next-up";
 
 export type ReviewItem = {
   id: string; sectorId: string; sectorName: string; status: ItemStatus; everApproved: boolean;
@@ -23,7 +24,7 @@ type Option = { value: string; label: string; tone: "green" | "violet" | "red" }
 
 const OPTIONS: Record<"FIEO" | "DIC", Option[]> = {
   FIEO: [
-    { value: "recommend", label: "Recommend to DIC", tone: "violet" },
+    { value: "recommend", label: "Recommend to Directorate", tone: "violet" },
     { value: "return", label: "Return to buyer", tone: "red" },
   ],
   DIC: [
@@ -42,7 +43,7 @@ const ON: Record<Option["tone"], string> = {
  * Sector-by-sector review. FIEO / DIC pick a decision for each pending sector
  * independently (or leave it for later) and save them together.
  */
-export function ItemReview({ buyerId, role, items }: { buyerId: string; role: Role; items: ReviewItem[] }) {
+export function ItemReview({ buyerId, role, items, nav }: { buyerId: string; role: Role; items: ReviewItem[]; nav?: NextUpLinks }) {
   const reviewer = role === "FIEO" || role === "DIC" ? role : null;
   const queue = reviewer === "FIEO" ? FIEO_ITEM_QUEUE : reviewer === "DIC" ? DIC_ITEM_QUEUE : [];
   const pending = items.filter((i) => queue.includes(i.status));
@@ -74,7 +75,7 @@ export function ItemReview({ buyerId, role, items }: { buyerId: string; role: Ro
         )}
       </div>
 
-      {state?.ok && <Alert tone="green" title="Saved">{state.message}</Alert>}
+      {state?.ok && <Alert tone="green" title="Saved">{state.message}{nav && !pending.length && <NextUp {...nav} />}</Alert>}
       {state?.error && <Alert tone="red">{state.error}</Alert>}
       {!items.length && <Card className="p-6 text-sm text-slate-500">No sector requirements yet.</Card>}
 
@@ -85,7 +86,7 @@ export function ItemReview({ buyerId, role, items }: { buyerId: string; role: Ro
         // Comments reviewers need most: the latest return and recommendation notes.
         const notes = it.history.filter((h) => h.comment && h.action !== "REQ_SUBMITTED");
         return (
-          <Card key={it.id} className={cn("overflow-hidden", actionable && "ring-2 ring-brand-100")}>
+          <Card key={it.id} id={`item-${it.id}`} className={cn("scroll-mt-24 overflow-hidden", actionable && "ring-2 ring-brand-100")}>
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-6 py-4">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-base font-bold text-ink">{it.sectorName}</h3>

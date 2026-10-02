@@ -16,8 +16,8 @@ export const ITEM_META: Record<ItemStatus, { label: string; short: string; tone:
   DRAFT: { label: "Draft — not submitted", short: "Draft", tone: "slate", dot: "bg-slate-400" },
   SUBMITTED: { label: "Awaiting FIEO recommendation", short: "With FIEO", tone: "amber", dot: "bg-tx-yellow" },
   FIEO_RETURNED: { label: "Returned by FIEO", short: "Returned", tone: "red", dot: "bg-tx-red" },
-  FIEO_RECOMMENDED: { label: "Awaiting DIC approval", short: "With DIC", tone: "violet", dot: "bg-violet-500" },
-  DIC_RETURNED: { label: "Returned by DIC to FIEO", short: "DIC returned", tone: "red", dot: "bg-orange-500" },
+  FIEO_RECOMMENDED: { label: "Awaiting Directorate approval", short: "With Directorate", tone: "violet", dot: "bg-violet-500" },
+  DIC_RETURNED: { label: "Returned by Directorate to FIEO", short: "Directorate returned", tone: "red", dot: "bg-orange-500" },
   APPROVED: { label: "Approved", short: "Approved", tone: "green", dot: "bg-tx-green" },
 };
 

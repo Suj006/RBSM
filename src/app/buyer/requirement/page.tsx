@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Detailed requirement" };
 export default async function RequirementPage() {
   const { buyer: b } = await requireBuyer();
   const header = (
-    <PageHeader eyebrow={b.regNo} title="Detailed requirement"
+    <PageHeader back={{ href: "/buyer", label: "Back to dashboard" }} eyebrow={b.regNo} title="Detailed requirement"
       subtitle="Your sourcing requirement by sector — the basis for buyer–seller matchmaking. Each sector is approved separately."
       actions={<StatusBadge status={b.status} />} />
   );

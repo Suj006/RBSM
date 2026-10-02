@@ -16,7 +16,7 @@ export type BuyerRow = {
 export function BuyerTable({ rows, base }: { rows: BuyerRow[]; base: string }) {
   if (!rows.length) return <EmptyState icon={<Users className="size-5" />} title="No buyers found">Try changing the filters.</EmptyState>;
   return (
-    <div className="relative overflow-x-auto">
+    <div className="table-scroll relative overflow-x-auto">
       <table className="w-full min-w-[820px] text-left text-sm">
         <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <tr>

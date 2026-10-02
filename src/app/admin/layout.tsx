@@ -7,6 +7,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <AppShell role="ADMIN" user={user} nav={[
       { href: "/admin", label: "Dashboard", icon: "dashboard", exact: true },
       { href: "/admin/buyers", label: "All buyers", icon: "buyers" },
+      { href: "/admin/requirements", label: "Sector requirements", icon: "requirement" },
       { href: "/admin/approved", label: "RBSM buyer list", icon: "approved" },
       { href: "/admin/sellers", label: "All sellers", icon: "sellers" },
       { href: "/admin/demand", label: "Sector demand", icon: "demand" },

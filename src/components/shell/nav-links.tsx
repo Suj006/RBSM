@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, UserRound, ClipboardList, Users, ShieldCheck, Layers, Award, Mail, FileDown, BadgeCheck, Inbox,
@@ -21,8 +22,13 @@ export function NavLinks({ items, horizontal }: { items: NavItem[]; horizontal?:
   // Highlight only the most specific matching item (e.g. "Add seller" rather than also "Sellers").
   const matches = (it: NavItem) => (it.exact ? path === it.href : path === it.href || path.startsWith(it.href + "/"));
   const best = items.filter(matches).sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  const ref = useRef<HTMLUListElement>(null);
+  // On phones the menu is a sideways strip: keep the current page's tab in view.
+  useEffect(() => {
+    if (horizontal) ref.current?.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [horizontal, best]);
   return (
-    <ul className={cn(horizontal ? "flex gap-1" : "space-y-1")}>
+    <ul ref={ref} className={cn(horizontal ? "flex gap-1" : "space-y-1")}>
       {items.map((it) => {
         const active = it.href === best;
         const Icon = ICONS[it.icon];

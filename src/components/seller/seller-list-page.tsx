@@ -73,7 +73,7 @@ export async function SellerListPage({ user, base, filters, title, subtitle }: {
           ) : (
             <Select name="source" defaultValue={filters.source ?? ""} aria-label="Source">
               <option value="">All sources</option>
-              <option value="DISTRICT">Entered by DIC</option>
+              <option value="DISTRICT">Entered by district centre</option>
               <option value="BULK">Bulk upload</option>
               <option value="SELF">Self-registered</option>
             </Select>

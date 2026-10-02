@@ -606,7 +606,7 @@ export async function buildSellerProfile(user: User, sellerId: string): Promise<
           ["Local body", `${x.localBodyName} ${localBodyLabel(x.localBodyType)}`], ["Export experience", x.exportExperience ? "Yes" : "No"],
           ["Contact person", x.contactName], ["Mobile number", fmtMobile(x.contactMobile)], ["WhatsApp number", fmtMobile(x.contactWhatsapp)],
           ["E-mail ID", x.contactEmail],
-          ["Source", x.source === "SELF" ? "Self-registered" : x.source === "BULK" ? "Bulk upload by DIC" : "Entered by DIC"],
+          ["Source", x.source === "SELF" ? "Self-registered" : x.source === "BULK" ? "Bulk upload by district centre" : "Entered by district centre"],
           ["Registered on", x.createdAt], ["Recommended on", x.recommendedAt], ["Approved on", x.approvedAt],
         ]),
       },

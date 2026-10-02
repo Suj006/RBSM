@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { BackLink } from "@/components/nav/back-link";
 
 type Variant = "primary" | "secondary" | "danger" | "ghost" | "success";
 const VARIANTS: Record<Variant, string> = {
@@ -42,8 +43,12 @@ export function CardHeader({ title, subtitle, action, icon }: { title: ReactNode
   );
 }
 
-export function PageHeader({ title, subtitle, actions, eyebrow }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; eyebrow?: ReactNode }) {
+export function PageHeader({ title, subtitle, actions, eyebrow, back }: {
+  title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; eyebrow?: ReactNode; back?: { href: string; label: string; from?: { href: string; label: string }[] };
+}) {
   return (
+    <>
+    {back && <BackLink {...back} />}
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
         {eyebrow && <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-brand-700">{eyebrow}</div>}
@@ -52,6 +57,7 @@ export function PageHeader({ title, subtitle, actions, eyebrow }: { title: React
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </div>
+    </>
   );
 }
 

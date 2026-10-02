@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ChevronRight, Package } from "lucide-react";
+import { ChevronRight, Package } from "lucide-react";
 import type { User } from "@/generated/prisma/client";
 import { sectorDemandDetail, sectorDemandSummary } from "@/lib/demand";
 import { ITEM_META } from "@/lib/status";
@@ -23,7 +23,7 @@ export async function DemandSummaryPage({ user, base }: { user: User; base: stri
       </div>
       <Card className="overflow-hidden">
         {rows.length ? (
-          <div className="relative overflow-x-auto">
+          <div className="table-scroll relative overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
@@ -76,15 +76,14 @@ export async function DemandDetailPage({ user, base, sectorId, buyerBase, seller
   if (!d) notFound();
   return (
     <>
-      <Link href={base} className="no-print mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-ink"><ArrowLeft className="size-4" /> All sectors</Link>
-      <PageHeader eyebrow="Sector demand" title={d.sector.name}
+      <PageHeader back={{ href: base, label: "Back to all sectors", from: [{ href: base.slice(0, base.lastIndexOf("/")), label: "Back to dashboard" }] }} eyebrow="Sector demand" title={d.sector.name}
         subtitle={`${d.buyers.length} buyer requirement${d.buyers.length === 1 ? "" : "s"} · ${d.products.length} distinct products requested · ${d.sellers.length} approved seller${d.sellers.length === 1 ? "" : "s"}`}
         actions={<DownloadButtons href={`/api/reports/sector-demand?sector=${d.sector.id}`} label="This sector" compact />} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader title="Products requested by buyers" subtitle="Each product with the number of buyers asking for it, and approved sellers offering it" />
-          <div className="relative overflow-x-auto">
+          <div className="table-scroll relative overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr><th className="px-5 py-2.5 text-left">Product</th><th className="px-3 py-2.5 text-right">Buyers</th><th className="px-5 py-2.5 text-left">Requested by</th><th className="px-3 py-2.5 text-right">Sellers offering</th></tr>
@@ -116,7 +115,7 @@ export async function DemandDetailPage({ user, base, sectorId, buyerBase, seller
 
       <Card className="mt-6 overflow-hidden">
         <CardHeader title="Buyer requirements in this sector" />
-        <div className="relative overflow-x-auto">
+        <div className="table-scroll relative overflow-x-auto">
           <table className="w-full min-w-[960px] text-left text-sm">
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr><th className="px-4 py-3">Buyer</th><th className="px-4 py-3">Products</th><th className="px-4 py-3">Specifications</th><th className="px-4 py-3">Certifications</th><th className="px-4 py-3">Volume</th><th className="px-4 py-3">Status</th></tr>
@@ -125,7 +124,7 @@ export async function DemandDetailPage({ user, base, sectorId, buyerBase, seller
               {d.buyers.map((b) => (
                 <tr key={b.itemId} className="align-top hover:bg-brand-50/40">
                   <td className="px-4 py-3">
-                    <Link href={`${buyerBase}/${b.buyerId}`} className="font-semibold text-ink hover:text-brand-700">{b.name}</Link>
+                    <Link href={`${buyerBase}/${b.buyerId}#item-${b.itemId}`} className="font-semibold text-ink hover:text-brand-700">{b.name}</Link>
                     <div className="text-xs text-slate-500">{b.country} · <span className="whitespace-nowrap font-mono">{b.approvedNo ?? b.regNo}</span></div>
                   </td>
                   <td className="px-4 py-3 text-slate-800">{b.products}</td>
@@ -143,7 +142,7 @@ export async function DemandDetailPage({ user, base, sectorId, buyerBase, seller
 
       <Card className="mt-6 overflow-hidden">
         <CardHeader title="Approved sellers in this sector" subtitle="Products in green match what buyers asked for" />
-        <div className="relative overflow-x-auto">
+        <div className="table-scroll relative overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr><th className="px-4 py-3">Seller</th><th className="px-4 py-3">District</th><th className="px-4 py-3">Products ready to export</th><th className="px-4 py-3">Export exp.</th></tr>

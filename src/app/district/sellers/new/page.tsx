@@ -11,7 +11,7 @@ export default async function Page() {
   const sectors = await prisma.sector.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } });
   return (
     <>
-      <PageHeader eyebrow={user.district ?? undefined} title="Add seller" subtitle="Register an MSME seller from your district. You can recommend it to the Directorate straight away or later." />
+      <PageHeader back={{ href: "/district/sellers", label: "Back to sellers", from: [{ href: "/district", label: "Back to dashboard" }] }} eyebrow={user.district ?? undefined} title="Add seller" subtitle="Register an MSME seller from your district. You can recommend it to the Directorate straight away or later." />
       <SellerForm mode="district" district={user.district ?? ""} initial={{ ...EMPTY_SELLER, district: user.district ?? "" }} sectors={sectors} backHref="/district/sellers" />
     </>
   );

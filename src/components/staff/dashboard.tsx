@@ -23,7 +23,7 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
     prisma.buyer.groupBy({ by: ["status"], where: scope, _count: true }),
     prisma.requirementItem.groupBy({ by: ["status"], where: iScope, _count: true }),
     prisma.buyer.groupBy({ by: ["country"], where: scope, _count: true, orderBy: { _count: { country: "desc" } }, take: 8 }),
-    prisma.requirementItem.findMany({ where: iScope, select: { sectorId: true, sector: { select: { name: true } } } }),
+    prisma.requirementItem.findMany({ where: { AND: [iScope, { status: { not: "DRAFT" } }] }, select: { sectorId: true, sector: { select: { name: true } } } }),
     prisma.buyer.findMany({ where: { AND: [scope, { createdAt: { gte: since } }] }, select: { createdAt: true } }),
     prisma.buyer.findMany({
       where: { AND: [scope, actionWhere(role)] },
@@ -52,10 +52,10 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
 
   const stats = role === "DIC"
     ? [
-        { label: "Sectors awaiting my approval", value: items("FIEO_RECOMMENDED"), accent: "violet" as const, href: `${base}/buyers?item=FIEO_RECOMMENDED` },
-        { label: "Sectors returned to FIEO", value: items("DIC_RETURNED"), accent: "red" as const, href: `${base}/buyers?item=DIC_RETURNED` },
-        { label: "Approved sectors", value: items("APPROVED"), accent: "green" as const, href: `${base}/buyers?item=APPROVED` },
-        { label: "Approved buyers", value: count("APPROVED"), accent: "blue" as const, href: `${base}/approved` },
+        { label: "Sectors awaiting my approval", value: items("FIEO_RECOMMENDED"), accent: "violet" as const, href: `${base}/requirements?item=FIEO_RECOMMENDED` },
+        { label: "Sectors returned to FIEO", value: items("DIC_RETURNED"), accent: "red" as const, href: `${base}/requirements?item=DIC_RETURNED` },
+        { label: "Approved sectors", value: items("APPROVED"), accent: "green" as const, href: `${base}/requirements?item=APPROVED` },
+        { label: "Approved buyers", value: count("APPROVED"), accent: "blue" as const, href: `${base}/buyers?status=APPROVED` },
       ]
     : [
         // Row 1 — basic details
@@ -66,20 +66,20 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
         { label: "Basic details approved", value: count("BASIC_APPROVED", "APPROVED"), accent: "green" as const,
           hint: `${count("APPROVED")} already approved buyers`, href: `${base}/buyers?status=basic_approved` },
         // Row 2 — sector requirements
-        { label: "Sectors pending with FIEO", value: items(...FIEO_ITEM_QUEUE), accent: "yellow" as const, hint: items("DIC_RETURNED") ? `${items("DIC_RETURNED")} returned by DIC` : undefined, href: `${base}/buyers?status=action` },
-        { label: "Sectors with Directorate", value: items("FIEO_RECOMMENDED"), accent: "violet" as const, href: `${base}/buyers?item=FIEO_RECOMMENDED` },
-        { label: "Approved sectors", value: items("APPROVED"), accent: "green" as const, href: `${base}/buyers?item=APPROVED` },
+        { label: "Sectors pending with FIEO", value: items(...FIEO_ITEM_QUEUE), accent: "yellow" as const, hint: items("DIC_RETURNED") ? `${items("DIC_RETURNED")} returned by Directorate` : undefined, href: `${base}/requirements?item=action` },
+        { label: "Sectors with Directorate", value: items("FIEO_RECOMMENDED"), accent: "violet" as const, href: `${base}/requirements?item=FIEO_RECOMMENDED` },
+        { label: "Approved sectors", value: items("APPROVED"), accent: "green" as const, href: `${base}/requirements?item=APPROVED` },
         { label: "Approved buyers", value: count("APPROVED"), accent: "green" as const, href: `${base}/buyers?status=APPROVED` },
       ];
 
   const buyerPipeline = [
-    { label: "Basic details pending", value: count("SIGNED_UP", "BASIC_RETURNED"), color: "bg-slate-400" },
-    { label: "Basic under review", value: count("BASIC_SUBMITTED"), color: "bg-tx-yellow" },
-    { label: "Requirement stage", value: count("BASIC_APPROVED"), color: "bg-tx-blue" },
-    { label: "Approved buyers", value: count("APPROVED"), color: "bg-tx-green" },
+    { label: "Basic details pending", value: count("SIGNED_UP", "BASIC_RETURNED"), color: "bg-slate-400", href: `${base}/buyers?status=basic_pending` },
+    { label: "Basic under review", value: count("BASIC_SUBMITTED"), color: "bg-tx-yellow", href: `${base}/buyers?status=BASIC_SUBMITTED` },
+    { label: "Requirement stage", value: count("BASIC_APPROVED"), color: "bg-tx-blue", href: `${base}/buyers?status=BASIC_APPROVED` },
+    { label: "Approved buyers", value: count("APPROVED"), color: "bg-tx-green", href: `${base}/buyers?status=APPROVED` },
   ];
   const itemPipeline = (role === "DIC" ? DIC_VISIBLE_ITEMS : (Object.keys(ITEM_META) as ItemStatus[])).map((s) => ({
-    label: ITEM_META[s].short, value: items(s), color: ITEM_META[s].dot,
+    label: ITEM_META[s].short, value: items(s), color: ITEM_META[s].dot, href: `${base}/requirements?item=${s}`,
   }));
 
   return (
@@ -92,7 +92,7 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
         {stats.map((s) => <StatCard key={s.label} {...s} />)}
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader title="Pipeline" subtitle={`${total} buyers · ${totalItems} sector requirements in view`} />
           <div className="space-y-8 p-6">
@@ -121,13 +121,9 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
             {queue.map((b) => (
               <li key={b.id}>
                 <Link href={`${base}/buyers/${b.id}`} className="block px-5 py-3 hover:bg-slate-50">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-ink">{b.name}</div>
-                      <div className="text-xs text-slate-500">{b.regNo} · {b.country} · {fmtDate(b.updatedAt)}</div>
-                    </div>
-                    {b.status === "BASIC_SUBMITTED" && <StatusBadge status={b.status} />}
-                  </div>
+                  <div className="truncate text-sm font-semibold text-ink" title={b.name}>{b.name}</div>
+                  <div className="text-xs text-slate-500">{b.regNo} · {b.country} · {fmtDate(b.updatedAt)}</div>
+                  {b.status === "BASIC_SUBMITTED" && <div className="mt-1.5"><StatusBadge status={b.status} /></div>}
                   {!!b.requirement?.items.length && <div className="mt-1.5"><ItemChips items={b.requirement.items} /></div>}
                 </Link>
               </li>
@@ -142,9 +138,9 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
           </div>
         </Card>
         <Card>
-          <CardHeader title="Sectors of interest" subtitle="Number of buyers per sector" />
+          <CardHeader title="Sectors of interest" subtitle="Buyer requirements per sector" />
           <div className="p-6">
-            <BarList data={topSectors.map((s) => ({ label: s.name, value: s.n, href: `${base}/buyers?sector=${s.id}` }))} color="bg-tx-red" empty="No sector requirements yet." />
+            <BarList data={topSectors.map((s) => ({ label: s.name, value: s.n, href: `${base}/requirements?sector=${s.id}` }))} color="bg-tx-red" empty="No sector requirements yet." />
           </div>
         </Card>
       </div>

@@ -1,11 +1,11 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import type { Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
-import { itemScope, scopeFor } from "@/lib/buyer-query";
+import { actionWhere, itemScope, scopeFor } from "@/lib/buyer-query";
+import { backFor } from "@/components/nav/back-target";
 import { Alert, Card, CardHeader, DL, PageHeader } from "@/components/ui";
 import { StatusBadge } from "@/components/status-badge";
+import { DIC_ITEM_QUEUE, FIEO_ITEM_QUEUE } from "@/lib/status";
 import { JourneyStepper } from "@/components/journey";
 import { Timeline } from "@/components/timeline";
 import { DocLink } from "@/components/doc-link";
@@ -46,18 +46,30 @@ export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; i
   if (!b) notFound();
   const doc = (k: "PROFILE" | "CREDENTIALS") => b.documents.find((d) => d.kind === k) ?? null;
   const basicPending = role === "FIEO" && b.status === "BASIC_SUBMITTED";
+  const queue = role === "FIEO" ? FIEO_ITEM_QUEUE : role === "DIC" ? DIC_ITEM_QUEUE : [];
+  const pendingItems = (b.requirement?.items ?? []).filter((i) => queue.includes(i.status)).length;
+  const next = role === "FIEO" || role === "DIC"
+    ? await prisma.buyer.findFirst({ where: { AND: [actionWhere(role), { id: { not: b.id } }] }, orderBy: { updatedAt: "asc" }, select: { id: true } })
+    : null;
+  const nav = { next: next ? `${base}/${next.id}` : null, list: `${base}?status=action`, listLabel: "Waiting for my decision" };
 
   return (
     <>
-      <Link href={base} className="no-print mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-ink">
-        <ArrowLeft className="size-4" /> Back to list
-      </Link>
       <PageHeader
+        back={backFor(base, "Back to buyers")}
         eyebrow={<>{b.regNo}{b.approvedNo && <> · <span className="text-brand-700">{b.approvedNo}</span></>}</>}
         title={b.name}
         subtitle={`${b.country} · Login ${b.user.username}`}
         actions={<><StatusBadge status={b.status} /><DownloadButtons href={`/api/reports/buyer-profile?buyerId=${b.id}`} label="Buyer profile" compact /></>}
       />
+      {(basicPending || pendingItems > 0) && (
+        // On phones the decision panels sit below the long details; offer a shortcut.
+        <a href={basicPending ? "#decision" : "#sectors"}
+          className="no-print mb-4 flex items-center justify-between gap-3 rounded-xl bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800 ring-1 ring-brand-200 lg:hidden">
+          {basicPending ? "Go to the basic details decision" : `Go to the ${pendingItems} sector${pendingItems > 1 ? "s" : ""} to decide`}
+          <span aria-hidden>↓</span>
+        </a>
+      )}
       <Card className="mb-6 p-5 sm:p-6"><JourneyStepper status={b.status} /></Card>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -86,15 +98,18 @@ export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; i
         </div>
 
         <div className="space-y-6">
-          {role === "FIEO" && (b.status === "BASIC_SUBMITTED" || b.status === "BASIC_RETURNED" || b.status === "SIGNED_UP") && (
+          {role === "FIEO" && b.status !== "APPROVED" && (
             // Stays mounted so the confirmation remains visible after the status moves on.
-            <Card className={basicPending ? "no-print border-brand-200 p-5 ring-2 ring-brand-100" : "no-print p-5"}>
+            <Card id="decision" className={basicPending ? "no-print scroll-mt-24 border-brand-200 p-5 ring-2 ring-brand-100" : "no-print scroll-mt-24 p-5"}>
               <ReviewPanel
                 buyerId={b.id}
+                nav={nav}
                 heading={basicPending ? "Verify basic details" : "Basic details"}
                 note={basicPending
                   ? "Check the buyer's identity, contact and documents. Approving lets the buyer add sector requirements."
-                  : "Waiting for the buyer to submit their basic details."}
+                  : b.status === "BASIC_APPROVED"
+                    ? "Approved. The buyer's sector requirements are reviewed below, one sector at a time."
+                    : "Waiting for the buyer to submit their basic details."}
                 actions={basicPending ? [
                   { decision: "approve_basic", label: "Approve basic details", variant: "success", needsComment: false },
                   { decision: "return_basic", label: "Return to buyer for correction", variant: "danger", needsComment: true },
@@ -110,9 +125,10 @@ export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; i
         </div>
       </div>
 
-      <div className="mt-8">
+      <div id="sectors" className="mt-8 scroll-mt-24">
         <ItemReview
           buyerId={b.id}
+          nav={nav}
           role={role}
           items={(b.requirement?.items ?? []).map((i) => ({
             id: i.id, sectorId: i.sectorId, sectorName: i.sector.name, status: i.status, everApproved: i.everApproved,

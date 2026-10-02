@@ -95,7 +95,7 @@ function ItemCard({ item, onEdit, onRemoved }: { item: BoardItem; onEdit: () => 
   const editable = ITEM_EDITABLE.includes(item.status);
   const returned = item.status === "FIEO_RETURNED";
   return (
-    <Card className={cn("overflow-hidden", returned && "ring-2 ring-red-200")}>
+    <Card id={`item-${item.id}`} className={cn("scroll-mt-24 overflow-hidden", returned && "ring-2 ring-red-200")}>
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-6 py-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">

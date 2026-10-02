@@ -33,7 +33,7 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
     prisma.seller.groupBy({ by: ["status"], where: scope, _count: true }),
     prisma.seller.groupBy({ by: ["district", "status"], where: scope, _count: true }),
     prisma.sellerProduct.findMany({ where: { seller: scope }, select: { sectorId: true, sector: { select: { name: true } } } }),
-    prisma.seller.groupBy({ by: ["exportExperience"], where: scope, _count: true }),
+    prisma.seller.groupBy({ by: ["exportExperience", "status"], where: scope, _count: true }),
     prisma.seller.groupBy({ by: ["source"], where: scope, _count: true }),
     prisma.buyer.count({ where: { status: "APPROVED" } }),
     user.role === "DISTRICT" || user.role === "DIC"
@@ -46,6 +46,8 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
   const n = (...s: SellerStatus[]) => byStatus.filter((x) => s.includes(x.status)).reduce((a, x) => a + x._count, 0);
   const total = byStatus.reduce((a, x) => a + x._count, 0);
   const approved = n("APPROVED");
+  const expCount = (yes: boolean, status?: SellerStatus) =>
+    exp.filter((e) => e.exportExperience === yes && (!status || e.status === status)).reduce((a, e) => a + e._count, 0);
 
   const stats =
     user.role === "DISTRICT" ? [
@@ -56,7 +58,7 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
     ]
     : user.role === "FIEO" ? [
       { label: "Approved sellers", value: approved, accent: "green" as const, href: `${base}/sellers` },
-      { label: "With export experience", value: exp.find((e) => e.exportExperience)?._count ?? 0, accent: "blue" as const, href: `${base}/sellers?exp=yes` },
+      { label: "With export experience", value: expCount(true), accent: "blue" as const, href: `${base}/sellers?exp=yes` },
       { label: "Sectors covered", value: new Set(products.map((p) => p.sectorId)).size, accent: "violet" as const },
       { label: "Districts represented", value: new Set(byDistrict.map((d) => d.district)).size, accent: "yellow" as const },
     ]
@@ -66,7 +68,7 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
       { label: "Approved sellers", value: approved, accent: "green" as const, href: `${base}/sellers?status=APPROVED` },
       ...(user.role === "ADMIN"
         ? [{ label: "Pending with districts", value: n("WITH_DISTRICT"), accent: "yellow" as const, href: `${base}/sellers?status=WITH_DISTRICT` }]
-        : [{ label: "With export experience", value: exp.find((e) => e.exportExperience)?._count ?? 0, accent: "blue" as const, href: `${base}/sellers?exp=yes` }]),
+        : [{ label: "Approved, with export experience", value: expCount(true, "APPROVED"), accent: "blue" as const, href: `${base}/sellers?status=APPROVED&exp=yes` }]),
     ];
 
   const sectorCounts = new Map<string, { id: string; name: string; n: number }>();
@@ -83,6 +85,15 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
   const targets = await getTargets();
   const ownTarget = user.role === "DISTRICT" ? targets.district[user.district ?? ""] ?? 0 : 0;
 
+  const sellersBySector = (
+    <Card className={user.role === "ADMIN" ? "" : "lg:col-span-2"}>
+      <CardHeader title="Sellers by sector" subtitle="Sellers ready to export, per sector" />
+      <div className="p-6">
+        <BarList data={topSectors.map((s) => ({ label: s.name, value: s.n, href: `${base}/sellers?sector=${s.id}` }))} color="bg-tx-red" empty="No sellers yet." />
+      </div>
+    </Card>
+  );
+
   return (
     <section className={standalone ? "" : "mt-10"}>
       {!standalone && (
@@ -98,17 +109,18 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
         {stats.map((s) => <StatCard key={s.label} {...s} />)}
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-3">
+        {/* FIEO sees approved sellers only, so a status pipeline would be a single bar. */}
+        {user.role === "FIEO" ? sellersBySector : <Card className="lg:col-span-2">
           <CardHeader title="Seller pipeline" subtitle={`${total} sellers in view`} />
           <div className="space-y-6 p-6">
-            <PipelineBar segments={statuses.map((s) => ({ label: SELLER_META[s].short, value: n(s), color: SELLER_META[s].dot }))} />
-            {(user.role === "DISTRICT" || user.role === "ADMIN") && (
+            <PipelineBar segments={statuses.map((s) => ({ label: SELLER_META[s].short, value: n(s), color: SELLER_META[s].dot, href: `${base}/sellers?status=${s}` }))} />
+            {(user.role === "DISTRICT" || user.role === "ADMIN" || user.role === "DIC") && (
               <div className="grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2">
                 <div>
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">How sellers were registered</div>
                   <ul className="space-y-1 text-sm">
-                    {[["DISTRICT", "Entered by DIC"], ["BULK", "Bulk upload"], ["SELF", "Self-registered"]].map(([k, l]) => (
+                    {[["DISTRICT", "Entered by district centre"], ["BULK", "Bulk upload"], ["SELF", "Self-registered"]].map(([k, l]) => (
                       <li key={k} className="flex justify-between"><span className="text-slate-600">{l}</span><span className="font-semibold tabular-nums">{bySource.find((x) => x.source === k)?._count ?? 0}</span></li>
                     ))}
                   </ul>
@@ -116,14 +128,14 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
                 <div>
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Export experience</div>
                   <ul className="space-y-1 text-sm">
-                    <li className="flex justify-between"><span className="text-slate-600">Yes</span><span className="font-semibold tabular-nums">{exp.find((e) => e.exportExperience)?._count ?? 0}</span></li>
-                    <li className="flex justify-between"><span className="text-slate-600">No</span><span className="font-semibold tabular-nums">{exp.find((e) => !e.exportExperience)?._count ?? 0}</span></li>
+                    <li className="flex justify-between"><span className="text-slate-600">Yes</span><span className="font-semibold tabular-nums">{expCount(true)}</span></li>
+                    <li className="flex justify-between"><span className="text-slate-600">No</span><span className="font-semibold tabular-nums">{expCount(false)}</span></li>
                   </ul>
                 </div>
               </div>
             )}
           </div>
-        </Card>
+        </Card>}
         <Card>
           <CardHeader title="Programme targets" icon={<Target className="size-4" />}
             subtitle={user.role === "DISTRICT" ? "Approved-seller target set by the Directorate" : `Each buyer to meet at least ${targets.sellersPerBuyer} sellers`}
@@ -142,7 +154,7 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
         </Card>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      {user.role !== "FIEO" && <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {user.role === "DISTRICT" || user.role === "DIC" ? (
           <Card>
             <CardHeader title={user.role === "DISTRICT" ? "Waiting for recommendation" : "Waiting for approval"} subtitle="Oldest first"
@@ -163,16 +175,11 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
             </ul>
           </Card>
         ) : null}
-        <Card className={user.role === "FIEO" ? "lg:col-span-3" : ""}>
-          <CardHeader title="Sellers by sector" subtitle="Sellers ready to export, per sector" />
-          <div className="p-6">
-            <BarList data={topSectors.map((s) => ({ label: s.name, value: s.n, href: `${base}/sellers?sector=${s.id}` }))} color="bg-tx-red" empty="No sellers yet." />
-          </div>
-        </Card>
+        {sellersBySector}
         {(user.role === "DIC" || user.role === "ADMIN") && (
           <Card className={user.role === "DIC" ? "lg:col-span-3" : "lg:col-span-2"}>
             <CardHeader title="District-wise position" subtitle="Approved sellers against each district's target" />
-            <div className="relative overflow-x-auto">
+            <div className="table-scroll relative overflow-x-auto">
               <table className="w-full min-w-[520px] text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
@@ -209,7 +216,7 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
             </div>
           </Card>
         )}
-      </div>
+      </div>}
     </section>
   );
 }

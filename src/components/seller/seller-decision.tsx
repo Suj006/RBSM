@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { CheckCircle2, Send, Undo2, XCircle } from "lucide-react";
 import { sellerDecisionAction } from "@/app/actions/seller";
+import { NextUp, type NextUpLinks } from "@/components/nav/next-up";
 import { Alert, Button, Field, Textarea } from "@/components/ui";
 import { useKeepForm } from "@/lib/use-keep-form";
 
@@ -21,11 +22,11 @@ export const DIRECTORATE_OPTIONS: Opt[] = [
 const ICON = { recommend: Send, approve: CheckCircle2, return: Undo2, reject: XCircle };
 
 /** Decision panel for one seller (detail page). */
-export function SellerDecision({ sellerId, options, heading, note }: { sellerId: string; options: Opt[]; heading: string; note?: string }) {
+export function SellerDecision({ sellerId, options, heading, note, nav }: { sellerId: string; options: Opt[]; heading: string; note?: string; nav?: NextUpLinks }) {
   const [state, action, pending] = useActionState(sellerDecisionAction, undefined);
   const onSubmit = useKeepForm(action);
   const [comment, setComment] = useState("");
-  if (state?.ok) return <Alert tone="green" title="Done">{state.message}</Alert>;
+  if (state?.ok) return <Alert tone="green" title="Done">{state.message}{nav && <NextUp {...nav} />}</Alert>;
   if (!options.length) return <div><div className="font-bold text-ink">{heading}</div>{note && <p className="mt-1 text-sm text-slate-500">{note}</p>}</div>;
   return (
     <form onSubmit={onSubmit} className="space-y-4">

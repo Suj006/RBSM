@@ -54,7 +54,7 @@ export function SellerTable({ rows, base, bulk }: {
           </Button>
         </div>
       )}
-      <div className="relative overflow-x-auto">
+      <div className="table-scroll relative overflow-x-auto">
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <tr>
@@ -100,7 +100,7 @@ export function SellerTable({ rows, base, bulk }: {
                   <td className="px-4 py-3 align-top">{r.exportExperience ? <Badge tone="green">Yes</Badge> : <Badge tone="slate">No</Badge>}</td>
                   <td className="px-4 py-3 align-top">
                     <Badge tone={m.tone}>{m.short}</Badge>
-                    <div className="mt-1 text-[11px] text-slate-400">{r.source === "SELF" ? "Self-registered" : r.source === "BULK" ? "Bulk upload" : "Entered by DIC"} · {r.updated}</div>
+                    <div className="mt-1 text-[11px] text-slate-400">{r.source === "SELF" ? "Self-registered" : r.source === "BULK" ? "Bulk upload" : "Entered by district centre"} · {r.updated}</div>
                   </td>
                   <td className="px-4 py-3 text-right align-top">
                     <Link href={`${base}/${r.id}`} aria-label={`Open ${r.name}`} className="inline-grid size-8 place-items-center rounded-lg text-slate-400 group-hover:bg-white group-hover:text-brand-700">

@@ -15,7 +15,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const sectors = await prisma.sector.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } });
   return (
     <>
-      <PageHeader eyebrow={s.regNo} title={`Edit — ${s.name}`} />
+      <PageHeader back={{ href: `/district/sellers/${s.id}`, label: "Back to seller" }} eyebrow={s.regNo} title={`Edit — ${s.name}`} />
       {SELLER_DISTRICT_EDITABLE.includes(s.status) ? (
         <SellerForm mode="district" district={s.district} backHref={`/district/sellers/${s.id}`} sectors={sectors}
           initial={{

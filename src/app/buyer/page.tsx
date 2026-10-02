@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, Clock, AlertTriangle, Plus } from "lucide-react";
+import { ArrowRight, BadgeCheck, Clock, AlertTriangle, Plus, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireBuyer } from "@/lib/auth";
 import { Alert, Badge, ButtonLink, Card, CardHeader, DL, PageHeader } from "@/components/ui";
@@ -79,12 +79,17 @@ export default async function BuyerDashboard() {
                 action={<Link href="/buyer/requirement" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:underline"><Plus className="size-4" /> Add / modify</Link>} />
               <ul className="divide-y divide-slate-100">
                 {items.map((i) => (
-                  <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 px-6 py-3">
-                    <div className="min-w-0">
-                      <div className="font-semibold text-ink">{i.sector.name}</div>
-                      <div className="truncate text-xs text-slate-500">{i.products}</div>
-                    </div>
-                    <Badge tone={ITEM_META[i.status].tone}>{ITEM_META[i.status].label}</Badge>
+                  <li key={i.id}>
+                    <Link href={`/buyer/requirement#item-${i.id}`} className="group flex flex-wrap items-center justify-between gap-2 px-6 py-3 hover:bg-slate-50">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-ink group-hover:text-brand-700">{i.sector.name}</div>
+                        <div className="truncate text-xs text-slate-500">{i.products}</div>
+                      </div>
+                      <span className="inline-flex items-center gap-2">
+                        <Badge tone={ITEM_META[i.status].tone}>{ITEM_META[i.status].label}</Badge>
+                        <ChevronRight className="size-4 text-slate-400 group-hover:text-brand-700" />
+                      </span>
+                    </Link>
                   </li>
                 ))}
                 {!items.length && <li className="px-6 py-6 text-sm text-slate-500">No sectors added yet.</li>}

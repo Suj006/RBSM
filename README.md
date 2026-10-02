@@ -64,6 +64,11 @@ Staff passwords can be changed from **Admin → Users & logins**.
 - Detailed requirement: multiple sectors, products, specifications, volumes, certifications (master + custom)
 - Sector-wise approval: save draft / submit per sector, return-with-comment at FIEO and Directorate, modify approved sectors or add new ones later; full audit trail
 - Role dashboards: KPIs, pipeline, sign-up trend, top countries, sectors of interest, work queue
+- Every dashboard tile, pipeline legend and chart bar opens the matching list, with the same count
+  (buyer tiles open **Buyer applications**; sector tiles open **Sector requirements**, one row per buyer sector)
+- Easy navigation: "Back to …" on every inner page returns to the list you came from with its filters kept;
+  after a decision, **Next pending application** opens the next item in your queue; sector rows jump straight
+  to that sector on the buyer's page; on phones a shortcut jumps to the decision panel
 - Reports (Reports page for FIEO, Directorate and Admin) — each as a formatted **Excel** workbook and a **PDF**
   with the TRADEX letterhead, coloured headings, status colours, summary boxes and page numbers:
   Buyer Registration Register, Sector-wise Requirement Report, RBSM Approved Buyer List, MIS Summary,

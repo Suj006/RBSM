@@ -47,7 +47,7 @@ export function ColumnChart({ data, label }: { data: { day: string; value: numbe
 }
 
 /** Stacked horizontal bar showing the pipeline split by status. */
-export function PipelineBar({ segments }: { segments: { label: string; value: number; color: string }[] }) {
+export function PipelineBar({ segments }: { segments: { label: string; value: number; color: string; href?: string }[] }) {
   const total = segments.reduce((s, x) => s + x.value, 0);
   return (
     <div>
@@ -58,10 +58,19 @@ export function PipelineBar({ segments }: { segments: { label: string; value: nu
       </div>
       <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3">
         {segments.map((s) => (
-          <li key={s.label} className="flex items-center gap-2">
-            <span className={cn("size-2.5 shrink-0 rounded-sm", s.color)} />
-            <span className="truncate text-slate-600">{s.label}</span>
-            <span className="ml-auto font-semibold tabular-nums text-ink">{s.value}</span>
+          <li key={s.label}>
+            {(() => {
+              const body = (
+                <>
+                  <span className={cn("size-2.5 shrink-0 rounded-sm", s.color)} />
+                  <span className="truncate text-slate-600 group-hover:text-brand-700 group-hover:underline">{s.label}</span>
+                  <span className="ml-auto font-semibold tabular-nums text-ink">{s.value}</span>
+                </>
+              );
+              return s.href
+                ? <a href={s.href} className="group -mx-1.5 flex items-center gap-2 rounded px-1.5 py-0.5 hover:bg-brand-50" title={`Open: ${s.label}`}>{body}</a>
+                : <div className="flex items-center gap-2 py-0.5">{body}</div>;
+            })()}
           </li>
         ))}
       </ul>

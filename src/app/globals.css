@@ -57,3 +57,12 @@ body {
   body { background: #fff; }
   .print-full { margin: 0 !important; padding: 0 !important; max-width: none !important; }
 }
+
+/* Wide tables scroll sideways on phones; say so. */
+@media (max-width: 639px) {
+  .table-scroll::before {
+    content: "Swipe sideways to see all columns →";
+    display: block; position: sticky; left: 0;
+    padding: 0.5rem 1rem; font-size: 0.75rem; color: #94a3b8;
+  }
+}

@@ -20,7 +20,7 @@ export async function ApprovedListPage({ base }: { base: string }) {
       />
       <Card className="overflow-hidden">
         {rows.length ? (
-          <div className="relative overflow-x-auto">
+          <div className="table-scroll relative overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
