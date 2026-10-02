@@ -83,6 +83,7 @@ model User {
   reviewLogs   ReviewLog[]
   sellersAdded Seller[]    @relation("SellerCreatedBy")
   sellerLogs   SellerLog[]
+  targetsSet   Target[]    @relation("TargetUpdatedBy")
 }
 
 model Session {
@@ -348,4 +349,14 @@ model SellerLog {
   createdAt DateTime     @default(now())
 
   @@index([sellerId, createdAt])
+}
+
+// Programme targets set by the Directorate. Keys: "sellers", "buyers",
+// "sellersPerBuyer" and "district:<District name>" (approved-seller target per district).
+model Target {
+  key         String   @id
+  value       Int
+  updatedById String?
+  updatedBy   User?    @relation("TargetUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedAt   DateTime @updatedAt
 }

@@ -7,7 +7,7 @@ import { firstErrors } from "@/lib/text";
 import { C } from "@/lib/reports/theme";
 
 export const MAX_ROWS = 1000;
-const SECTOR_SLOTS = 3;
+const SECTOR_SLOTS = 5; // sector + products column pairs in the upload template
 
 // Column order of the upload template (district is fixed to the uploading office).
 export const COLUMNS = [

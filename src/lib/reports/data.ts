@@ -12,6 +12,7 @@ import { ALL_SELLER_STATUSES, SELLER_ACTION_LABEL, SELLER_META } from "@/lib/sta
 import type { SellerStatus } from "@/generated/prisma/enums";
 import { DISTRICT_NAMES, localBodyLabel } from "@/lib/config";
 import { fmtMobile } from "@/lib/text";
+import { getTargets } from "@/lib/targets";
 
 export const REPORTS = {
   "buyer-register": {
@@ -32,7 +33,7 @@ export const REPORTS = {
   },
   "seller-district-summary": {
     title: "District-wise Seller Summary",
-    description: "Seller registrations and approvals by district, against the programme target.",
+    description: "Seller registrations and approvals by district, against the targets set by the Directorate.",
   },
   "mis-summary": {
     title: "MIS Summary Report",
@@ -55,6 +56,8 @@ async function describeFilters(f: BuyerFilters): Promise<string[]> {
   const out: string[] = [];
   if (f.q) out.push(`Search: "${f.q}"`);
   if (f.status === "action") out.push("Buyer status: pending action");
+  else if (f.status === "basic_approved") out.push("Buyer status: basic details approved");
+  else if (f.status === "basic_pending") out.push("Buyer status: basic details not submitted / returned");
   else if (f.status && ALL_STATUSES.includes(f.status as BuyerStatus)) out.push(`Buyer status: ${STATUS_META[f.status as BuyerStatus].label}`);
   if (f.item && ALL_ITEM_STATUSES.includes(f.item as ItemStatus)) out.push(`Sector status: ${ITEM_META[f.item as ItemStatus].label}`);
   if (f.sector) {
@@ -508,15 +511,15 @@ async function sellerRegister(user: User, f: SellerFilters): Promise<Report> {
 async function sellerDistrictSummary(user: User): Promise<Report> {
   const sellers = await prisma.seller.findMany({ where: sellerScope(user), select: { district: true, status: true, exportExperience: true } });
   const districts = user.role === "DISTRICT" ? [user.district ?? ""] : DISTRICT_NAMES;
-  const perDistrict = Math.ceil(EVENT.targetSellers / DISTRICT_NAMES.length);
+  const targets = await getTargets();
   const rows = districts.map((d) => {
     const ds = sellers.filter((x) => x.district === d);
     const c = (...st: SellerStatus[]) => ds.filter((x) => st.includes(x.status)).length;
     const approved = c("APPROVED");
     return {
       district: d, total: ds.length, pending: c("WITH_DISTRICT", "RETURNED"), recommended: c("RECOMMENDED"),
-      approved, rejected: c("REJECTED"), exp: ds.filter((x) => x.exportExperience).length, target: perDistrict,
-      achieved: perDistrict ? approved / perDistrict : null,
+      approved, rejected: c("REJECTED"), exp: ds.filter((x) => x.exportExperience).length, target: targets.district[d] ?? 0,
+      achieved: targets.district[d] ? approved / targets.district[d] : null,
     };
   });
   const sum = (k: keyof (typeof rows)[number]) => rows.reduce((a, r) => a + Number(r[k] ?? 0), 0);
@@ -530,7 +533,7 @@ async function sellerDistrictSummary(user: User): Promise<Report> {
     kpis: [
       { label: "Sellers", value: sellers.length, tone: "blue" },
       { label: "Approved sellers", value: totalApproved, tone: "green" },
-      { label: `Target (${user.role === "DISTRICT" ? "district share" : "programme"})`, value: user.role === "DISTRICT" ? perDistrict : EVENT.targetSellers, tone: "yellow" },
+      ...(fieo ? [] : [{ label: `Target (${user.role === "DISTRICT" ? "district" : "programme"})`, value: user.role === "DISTRICT" ? targets.district[user.district ?? ""] ?? 0 : targets.sellers, tone: "yellow" as const }]),
     ],
     tables: [{
       name: "District-wise",
@@ -544,15 +547,18 @@ async function sellerDistrictSummary(user: User): Promise<Report> {
         { key: "approved", header: "Approved", width: 11, kind: "number", align: "right" },
         ...(fieo ? [] : [{ key: "rejected", header: "Rejected", width: 10, kind: "number" as const, align: "right" as const }]),
         { key: "exp", header: "Export Exp.", width: 11, kind: "number", align: "right" },
-        { key: "target", header: "Target", width: 9, kind: "number", align: "right" },
-        { key: "achieved", header: "Achieved", width: 10, kind: "percent", align: "right" },
+        // Targets are an internal Directorate / district matter — not shown to FIEO.
+        ...(fieo ? [] : [
+          { key: "target", header: "Target", width: 9, kind: "number" as const, align: "right" as const },
+          { key: "achieved", header: "Achieved", width: 10, kind: "percent" as const, align: "right" as const },
+        ]),
       ],
       rows,
       totals: {
         district: "Total", total: sum("total"), pending: sum("pending"), recommended: sum("recommended"), approved: totalApproved,
         rejected: sum("rejected"), exp: sum("exp"),
-        target: user.role === "DISTRICT" ? perDistrict : EVENT.targetSellers,
-        achieved: totalApproved / (user.role === "DISTRICT" ? perDistrict : EVENT.targetSellers),
+        target: user.role === "DISTRICT" ? targets.district[user.district ?? ""] ?? 0 : targets.sellers,
+        achieved: (user.role === "DISTRICT" ? targets.district[user.district ?? ""] : targets.sellers) ? totalApproved / (user.role === "DISTRICT" ? targets.district[user.district ?? ""] : targets.sellers) : null,
       },
     }],
   };

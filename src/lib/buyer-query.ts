@@ -42,6 +42,8 @@ export function buyerWhere(role: Role, f: BuyerFilters): Prisma.BuyerWhereInput 
     });
   }
   if (f.status === "action") and.push(actionWhere(role));
+  else if (f.status === "basic_approved") and.push({ status: { in: ["BASIC_APPROVED", "APPROVED"] } });
+  else if (f.status === "basic_pending") and.push({ status: { in: ["SIGNED_UP", "BASIC_RETURNED"] } });
   else if (f.status && ALL_STATUSES.includes(f.status as BuyerStatus)) and.push({ status: f.status as BuyerStatus });
 
   const item: Prisma.RequirementItemWhereInput = { ...itemScope(role) };

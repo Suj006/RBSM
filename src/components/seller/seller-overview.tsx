@@ -4,7 +4,8 @@ import type { User } from "@/generated/prisma/client";
 import type { SellerStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { sellerScope } from "@/lib/seller-query";
-import { DISTRICT_NAMES, EVENT } from "@/lib/config";
+import { DISTRICT_NAMES } from "@/lib/config";
+import { getTargets } from "@/lib/targets";
 import { SELLER_META } from "@/lib/status";
 import { fmtDate } from "@/lib/format";
 import { Badge, Card, CardHeader, StatCard } from "@/components/ui";
@@ -79,7 +80,8 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
     const c = (...s: SellerStatus[]) => byDistrict.filter((x) => x.district === d && s.includes(x.status)).reduce((a, x) => a + x._count, 0);
     return { d, pending: c("WITH_DISTRICT"), dic: c("RECOMMENDED"), returned: c("RETURNED"), approved: c("APPROVED") };
   });
-  const perDistrictTarget = Math.ceil(EVENT.targetSellers / DISTRICT_NAMES.length);
+  const targets = await getTargets();
+  const ownTarget = user.role === "DISTRICT" ? targets.district[user.district ?? ""] ?? 0 : 0;
 
   return (
     <section className={standalone ? "" : "mt-10"}>
@@ -124,15 +126,16 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
         </Card>
         <Card>
           <CardHeader title="Programme targets" icon={<Target className="size-4" />}
-            subtitle={user.role === "DISTRICT" ? `Indicative share: ${perDistrictTarget} sellers per district` : "Each buyer to meet at least 10 sellers"} />
+            subtitle={user.role === "DISTRICT" ? "Approved-seller target set by the Directorate" : `Each buyer to meet at least ${targets.sellersPerBuyer} sellers`}
+            action={user.role === "DIC" || user.role === "ADMIN" ? <Link href={`${base}/targets`} className="text-sm font-semibold text-brand-700 hover:underline">Edit</Link> : undefined} />
           <div className="space-y-6 p-6">
             {user.role === "DISTRICT" ? (
-              <Progress label={`Approved sellers — ${user.district}`} value={approved} target={perDistrictTarget} color="bg-tx-green" />
+              <Progress label={`Approved sellers — ${user.district}`} value={approved} target={ownTarget} color="bg-tx-green" />
             ) : (
               <>
-                <Progress label="Approved sellers" value={approved} target={EVENT.targetSellers} color="bg-tx-green" />
-                <Progress label="Approved buyers" value={approvedBuyers} target={EVENT.targetBuyers} color="bg-tx-blue" />
-                <Progress label="Sellers per approved buyer" value={approvedBuyers ? Math.floor(approved / approvedBuyers) : 0} target={10} color="bg-tx-yellow" />
+                <Progress label="Approved sellers" value={approved} target={targets.sellers} color="bg-tx-green" />
+                <Progress label="Approved buyers" value={approvedBuyers} target={targets.buyers} color="bg-tx-blue" />
+                <Progress label="Sellers per approved buyer" value={approvedBuyers ? Math.floor(approved / approvedBuyers) : 0} target={targets.sellersPerBuyer} color="bg-tx-yellow" />
               </>
             )}
           </div>
@@ -160,41 +163,42 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
             </ul>
           </Card>
         ) : null}
-        <Card className={user.role === "DISTRICT" || user.role === "DIC" ? "" : "lg:col-span-1"}>
+        <Card className={user.role === "FIEO" ? "lg:col-span-3" : ""}>
           <CardHeader title="Sellers by sector" subtitle="Sellers ready to export, per sector" />
           <div className="p-6">
             <BarList data={topSectors.map((s) => ({ label: s.name, value: s.n, href: `${base}/sellers?sector=${s.id}` }))} color="bg-tx-red" empty="No sellers yet." />
           </div>
         </Card>
-        {user.role !== "DISTRICT" && (
+        {(user.role === "DIC" || user.role === "ADMIN") && (
           <Card className={user.role === "DIC" ? "lg:col-span-3" : "lg:col-span-2"}>
-            <CardHeader title="District-wise position" subtitle={`Indicative target: ${perDistrictTarget} approved sellers per district`} />
+            <CardHeader title="District-wise position" subtitle="Approved sellers against each district's target" />
             <div className="relative overflow-x-auto">
               <table className="w-full min-w-[520px] text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-4 py-2.5 text-left">District</th>
                     {user.role === "ADMIN" && <th className="px-3 py-2.5 text-right">With district</th>}
-                    {user.role !== "FIEO" && <th className="px-3 py-2.5 text-right">With Directorate</th>}
-                    {user.role !== "FIEO" && <th className="px-3 py-2.5 text-right">Returned</th>}
+                    <th className="px-3 py-2.5 text-right">With Directorate</th>
+                    <th className="px-3 py-2.5 text-right">Returned</th>
                     <th className="px-3 py-2.5 text-right">Approved</th>
                     <th className="w-[28%] px-4 py-2.5 text-left">Progress to target</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {districtRows.map((r) => {
-                    const pct = Math.min(100, (r.approved / perDistrictTarget) * 100);
+                    const tg = targets.district[r.d] ?? 0;
+                    const pct = tg ? Math.min(100, (r.approved / tg) * 100) : 0;
                     return (
                       <tr key={r.d} className="hover:bg-slate-50">
                         <td className="px-4 py-2"><Link href={`${base}/sellers?district=${encodeURIComponent(r.d)}`} className="hover:text-brand-700">{r.d}</Link></td>
                         {user.role === "ADMIN" && <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.pending}</td>}
-                        {user.role !== "FIEO" && <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.dic}</td>}
-                        {user.role !== "FIEO" && <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.returned}</td>}
+                        <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.dic}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.returned}</td>
                         <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{r.approved}</td>
                         <td className="px-4 py-2">
                           <div className="flex items-center gap-2">
                             <div className="h-2 flex-1 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-tx-green" style={{ width: `${Math.max(pct, r.approved ? 3 : 0)}%` }} /></div>
-                            <span className="w-9 text-right text-xs tabular-nums text-slate-500">{pct.toFixed(0)}%</span>
+                            <span className="w-16 text-right text-xs tabular-nums text-slate-500">{r.approved}/{tg}</span>
                           </div>
                         </td>
                       </tr>

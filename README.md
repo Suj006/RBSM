@@ -39,7 +39,8 @@ Seller details: name, district (14 Kerala districts), taluk, local body type (Pa
 Corporation) and name, Udyam number (Kerala only, UDYAM-KL-00-0000000, unique), export experience,
 sectors with products ready to export, and promoter contact (name, mobile, WhatsApp, e-mail).
 FIEO sees sellers only after Directorate approval. Seller products use the same sector master as buyer
-requirements, ready for buyer–seller matchmaking (target: 600 sellers, 60 buyers, 10 sellers per buyer).
+requirements, ready for buyer–seller matchmaking. Targets (approved sellers overall and per district,
+approved buyers, sellers per buyer — default 600 / 60 / 10) are set by the Directorate on the **Targets** page.
 
 ## Logins (phase-1 defaults — change before going live)
 
@@ -48,7 +49,7 @@ requirements, ready for buyer–seller matchmaking (target: 600 sellers, 60 buye
 | FIEO | `fieo` | `pass@123` | See all buyers, approve / return basic details, recommend / return each sector |
 | Directorate | `dic123` | `dic123` | See FIEO-recommended sectors, approve each (first approval adds the buyer to the RBSM list) / return to FIEO |
 | Admin | `admin` | `admin` | Sector & certification masters, users, buyer password reset, e-mail outbox, all reports |
-| District offices (14) | `dic-tvm`, `dic-klm`, `dic-pta`, `dic-alp`, `dic-ktm`, `dic-idk`, `dic-ekm`, `dic-tsr`, `dic-pkd`, `dic-mlp`, `dic-kkd`, `dic-wyd`, `dic-knr`, `dic-ksd` | `pass@123` | Register sellers of their district (form / bulk upload), recommend or reject |
+| District offices (14) | `dic-tvm`, `dic-klm`, `dic-pta`, `dic-alp`, `dic-ktm`, `dic-idk`, `dic-ekm`, `dic-tsr`, `dic-pkd`, `dic-mlp`, `dic-kkd`, `dic-wyd`, `dic-knr`, `dic-ksd` | `pass@123` | Register sellers of their district (form / bulk Excel upload, up to 5 sectors per row), recommend or reject |
 | Buyer | `Tradex2027-NNN` | `pass@123` (must change on first login) | Own profile and requirement |
 | Seller | `Tradex2027-SNNN` (allotted on approval) | `pass@123` (must change on first login) | Own seller dashboard |
 

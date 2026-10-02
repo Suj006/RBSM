@@ -58,12 +58,18 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
         { label: "Approved buyers", value: count("APPROVED"), accent: "blue" as const, href: `${base}/approved` },
       ]
     : [
+        // Row 1 — basic details
         { label: "Total sign-ups", value: total, accent: "blue" as const, href: `${base}/buyers` },
+        { label: "Basic details not submitted / returned", value: count("SIGNED_UP", "BASIC_RETURNED"), accent: "slate" as const,
+          hint: count("BASIC_RETURNED") ? `${count("BASIC_RETURNED")} returned for correction` : undefined, href: `${base}/buyers?status=basic_pending` },
         { label: "Basic details to verify", value: count("BASIC_SUBMITTED"), accent: "yellow" as const, href: `${base}/buyers?status=BASIC_SUBMITTED` },
+        { label: "Basic details approved", value: count("BASIC_APPROVED", "APPROVED"), accent: "green" as const,
+          hint: `${count("APPROVED")} already approved buyers`, href: `${base}/buyers?status=basic_approved` },
+        // Row 2 — sector requirements
         { label: "Sectors pending with FIEO", value: items(...FIEO_ITEM_QUEUE), accent: "yellow" as const, hint: items("DIC_RETURNED") ? `${items("DIC_RETURNED")} returned by DIC` : undefined, href: `${base}/buyers?status=action` },
         { label: "Sectors with Directorate", value: items("FIEO_RECOMMENDED"), accent: "violet" as const, href: `${base}/buyers?item=FIEO_RECOMMENDED` },
-        { label: "Approved buyers", value: count("APPROVED"), accent: "green" as const, href: `${base}/buyers?status=APPROVED` },
         { label: "Approved sectors", value: items("APPROVED"), accent: "green" as const, href: `${base}/buyers?item=APPROVED` },
+        { label: "Approved buyers", value: count("APPROVED"), accent: "green" as const, href: `${base}/buyers?status=APPROVED` },
       ];
 
   const buyerPipeline = [
@@ -82,7 +88,7 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
         subtitle="Real-time view of buyer registrations and sector-wise approvals."
         actions={<ButtonLink href={`${base}/buyers?status=action`}>Open work queue <ArrowRight className="size-4" /></ButtonLink>} />
 
-      <div className={`grid gap-4 sm:grid-cols-2 ${stats.length > 4 ? "xl:grid-cols-3" : "xl:grid-cols-4"}`}>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s) => <StatCard key={s.label} {...s} />)}
       </div>
 
