@@ -165,3 +165,42 @@ export function firstErrors(e: z.ZodError, joinPath = false) {
   }
   return out;
 }
+
+/** Place names (taluk, local body) — English letters, spaces, . and -; Title Case. */
+export function placeName(label: string) {
+  return z
+    .string()
+    .transform((v) => tidy(v))
+    .pipe(
+      z
+        .string()
+        .min(2, `Enter the ${label.toLowerCase()}.`)
+        .max(80)
+        .regex(/^[A-Za-z][A-Za-z .-]*$/, `${label}: use English letters, spaces, . and - only.`),
+    )
+    .transform(titleCase);
+}
+
+/** Udyam Registration Number of a Kerala MSME: UDYAM-KL-00-0000000. */
+export function udyamField() {
+  return z
+    .string()
+    .transform((v) => toPlainText(v).toUpperCase().replace(/\s+/g, "").replace(/[–—_]/g, "-"))
+    .pipe(
+      z
+        .string()
+        .regex(/^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/, "Enter the Udyam number in the format UDYAM-KL-00-0000000.")
+        .regex(/^UDYAM-KL-/, "Only Kerala Udyam numbers (UDYAM-KL-…) can be registered."),
+    );
+}
+
+/** Indian mobile number; stored as 10 digits. Accepts +91 / 0 prefixes and spaces. */
+export function indianMobile(label = "Mobile number") {
+  return z
+    .string()
+    .transform((v) => toPlainText(v).replace(/[\s()-]/g, "").replace(/^(\+91|0091|91(?=\d{10}$)|0(?=\d{10}$))/, ""))
+    .pipe(z.string().regex(/^[6-9]\d{9}$/, `${label}: enter a valid 10-digit Indian mobile number.`));
+}
+
+/** 9876543210 → +91 98765 43210 */
+export const fmtMobile = (m?: string | null) => (m && /^\d{10}$/.test(m) ? `+91 ${m.slice(0, 5)} ${m.slice(5)}` : m ?? "");

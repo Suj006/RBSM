@@ -31,7 +31,7 @@ export async function loginAction(_: FormState, form: FormData): Promise<FormSta
   // User names are case-insensitive: "tradex2027-001" and "FIEO" also work.
   const prefix = EVENT.usernamePrefix.toLowerCase();
   const canonical = username.toLowerCase().startsWith(prefix)
-    ? EVENT.usernamePrefix + username.slice(prefix.length)
+    ? EVENT.usernamePrefix + username.slice(prefix.length).toUpperCase() // Tradex2027-001 / Tradex2027-S001
     : username.toLowerCase();
   const user = await prisma.user.findUnique({ where: { username: canonical } });
   if (!user || !user.isActive || !(await verifyPassword(password, user.passwordHash))) {

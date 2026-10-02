@@ -4,12 +4,13 @@ import { ITEM_META, STATUS_META } from "@/lib/status";
 import type { BuyerStatus, ItemStatus } from "@/generated/prisma/enums";
 import type { BuyerFilters as F } from "@/lib/buyer-query";
 
-export function BuyerFilters({ action, filters, statuses, itemStatuses, countries, sectors, actionLabel }: {
+export function BuyerFilters({ action, filters, statuses, itemStatuses, countries, sectors, actionLabel, hidden = [] }: {
   action: string; filters: F; statuses: BuyerStatus[]; itemStatuses: ItemStatus[]; countries: string[];
-  sectors: { id: string; name: string }[]; actionLabel: string;
+  sectors: { id: string; name: string }[]; actionLabel: string; hidden?: [string, string | undefined][];
 }) {
   return (
     <form action={action} className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[1.3fr_1fr_1.25fr_1fr_1fr_auto]">
+      {hidden.map(([k, v]) => <input key={k} type="hidden" name={k} value={v ?? ""} />)}
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
         <Input name="q" defaultValue={filters.q} placeholder="Search name, reg. no., e-mail…" className="pl-9" aria-label="Search" />

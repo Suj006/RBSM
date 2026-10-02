@@ -13,7 +13,7 @@ export function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       {state?.error && <Alert tone="red">{state.error}</Alert>}
-      <Field label="User name" htmlFor="username" hint="Buyers: e.g. Tradex2027-001">
+      <Field label="User name" htmlFor="username" hint="Buyers: Tradex2027-001 · Sellers: Tradex2027-S001 · District offices: dic-tvm">
         <Input id="username" name="username" autoComplete="username" required autoFocus defaultValue={state?.data?.username} />
       </Field>
       <Field label="Password" htmlFor="password">
@@ -25,6 +25,9 @@ export function LoginForm() {
       <p className="text-center text-sm text-slate-500">
         New international buyer?{" "}
         <Link href="/signup" className="font-semibold text-brand-700 hover:underline">Register for the event</Link>
+        <br />
+        Kerala MSME seller?{" "}
+        <Link href="/seller-register" className="font-semibold text-brand-700 hover:underline">Register as a seller</Link>
       </p>
     </form>
   );

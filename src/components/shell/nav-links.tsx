@@ -4,22 +4,27 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, UserRound, ClipboardList, Users, ShieldCheck, Layers, Award, Mail, FileDown, BadgeCheck, Inbox,
+  Store, Upload, PlusCircle,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const ICONS = {
   dashboard: LayoutDashboard, profile: UserRound, requirement: ClipboardList, buyers: Users, review: Inbox,
   approved: BadgeCheck, users: ShieldCheck, sectors: Layers, certs: Award, mail: Mail, reports: FileDown,
+  sellers: Store, upload: Upload, add: PlusCircle,
 } as const;
 
 export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; exact?: boolean; badge?: number };
 
 export function NavLinks({ items, horizontal }: { items: NavItem[]; horizontal?: boolean }) {
   const path = usePathname();
+  // Highlight only the most specific matching item (e.g. "Add seller" rather than also "Sellers").
+  const matches = (it: NavItem) => (it.exact ? path === it.href : path === it.href || path.startsWith(it.href + "/"));
+  const best = items.filter(matches).sort((a, b) => b.href.length - a.href.length)[0]?.href;
   return (
     <ul className={cn(horizontal ? "flex gap-1" : "space-y-1")}>
       {items.map((it) => {
-        const active = it.exact ? path === it.href : path === it.href || path.startsWith(it.href + "/");
+        const active = it.href === best;
         const Icon = ICONS[it.icon];
         return (
           <li key={it.href}>

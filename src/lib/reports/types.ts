@@ -1,6 +1,6 @@
-import type { BuyerStatus, ItemStatus } from "@/generated/prisma/enums";
+import type { BuyerStatus, ItemStatus, SellerStatus } from "@/generated/prisma/enums";
 
-export type ColumnKind = "text" | "mono" | "number" | "percent" | "date" | "datetime" | "buyerStatus" | "itemStatus";
+export type ColumnKind = "text" | "mono" | "number" | "percent" | "date" | "datetime" | "buyerStatus" | "itemStatus" | "sellerStatus";
 
 export type Column = {
   key: string;
@@ -11,7 +11,7 @@ export type Column = {
   align?: "left" | "center" | "right";
 };
 
-export type Row = Record<string, string | number | Date | null | undefined | BuyerStatus | ItemStatus>;
+export type Row = Record<string, string | number | Date | null | undefined | BuyerStatus | ItemStatus | SellerStatus>;
 
 export type Table = {
   /** Excel sheet name (max 31 chars) and PDF section heading. */

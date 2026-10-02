@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { buildDossier, buildReport, isReportId } from "@/lib/reports/data";
+import { buildDossier, buildReport, buildSellerProfile, isReportId, reportsFor } from "@/lib/reports/data";
 import { reportToXlsx } from "@/lib/reports/excel";
 import { reportToPdf } from "@/lib/reports/pdf";
 
@@ -8,14 +8,15 @@ import { reportToPdf } from "@/lib/reports/pdf";
 // GET /api/reports/buyer-profile?buyerId=…&format=pdf|xlsx
 export async function GET(req: NextRequest, ctx: RouteContext<"/api/reports/[id]">) {
   const user = await getCurrentUser();
-  if (!user || user.role === "BUYER" || user.mustChangePassword) return new Response("Forbidden", { status: 403 });
+  if (!user || user.role === "BUYER" || user.role === "SELLER" || user.mustChangePassword) return new Response("Forbidden", { status: 403 });
   const { id } = await ctx.params;
   const sp = Object.fromEntries(req.nextUrl.searchParams);
   const format = sp.format === "pdf" ? "pdf" : "xlsx";
 
   const report =
-    id === "buyer-profile" ? await buildDossier(user, sp.buyerId ?? "")
-    : isReportId(id) ? await buildReport(id, user, sp)
+    id === "buyer-profile" ? (user.role === "DISTRICT" ? null : await buildDossier(user, sp.buyerId ?? ""))
+    : id === "seller-profile" ? await buildSellerProfile(user, sp.sellerId ?? "")
+    : isReportId(id) && reportsFor(user.role).includes(id) ? await buildReport(id, user, sp)
     : null;
   if (!report) return new Response("Report not found", { status: 404 });
 

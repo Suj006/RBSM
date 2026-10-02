@@ -10,13 +10,13 @@ export const metadata: Metadata = { title: "Users & logins" };
 
 export default async function Page() {
   const [staff, buyerCount, activeBuyers] = await Promise.all([
-    prisma.user.findMany({ where: { role: { not: "BUYER" } }, orderBy: { role: "asc" } }),
+    prisma.user.findMany({ where: { role: { in: ["ADMIN", "FIEO", "DIC", "DISTRICT"] } }, orderBy: [{ role: "asc" }, { username: "asc" }] }),
     prisma.user.count({ where: { role: "BUYER" } }),
     prisma.user.count({ where: { role: "BUYER", mustChangePassword: false } }),
   ]);
   return (
     <>
-      <PageHeader title="Users & logins" subtitle={`${buyerCount} buyer accounts · ${activeBuyers} have set their own password. Buyer passwords can be reset from each buyer's page.`} />
+      <PageHeader title="Users & logins" subtitle={`Staff and district office logins. ${buyerCount} buyer accounts (${activeBuyers} have set their own password) — buyer passwords can be reset from each buyer's page.`} />
       <Card>
         <CardHeader title="Staff logins" />
         <ul className="divide-y divide-slate-100">

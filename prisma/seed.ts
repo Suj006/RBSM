@@ -14,6 +14,13 @@ const STAFF = [
   { username: "admin", password: "admin", role: "ADMIN", displayName: "Portal Administrator" },
 ] as const;
 
+// One login per District Industries Centre: dic-tvm … dic-ksd (phase-1 password pass@123).
+const DISTRICTS: [string, string][] = [
+  ["Thiruvananthapuram", "tvm"], ["Kollam", "klm"], ["Pathanamthitta", "pta"], ["Alappuzha", "alp"],
+  ["Kottayam", "ktm"], ["Idukki", "idk"], ["Ernakulam", "ekm"], ["Thrissur", "tsr"], ["Palakkad", "pkd"],
+  ["Malappuram", "mlp"], ["Kozhikode", "kkd"], ["Wayanad", "wyd"], ["Kannur", "knr"], ["Kasaragod", "ksd"],
+];
+
 const SECTORS = [
   "Agriculture & Allied Products",
   "Spices & Condiments",
@@ -85,13 +92,21 @@ async function main() {
       },
     });
   }
+  const districtHash = await bcrypt.hash("pass@123", 10);
+  for (const [name, code] of DISTRICTS) {
+    await prisma.user.upsert({
+      where: { username: `dic-${code}` },
+      update: { district: name },
+      create: { username: `dic-${code}`, passwordHash: districtHash, role: "DISTRICT", district: name, displayName: `DIC ${name}` },
+    });
+  }
   for (const [i, name] of SECTORS.entries()) {
     await prisma.sector.upsert({ where: { name }, update: {}, create: { name, sortOrder: i + 1 } });
   }
   for (const name of CERTIFICATIONS) {
     await prisma.certification.upsert({ where: { name }, update: {}, create: { name } });
   }
-  console.log(`Seeded ${STAFF.length} staff logins, ${SECTORS.length} sectors, ${CERTIFICATIONS.length} certifications.`);
+  console.log(`Seeded ${STAFF.length} staff logins, ${DISTRICTS.length} district logins, ${SECTORS.length} sectors, ${CERTIFICATIONS.length} certifications.`);
 }
 
 main().finally(() => prisma.$disconnect());

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { requireUser } from "@/lib/auth";
 import { ReportsPage } from "@/components/staff/reports-page";
-import type { BuyerFilters } from "@/lib/buyer-query";
 
 export const metadata: Metadata = { title: "Reports" };
-export default async function Page({ searchParams }: { searchParams: Promise<BuyerFilters> }) {
-  return <ReportsPage role="ADMIN" base="/admin/reports" filters={await searchParams} />;
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const user = await requireUser("ADMIN");
+  return <ReportsPage user={user} base="/admin/reports" filters={await searchParams} />;
 }

@@ -13,28 +13,30 @@ datasource db {
 enum Role {
   BUYER
   FIEO
-  DIC
+  DIC // Directorate of Industries & Commerce (state level)
   ADMIN
+  DISTRICT // District Industries Centre — one login per district
+  SELLER // MSME seller, login allotted on Directorate approval
 }
 
 // Buyer registration stage. Sector requirements are approved one by one
 // (see ItemStatus); the buyer becomes APPROVED with their first approved sector.
 enum BuyerStatus {
-  SIGNED_UP       // account created, basic details not yet submitted
+  SIGNED_UP // account created, basic details not yet submitted
   BASIC_SUBMITTED // basic details waiting for FIEO approval
-  BASIC_RETURNED  // FIEO sent basic details back with a comment
-  BASIC_APPROVED  // FIEO approved; buyer adds sector requirements
-  APPROVED        // at least one sector approved by DIC — on the RBSM buyer list
+  BASIC_RETURNED // FIEO sent basic details back with a comment
+  BASIC_APPROVED // FIEO approved; buyer adds sector requirements
+  APPROVED // at least one sector approved by DIC — on the RBSM buyer list
 }
 
 // Approval state of one sector requirement.
 enum ItemStatus {
-  DRAFT            // being prepared (new, or an approved sector being modified)
-  SUBMITTED        // waiting for FIEO recommendation
-  FIEO_RETURNED    // FIEO returned it to the buyer with a comment
+  DRAFT // being prepared (new, or an approved sector being modified)
+  SUBMITTED // waiting for FIEO recommendation
+  FIEO_RETURNED // FIEO returned it to the buyer with a comment
   FIEO_RECOMMENDED // waiting for Directorate (DIC) approval
-  DIC_RETURNED     // DIC returned it to FIEO with a comment for re-verification
-  APPROVED         // approved by DIC
+  DIC_RETURNED // DIC returned it to FIEO with a comment for re-verification
+  APPROVED // approved by DIC
 }
 
 enum ReviewAction {
@@ -48,7 +50,7 @@ enum ReviewAction {
   DIC_RETURNED
   DIC_APPROVED
   REQ_WITHDRAWN // buyer removed a sector
-  REQ_MODIFIED  // buyer reopened an approved sector for changes
+  REQ_MODIFIED // buyer reopened an approved sector for changes
 }
 
 enum DocumentKind {
@@ -68,15 +70,19 @@ model User {
   passwordHash       String
   role               Role
   displayName        String
+  district           String? // DISTRICT users: the district they manage
   mustChangePassword Boolean   @default(false)
   isActive           Boolean   @default(true)
   lastLoginAt        DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  sessions   Session[]
-  buyer      Buyer?
-  reviewLogs ReviewLog[]
+  sessions     Session[]
+  buyer        Buyer?
+  seller       Seller?     @relation("SellerLogin")
+  reviewLogs   ReviewLog[]
+  sellersAdded Seller[]    @relation("SellerCreatedBy")
+  sellerLogs   SellerLog[]
 }
 
 model Session {
@@ -160,6 +166,7 @@ model Sector {
   updatedAt   DateTime @updatedAt
 
   requirementItems RequirementItem[]
+  sellerProducts   SellerProduct[]
 }
 
 model Certification {
@@ -196,9 +203,9 @@ model RequirementItem {
   sector         Sector      @relation(fields: [sectorId], references: [id])
   products       String // comma / newline separated product names
   specifications String?
-  certifications String @default("[]") // JSON array of certification names
+  certifications String      @default("[]") // JSON array of certification names
   quantity       String? // indicative volume
-  sortOrder      Int    @default(0)
+  sortOrder      Int         @default(0)
 
   status        ItemStatus @default(DRAFT)
   submittedAt   DateTime?
@@ -215,19 +222,19 @@ model RequirementItem {
 }
 
 model ReviewLog {
-  id        String       @id @default(cuid())
-  buyerId   String
-  buyer     Buyer        @relation(fields: [buyerId], references: [id], onDelete: Cascade)
-  actorId   String?
-  actor     User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  actorRole Role
-  action    ReviewAction
+  id         String           @id @default(cuid())
+  buyerId    String
+  buyer      Buyer            @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      User?            @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorRole  Role
+  action     ReviewAction
   // Set for sector-level actions; sectorName keeps the label if the row is removed.
   itemId     String?
   item       RequirementItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
   sectorName String?
   comment    String?
-  createdAt DateTime     @default(now())
+  createdAt  DateTime         @default(now())
 
   @@index([buyerId, createdAt])
 }
@@ -240,4 +247,105 @@ model EmailLog {
   status    EmailStatus
   error     String?
   createdAt DateTime    @default(now())
+}
+
+// ---------------------------------------------------------------- sellers (MSMEs)
+
+enum SellerStatus {
+  WITH_DISTRICT // entered by the district office or self-registered; awaiting district recommendation
+  RECOMMENDED // recommended by the district to the Directorate
+  RETURNED // Directorate returned it to the district with a comment
+  APPROVED // approved by the Directorate — login allotted, visible to FIEO
+  REJECTED // rejected by the district or the Directorate
+}
+
+enum SellerSource {
+  DISTRICT // entered individually by a district office
+  BULK // bulk Excel upload by a district office
+  SELF // self-registration on the portal
+}
+
+enum LocalBodyType {
+  PANCHAYAT
+  MUNICIPALITY
+  CORPORATION
+}
+
+enum SellerAction {
+  REGISTERED
+  UPDATED
+  RECOMMENDED
+  RETURNED
+  APPROVED
+  REJECTED
+}
+
+model Seller {
+  id    String @id @default(cuid())
+  seq   Int    @unique
+  regNo String @unique // RBSM-S-001
+
+  name             String
+  district         String
+  taluk            String
+  localBodyType    LocalBodyType
+  localBodyName    String
+  udyamNo          String        @unique // UDYAM-KL-00-0000000
+  exportExperience Boolean
+
+  contactName     String
+  contactMobile   String // 10-digit Indian mobile number
+  contactWhatsapp String
+  contactEmail    String
+
+  source      SellerSource
+  createdById String?
+  createdBy   User?        @relation("SellerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  status        SellerStatus @default(WITH_DISTRICT)
+  recommendedAt DateTime?
+  approvedAt    DateTime?
+  approvedSeq   Int?         @unique
+  approvedNo    String?      @unique // RBSM-Seller-2026001
+
+  userId String? @unique // login, created on approval
+  user   User?   @relation("SellerLogin", fields: [userId], references: [id], onDelete: SetNull)
+
+  products SellerProduct[]
+  logs     SellerLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([district, status])
+  @@index([status])
+}
+
+// Products the seller is ready to export, per sector (same sector master as buyers,
+// so buyer requirements and seller products can be matched sector by sector).
+model SellerProduct {
+  id        String @id @default(cuid())
+  sellerId  String
+  seller    Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  sectorId  String
+  sector    Sector @relation(fields: [sectorId], references: [id])
+  products  String
+  sortOrder Int    @default(0)
+
+  @@unique([sellerId, sectorId])
+  @@index([sectorId])
+}
+
+model SellerLog {
+  id        String       @id @default(cuid())
+  sellerId  String
+  seller    Seller       @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorRole Role? // null for public self-registration
+  action    SellerAction
+  comment   String?
+  createdAt DateTime     @default(now())
+
+  @@index([sellerId, createdAt])
 }

@@ -95,7 +95,7 @@ const PLAN: { status: BuyerStatus; items: ItemStatus[] }[] = [
 ];
 
 async function main() {
-  if (await prisma.buyer.count()) { console.error("Buyers already exist — demo data is only loaded into an empty database."); process.exit(1); }
+  if (await prisma.buyer.count() || await prisma.seller.count()) { console.error("Buyers or sellers already exist — demo data is only loaded into an empty database."); process.exit(1); }
   const sectors = await prisma.sector.findMany();
   const fieo = await prisma.user.findUniqueOrThrow({ where: { username: "fieo" } });
   const dic = await prisma.user.findUniqueOrThrow({ where: { username: "dic123" } });
@@ -158,7 +158,68 @@ async function main() {
   }
   await prisma.counter.upsert({ where: { name: "buyer" }, create: { name: "buyer", value: BUYERS.length }, update: { value: BUYERS.length } });
   await prisma.counter.upsert({ where: { name: "approved-2026" }, create: { name: "approved-2026", value: approvedSeq }, update: { value: approvedSeq } });
-  console.log(`Loaded ${BUYERS.length} demo buyers (${approvedSeq} approved). Demo buyer password: pass@123`);
+  // ---- sellers: 8–14 per district at every stage
+  const TALUKS: Record<string, string[]> = {
+    Thiruvananthapuram: ["Neyyattinkara", "Nedumangad"], Kollam: ["Karunagappally", "Kottarakkara"], Pathanamthitta: ["Adoor", "Thiruvalla"],
+    Alappuzha: ["Cherthala", "Ambalappuzha"], Kottayam: ["Changanassery", "Vaikom"], Idukki: ["Thodupuzha", "Devikulam"],
+    Ernakulam: ["Aluva", "Kanayannur"], Thrissur: ["Chalakudy", "Kodungallur"], Palakkad: ["Ottapalam", "Alathur"],
+    Malappuram: ["Tirur", "Perinthalmanna"], Kozhikode: ["Vadakara", "Koyilandy"], Wayanad: ["Mananthavady", "Vythiri"],
+    Kannur: ["Thalassery", "Taliparamba"], Kasaragod: ["Hosdurg", "Manjeshwaram"],
+  };
+  const FIRMS = ["Spices", "Coir Works", "Cashew Exports", "Agro Foods", "Handlooms", "Ayurveda", "Rubber Products", "Bamboo Crafts", "Tea Estates", "Seafoods", "Furniture", "Herbals"];
+  const PEOPLE = ["Anil Kumar", "Suresh Nair", "Lakshmi Menon", "Joseph Thomas", "Fathima Beevi", "Rajesh Pillai", "Mini Joseph", "Abdul Rahman", "Deepa Varghese", "Vinod Krishnan"];
+  const STATES: ("WITH_DISTRICT" | "RECOMMENDED" | "RETURNED" | "APPROVED" | "REJECTED")[] = ["APPROVED", "APPROVED", "RECOMMENDED", "WITH_DISTRICT", "APPROVED", "RETURNED", "WITH_DISTRICT", "APPROVED", "RECOMMENDED", "REJECTED"];
+  const districtUsers = await prisma.user.findMany({ where: { role: "DISTRICT" } });
+  let sSeq = 0, sApproved = 0;
+  for (const [di, [district, taluks]] of Object.entries(TALUKS).entries()) {
+    const du = districtUsers.find((u) => u.district === district);
+    const count = 8 + ((di * 5) % 7);
+    for (let k = 0; k < count; k++) {
+      sSeq++;
+      const status = STATES[(sSeq + di) % STATES.length];
+      const firm = `${district.slice(0, 3)}${["ra", "vi", "ka", "na", "sha"][k % 5]} ${FIRMS[(sSeq + k) % FIRMS.length]}`;
+      const created = new Date(Date.now() - (200 - sSeq) * day * 0.15);
+      const source = k % 4 === 0 ? "SELF" : k % 4 === 1 ? "BULK" : "DISTRICT";
+      const mobile = `9${String(400000000 + sSeq * 7351).slice(0, 9)}`;
+      const person = PEOPLE[(sSeq + di) % PEOPLE.length];
+      let userId: string | undefined, approvedNo: string | undefined, aSeq: number | undefined;
+      if (status === "APPROVED") {
+        sApproved++; aSeq = sApproved;
+        approvedNo = `RBSM-Seller-2026${String(sApproved).padStart(3, "0")}`;
+        const u = await prisma.user.create({ data: { username: `Tradex2027-S${String(sSeq).padStart(3, "0")}`, passwordHash: hash, role: "SELLER", displayName: firm } });
+        userId = u.id;
+      }
+      const seller = await prisma.seller.create({
+        data: {
+          seq: sSeq, regNo: `RBSM-S-${String(sSeq).padStart(3, "0")}`, name: firm, district, taluk: taluks[k % 2],
+          localBodyType: (["PANCHAYAT", "MUNICIPALITY", "CORPORATION"] as const)[k % 3], localBodyName: `${taluks[k % 2]}`,
+          udyamNo: `UDYAM-KL-${String(di + 1).padStart(2, "0")}-${String(1000000 + sSeq * 37).slice(0, 7)}`,
+          exportExperience: k % 3 !== 0, contactName: person, contactMobile: mobile, contactWhatsapp: mobile,
+          contactEmail: `${person.split(" ")[0].toLowerCase()}${sSeq}@msme.example`, source, createdById: source === "SELF" ? null : du?.id,
+          status, createdAt: created, recommendedAt: ["RECOMMENDED", "RETURNED", "APPROVED"].includes(status) ? created : null,
+          approvedAt: status === "APPROVED" ? created : null, approvedSeq: aSeq, approvedNo, userId,
+          products: {
+            create: [0, 1].slice(0, 1 + (k % 2)).map((j) => {
+              const sector = needSectors[(sSeq + j * 3) % needSectors.length];
+              const key = Object.keys(NEEDS).find((n) => n === sector.name)!;
+              return { sectorId: sector.id, products: NEEDS[key][0][0], sortOrder: j };
+            }),
+          },
+        },
+      });
+      const slog = (action: string, actorId: string | null | undefined, actorRole: "DISTRICT" | "DIC" | null, comment?: string) =>
+        prisma.sellerLog.create({ data: { sellerId: seller.id, actorId: actorId ?? null, actorRole, action: action as never, createdAt: created, comment } });
+      await slog("REGISTERED", source === "SELF" ? null : du?.id, source === "SELF" ? null : "DISTRICT", source === "SELF" ? "Self-registered on the portal" : source === "BULK" ? "Added by bulk upload" : undefined);
+      if (["RECOMMENDED", "RETURNED", "APPROVED"].includes(status)) await slog("RECOMMENDED", du?.id, "DISTRICT");
+      if (status === "RETURNED") await slog("RETURNED", dic.id, "DIC", "Udyam certificate details do not match. Please verify.");
+      if (status === "APPROVED") await slog("APPROVED", dic.id, "DIC");
+      if (status === "REJECTED") await slog("REJECTED", du?.id, "DISTRICT", "Enterprise is not export-ready at present.");
+    }
+  }
+  await prisma.counter.upsert({ where: { name: "seller" }, create: { name: "seller", value: sSeq }, update: { value: sSeq } });
+  await prisma.counter.upsert({ where: { name: "seller-approved-2026" }, create: { name: "seller-approved-2026", value: sApproved }, update: { value: sApproved } });
+
+  console.log(`Loaded ${BUYERS.length} demo buyers (${approvedSeq} approved) and ${sSeq} demo sellers (${sApproved} approved). Demo password: pass@123`);
 }
 
 main().finally(() => prisma.$disconnect());

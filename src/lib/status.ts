@@ -1,4 +1,4 @@
-import type { BuyerStatus, ItemStatus, ReviewAction, Role } from "@/generated/prisma/enums";
+import type { BuyerStatus, ItemStatus, ReviewAction, Role, SellerAction, SellerStatus } from "@/generated/prisma/enums";
 
 type Tone = "slate" | "blue" | "amber" | "red" | "green" | "violet";
 
@@ -42,6 +42,14 @@ export const ROLE_LABEL: Record<Role, string> = {
   FIEO: "FIEO",
   DIC: "Directorate",
   ADMIN: "Administrator",
+  DISTRICT: "District Industries Centre",
+  SELLER: "Seller",
+};
+
+/** Short label for the portal badge in the sidebar. */
+export const ROLE_BADGE: Record<Role, string> = {
+  BUYER: "Buyer portal", FIEO: "FIEO portal", DIC: "Directorate portal", ADMIN: "Admin portal",
+  DISTRICT: "District office", SELLER: "Seller portal",
 };
 
 export const ROLE_HOME: Record<Role, string> = {
@@ -49,6 +57,8 @@ export const ROLE_HOME: Record<Role, string> = {
   FIEO: "/fieo",
   DIC: "/dic",
   ADMIN: "/admin",
+  DISTRICT: "/district",
+  SELLER: "/seller",
 };
 
 // Registration journey (buyer level). Sector requirements then go through
@@ -67,3 +77,31 @@ export const canWorkOnRequirements = (s: BuyerStatus) => s === "BASIC_APPROVED" 
 /** Sector rows the buyer can edit or remove — anything not currently with a reviewer.
  *  Editing an approved sector sends it through approval again. */
 export const ITEM_EDITABLE: ItemStatus[] = ["DRAFT", "FIEO_RETURNED", "APPROVED"];
+
+// ---------------------------------------------------------------- sellers
+
+export const SELLER_META: Record<SellerStatus, { label: string; short: string; tone: Tone; dot: string }> = {
+  WITH_DISTRICT: { label: "Pending district recommendation", short: "With district", tone: "amber", dot: "bg-tx-yellow" },
+  RECOMMENDED: { label: "Awaiting Directorate approval", short: "With Directorate", tone: "violet", dot: "bg-violet-500" },
+  RETURNED: { label: "Returned to district", short: "Returned", tone: "red", dot: "bg-tx-red" },
+  APPROVED: { label: "Approved seller", short: "Approved", tone: "green", dot: "bg-tx-green" },
+  REJECTED: { label: "Rejected", short: "Rejected", tone: "slate", dot: "bg-slate-400" },
+};
+export const ALL_SELLER_STATUSES = Object.keys(SELLER_META) as SellerStatus[];
+
+export const SELLER_ACTION_LABEL: Record<SellerAction, string> = {
+  REGISTERED: "Registered",
+  UPDATED: "Details updated",
+  RECOMMENDED: "Recommended to Directorate",
+  RETURNED: "Returned to district",
+  APPROVED: "Approved — login allotted",
+  REJECTED: "Rejected",
+};
+
+/** Seller records each role may see. FIEO sees sellers only once approved. */
+export const SELLER_VISIBLE: Partial<Record<Role, SellerStatus[]>> = {
+  FIEO: ["APPROVED"],
+  DIC: ["RECOMMENDED", "RETURNED", "APPROVED"],
+};
+/** The district can edit (and recommend) these. */
+export const SELLER_DISTRICT_EDITABLE: SellerStatus[] = ["WITH_DISTRICT", "RETURNED"];

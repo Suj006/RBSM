@@ -14,6 +14,14 @@ export const EVENT = {
   approvedYear: 2026,
   // Initial password e-mailed to every newly signed-up buyer (phase 1 only).
   defaultBuyerPassword: "pass@123",
+  // Seller login IDs: Tradex2027-S001…; registration numbers RBSM-S-001…;
+  // approved seller numbers RBSM-Seller-2026001…
+  sellerUsernamePrefix: "Tradex2027-S",
+  sellerRegNoPrefix: "RBSM-S-",
+  sellerApprovedPrefix: "RBSM-Seller-",
+  // Programme targets shown on dashboards (each buyer meets at least 10 sellers).
+  targetSellers: 600,
+  targetBuyers: 60,
   // Portal logo (file in /public). Replace with the official artwork when available.
   logo: "/tradex-logo.svg",
 } as const;
@@ -26,6 +34,36 @@ export const buyerUsername = (seq: number) => `${EVENT.usernamePrefix}${pad3(seq
 export const buyerRegNo = (seq: number) => `${EVENT.regNoPrefix}${pad3(seq)}`;
 export const approvedBuyerNo = (seq: number) =>
   `${EVENT.approvedPrefix}${EVENT.approvedYear}${pad3(seq)}`;
+
+export const sellerUsername = (seq: number) => `${EVENT.sellerUsernamePrefix}${pad3(seq)}`;
+export const sellerRegNo = (seq: number) => `${EVENT.sellerRegNoPrefix}${pad3(seq)}`;
+export const approvedSellerNo = (seq: number) => `${EVENT.sellerApprovedPrefix}${EVENT.approvedYear}${pad3(seq)}`;
+
+/** The 14 districts of Kerala, with the code used in district login IDs (dic-tvm…). */
+export const DISTRICTS = [
+  { name: "Thiruvananthapuram", code: "tvm" },
+  { name: "Kollam", code: "klm" },
+  { name: "Pathanamthitta", code: "pta" },
+  { name: "Alappuzha", code: "alp" },
+  { name: "Kottayam", code: "ktm" },
+  { name: "Idukki", code: "idk" },
+  { name: "Ernakulam", code: "ekm" },
+  { name: "Thrissur", code: "tsr" },
+  { name: "Palakkad", code: "pkd" },
+  { name: "Malappuram", code: "mlp" },
+  { name: "Kozhikode", code: "kkd" },
+  { name: "Wayanad", code: "wyd" },
+  { name: "Kannur", code: "knr" },
+  { name: "Kasaragod", code: "ksd" },
+] as const;
+export const DISTRICT_NAMES: readonly string[] = DISTRICTS.map((d) => d.name);
+
+export const LOCAL_BODY_TYPES = [
+  { value: "PANCHAYAT", label: "Panchayat" },
+  { value: "MUNICIPALITY", label: "Municipality" },
+  { value: "CORPORATION", label: "Corporation" },
+] as const;
+export const localBodyLabel = (v: string) => LOCAL_BODY_TYPES.find((t) => t.value === v)?.label ?? v;
 
 export const ORGANISATION_TYPES = [
   "Importer",

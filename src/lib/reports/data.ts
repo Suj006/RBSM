@@ -7,6 +7,11 @@ import { ACTION_LABEL, ALL_ITEM_STATUSES, ALL_STATUSES, DIC_VISIBLE_ITEMS, ITEM_
 import { parseCerts } from "@/lib/format";
 import { EVENT } from "@/lib/config";
 import type { Kpi, Report, Row, Table } from "./types";
+import { sellerScope, sellerWhere, type SellerFilters } from "@/lib/seller-query";
+import { ALL_SELLER_STATUSES, SELLER_ACTION_LABEL, SELLER_META } from "@/lib/status";
+import type { SellerStatus } from "@/generated/prisma/enums";
+import { DISTRICT_NAMES, localBodyLabel } from "@/lib/config";
+import { fmtMobile } from "@/lib/text";
 
 export const REPORTS = {
   "buyer-register": {
@@ -21,6 +26,14 @@ export const REPORTS = {
     title: "RBSM Approved Buyer List",
     description: "Buyers approved by the Directorate, with their approved sectors and products.",
   },
+  "seller-register": {
+    title: "Seller Registration Register",
+    description: "Kerala MSME sellers with Udyam number, location, contact details, sectors and products ready to export, and approval status.",
+  },
+  "seller-district-summary": {
+    title: "District-wise Seller Summary",
+    description: "Seller registrations and approvals by district, against the programme target.",
+  },
   "mis-summary": {
     title: "MIS Summary Report",
     description: "Programme-level summary: registration pipeline, sector approvals, country-wise and sector-wise position.",
@@ -28,6 +41,12 @@ export const REPORTS = {
 } as const;
 
 export type ReportId = keyof typeof REPORTS;
+/** Reports a role may open (district offices: seller reports only). */
+export const reportsFor = (role: User["role"]): ReportId[] =>
+  role === "DISTRICT" ? ["seller-register", "seller-district-summary"]
+  : role === "DIC" ? ["sector-requirements", "approved-buyers", "seller-register", "seller-district-summary", "mis-summary"]
+  : role === "FIEO" || role === "ADMIN" ? (Object.keys(REPORTS) as ReportId[])
+  : [];
 export const isReportId = (s: string): s is ReportId => s in REPORTS;
 
 const stamp = (d: Date) => d.toISOString().slice(0, 10);
@@ -321,8 +340,10 @@ async function misSummary(user: User): Promise<Report> {
   };
 }
 
-export async function buildReport(id: ReportId, user: User, f: BuyerFilters): Promise<Report> {
+export async function buildReport(id: ReportId, user: User, f: BuyerFilters & SellerFilters): Promise<Report> {
   switch (id) {
+    case "seller-register": return sellerRegister(user, f);
+    case "seller-district-summary": return sellerDistrictSummary(user);
     case "buyer-register": return buyerRegister(user, f);
     case "sector-requirements": return sectorRequirements(user, f);
     case "approved-buyers": return approvedBuyers(user, f);
@@ -418,3 +439,188 @@ export async function buildDossier(user: User, buyerId: string): Promise<Report 
 }
 
 export const EVENT_LINE = `${EVENT.name} · ${EVENT.programme}`;
+
+// ---------------------------------------------------------------- sellers
+
+async function describeSellerFilters(user: User, f: SellerFilters): Promise<string[]> {
+  const out: string[] = [];
+  if (user.role === "DISTRICT") out.push(`District: ${user.district}`);
+  if (user.role === "FIEO") out.push("Approved sellers only");
+  if (f.q) out.push(`Search: "${f.q}"`);
+  if (f.status === "action") out.push("Status: needs action");
+  else if (f.status && ALL_SELLER_STATUSES.includes(f.status as SellerStatus)) out.push(`Status: ${SELLER_META[f.status as SellerStatus].label}`);
+  if (f.sector) {
+    const sec = await prisma.sector.findUnique({ where: { id: f.sector }, select: { name: true } });
+    if (sec) out.push(`Sector: ${sec.name}`);
+  }
+  if (f.district) out.push(`District: ${f.district}`);
+  if (f.exp === "yes") out.push("Export experience: Yes");
+  if (f.exp === "no") out.push("Export experience: No");
+  return out;
+}
+
+async function sellerRegister(user: User, f: SellerFilters): Promise<Report> {
+  const sellers = await prisma.seller.findMany({
+    where: sellerWhere(user, f),
+    orderBy: [{ district: "asc" }, { seq: "asc" }],
+    include: { products: { orderBy: { sortOrder: "asc" }, include: { sector: true } } },
+  });
+  const n = (s: SellerStatus[]) => sellers.filter((x) => s.includes(x.status)).length;
+  return {
+    ...base("seller-register", user, await describeSellerFilters(user, f)),
+    kpis: [
+      { label: "Sellers", value: sellers.length, tone: "blue" },
+      { label: "Approved", value: n(["APPROVED"]), tone: "green" },
+      { label: "Awaiting approval", value: n(["WITH_DISTRICT", "RECOMMENDED", "RETURNED"]), tone: "yellow" },
+      { label: "With export experience", value: sellers.filter((x) => x.exportExperience).length, tone: "violet" },
+    ],
+    tables: [{
+      name: "Seller Register",
+      columns: [
+        { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+        { key: "regNo", header: "Reg. No.", width: 13, kind: "mono" },
+        { key: "approvedNo", header: "Seller No.", width: 19, kind: "mono" },
+        { key: "name", header: "Name of Seller", width: 26 },
+        { key: "district", header: "District", width: 16 },
+        { key: "taluk", header: "Taluk", width: 17 },
+        { key: "localBody", header: "Local Body", width: 20 },
+        { key: "udyamNo", header: "Udyam Number", width: 21, kind: "mono" },
+        { key: "exp", header: "Export Exp.", width: 9, align: "center" },
+        { key: "contact", header: "Contact Person", width: 18 },
+        { key: "mobile", header: "Mobile / WhatsApp", width: 17 },
+        { key: "email", header: "E-mail", width: 26 },
+        { key: "products", header: "Sectors & Products", width: 37 },
+        { key: "status", header: "Status", width: 20, kind: "sellerStatus" },
+      ],
+      rows: sellers.map((x, i) => ({
+        sl: i + 1, regNo: x.regNo, approvedNo: x.approvedNo, name: x.name, district: x.district, taluk: x.taluk,
+        localBody: `${x.localBodyName} ${localBodyLabel(x.localBodyType)}`, udyamNo: x.udyamNo, exp: x.exportExperience ? "Yes" : "No",
+        contact: x.contactName,
+        mobile: fmtMobile(x.contactMobile) + (x.contactWhatsapp !== x.contactMobile ? `\nWA: ${fmtMobile(x.contactWhatsapp)}` : ""),
+        email: x.contactEmail,
+        products: x.products.map((p) => `${p.sector.name}: ${p.products}`).join("\n"),
+        status: x.status,
+      })),
+    }],
+  };
+}
+
+async function sellerDistrictSummary(user: User): Promise<Report> {
+  const sellers = await prisma.seller.findMany({ where: sellerScope(user), select: { district: true, status: true, exportExperience: true } });
+  const districts = user.role === "DISTRICT" ? [user.district ?? ""] : DISTRICT_NAMES;
+  const perDistrict = Math.ceil(EVENT.targetSellers / DISTRICT_NAMES.length);
+  const rows = districts.map((d) => {
+    const ds = sellers.filter((x) => x.district === d);
+    const c = (...st: SellerStatus[]) => ds.filter((x) => st.includes(x.status)).length;
+    const approved = c("APPROVED");
+    return {
+      district: d, total: ds.length, pending: c("WITH_DISTRICT", "RETURNED"), recommended: c("RECOMMENDED"),
+      approved, rejected: c("REJECTED"), exp: ds.filter((x) => x.exportExperience).length, target: perDistrict,
+      achieved: perDistrict ? approved / perDistrict : null,
+    };
+  });
+  const sum = (k: keyof (typeof rows)[number]) => rows.reduce((a, r) => a + Number(r[k] ?? 0), 0);
+  const totalApproved = sum("approved");
+  const fieo = user.role === "FIEO";
+  return {
+    ...base("seller-district-summary", user,
+      user.role === "DISTRICT" ? [`District: ${user.district}`]
+      : fieo ? ["Approved sellers only"]
+      : user.role === "DIC" ? ["Sellers recommended to the Directorate (with Directorate, returned or approved)"] : [], "portrait"),
+    kpis: [
+      { label: "Sellers", value: sellers.length, tone: "blue" },
+      { label: "Approved sellers", value: totalApproved, tone: "green" },
+      { label: `Target (${user.role === "DISTRICT" ? "district share" : "programme"})`, value: user.role === "DISTRICT" ? perDistrict : EVENT.targetSellers, tone: "yellow" },
+    ],
+    tables: [{
+      name: "District-wise",
+      columns: [
+        { key: "district", header: "District", width: 22 },
+        ...(fieo ? [] : [
+          { key: "total", header: "Registered", width: 11, kind: "number" as const, align: "right" as const },
+          { key: "pending", header: "With District", width: 11, kind: "number" as const, align: "right" as const },
+          { key: "recommended", header: "With Directorate", width: 13, kind: "number" as const, align: "right" as const },
+        ]),
+        { key: "approved", header: "Approved", width: 11, kind: "number", align: "right" },
+        ...(fieo ? [] : [{ key: "rejected", header: "Rejected", width: 10, kind: "number" as const, align: "right" as const }]),
+        { key: "exp", header: "Export Exp.", width: 11, kind: "number", align: "right" },
+        { key: "target", header: "Target", width: 9, kind: "number", align: "right" },
+        { key: "achieved", header: "Achieved", width: 10, kind: "percent", align: "right" },
+      ],
+      rows,
+      totals: {
+        district: "Total", total: sum("total"), pending: sum("pending"), recommended: sum("recommended"), approved: totalApproved,
+        rejected: sum("rejected"), exp: sum("exp"),
+        target: user.role === "DISTRICT" ? perDistrict : EVENT.targetSellers,
+        achieved: totalApproved / (user.role === "DISTRICT" ? perDistrict : EVENT.targetSellers),
+      },
+    }],
+  };
+}
+
+export async function buildSellerProfile(user: User, sellerId: string): Promise<Report | null> {
+  const x = await prisma.seller.findFirst({
+    where: { AND: [{ id: sellerId }, sellerScope(user)] },
+    include: {
+      products: { orderBy: { sortOrder: "asc" }, include: { sector: true } },
+      logs: { orderBy: { createdAt: "asc" }, include: { actor: { select: { displayName: true } } } },
+      user: { select: { username: true } },
+    },
+  });
+  if (!x) return null;
+  const generatedAt = new Date();
+  const kvCols = [{ key: "label", header: "Particulars", width: 28 }, { key: "value", header: "Details", width: 62 }];
+  const kv = (rows: [string, Row[string]][]): Row[] => rows.map(([label, value]) => ({ label, value }));
+  return {
+    id: "seller-profile",
+    title: "Seller Profile",
+    description: `${x.name} — ${x.regNo}${x.approvedNo ? ` / ${x.approvedNo}` : ""}`,
+    generatedAt,
+    generatedBy: `${user.displayName} (${ROLE_LABEL[user.role]})`,
+    filters: [],
+    orientation: "portrait",
+    fileName: `TRADEX-RBSM-Seller-Profile-${x.regNo}-${stamp(generatedAt)}`,
+    kpis: [
+      { label: "Status", value: SELLER_META[x.status].label, tone: x.status === "APPROVED" ? "green" : "blue" },
+      { label: "Sectors", value: x.products.length, tone: "violet" },
+      { label: "Export experience", value: x.exportExperience ? "Yes" : "No", tone: "yellow" },
+    ],
+    tables: [
+      {
+        name: "Seller Details", heading: "1. Enterprise and contact details", columns: kvCols,
+        rows: kv([
+          ["Registration No.", x.regNo], ["Seller No.", x.approvedNo ?? "Not yet approved"], ["Login ID", x.user?.username ?? "Allotted on approval"],
+          ["Name of the seller", x.name], ["Udyam number", x.udyamNo], ["District", x.district], ["Taluk", x.taluk],
+          ["Local body", `${x.localBodyName} ${localBodyLabel(x.localBodyType)}`], ["Export experience", x.exportExperience ? "Yes" : "No"],
+          ["Contact person", x.contactName], ["Mobile number", fmtMobile(x.contactMobile)], ["WhatsApp number", fmtMobile(x.contactWhatsapp)],
+          ["E-mail ID", x.contactEmail],
+          ["Source", x.source === "SELF" ? "Self-registered" : x.source === "BULK" ? "Bulk upload by DIC" : "Entered by DIC"],
+          ["Registered on", x.createdAt], ["Recommended on", x.recommendedAt], ["Approved on", x.approvedAt],
+        ]),
+      },
+      {
+        name: "Products", heading: "2. Sectors and products ready to export",
+        columns: [
+          { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+          { key: "sector", header: "Sector", width: 30 },
+          { key: "products", header: "Products", width: 60 },
+        ],
+        rows: x.products.map((p, i) => ({ sl: i + 1, sector: p.sector.name, products: p.products })),
+      },
+      {
+        name: "Activity Log", heading: "3. Activity log",
+        columns: [
+          { key: "at", header: "Date & Time", width: 18, kind: "datetime" },
+          { key: "by", header: "By", width: 22 },
+          { key: "action", header: "Action", width: 24 },
+          { key: "comment", header: "Comment", width: 30 },
+        ],
+        rows: x.logs.map((l) => ({
+          at: l.createdAt,
+          by: l.actorRole ? `${ROLE_LABEL[l.actorRole]}${l.actor ? ` — ${l.actor.displayName}` : ""}` : "Seller",
+          action: SELLER_ACTION_LABEL[l.action], comment: l.comment,
+        })),
+      },
+    ],
+  };
+}

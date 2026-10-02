@@ -3,7 +3,7 @@ import { LogOut, KeyRound } from "lucide-react";
 import type { Role } from "@/generated/prisma/enums";
 import { Logo } from "@/components/logo";
 import { logoutAction } from "@/app/actions/auth";
-import { ROLE_LABEL } from "@/lib/status";
+import { ROLE_BADGE } from "@/lib/status";
 import { NavLinks, type NavItem } from "./nav-links";
 
 export function AppShell({ role, user, nav, children }: {
@@ -18,7 +18,7 @@ export function AppShell({ role, user, nav, children }: {
         <div className="tx-ribbon h-1" />
         <Link href="/" className="px-5 py-5"><Logo /></Link>
         <div className="px-5 pb-3">
-          <span className="rounded-md bg-ink px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white">{ROLE_LABEL[role]} portal</span>
+          <span className="rounded-md bg-ink px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white">{ROLE_BADGE[role]}</span>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 pb-4"><NavLinks items={nav} /></nav>
         <div className="border-t border-slate-200 p-4">

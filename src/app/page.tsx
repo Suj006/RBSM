@@ -64,7 +64,7 @@ export default async function Home() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <ButtonLink href="/signup" className="px-6 py-3 text-base">Register as international buyer <ArrowRight className="size-4" /></ButtonLink>
-              <ButtonLink href="/login" variant="secondary" className="px-6 py-3 text-base">Sign in</ButtonLink>
+              <ButtonLink href="/seller-register" variant="secondary" className="px-6 py-3 text-base">Register as Kerala MSME seller</ButtonLink>
             </div>
             <p className="mt-6 text-sm text-slate-500">Organised by the {EVENT.organiser} with {EVENT.partner}.</p>
           </div>

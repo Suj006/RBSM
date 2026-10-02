@@ -129,3 +129,40 @@ Your buyer number: ${approvedNo}
 Further details on matchmaking and B2B meeting schedules will follow.${signature}`,
   }),
 };
+
+export const sellerMail = {
+  received: (name: string, regNo: string, district: string) => ({
+    subject: `${EVENT.name} ${EVENT.short} — seller registration received (${regNo})`,
+    text: `Dear ${name},
+
+Thank you for registering as a seller for ${EVENT.name} ${EVENT.programme}.
+
+Your registration number: ${regNo}
+
+Your details will be verified by the District Industries Centre, ${district}, and recommended to the Directorate of Industries & Commerce. Once approved, your login credentials will be sent to this e-mail address.${signature}`,
+  }),
+  approved: (name: string, approvedNo: string, username: string, password: string) => ({
+    subject: `${EVENT.name} ${EVENT.short} — seller registration approved (${approvedNo})`,
+    text: `Dear ${name},
+
+We are pleased to inform you that your registration has been approved by the Directorate of Industries & Commerce and you have been added to the ${EVENT.short} seller list.
+
+Your seller number: ${approvedNo}
+
+Your login credentials:
+User name: ${username}
+Password: ${password}
+
+Sign in at ${APP_URL}/login. You will be asked to change your password on first login. Buyer meeting details will be shared through the portal.${signature}`,
+  }),
+  rejected: (name: string, regNo: string, comment: string) => ({
+    subject: `${EVENT.name} ${EVENT.short} — seller registration ${regNo} not accepted`,
+    text: `Dear ${name},
+
+Your seller registration ${regNo} could not be accepted, for the following reason:
+
+"${comment}"
+
+For clarification, please contact your District Industries Centre.${signature}`,
+  }),
+};

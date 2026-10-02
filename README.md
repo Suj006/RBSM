@@ -26,6 +26,21 @@ another in the same step), with "Recommend all" / "Approve all" shortcuts.
 | Registration no. | `RBSM-B-001` | at sign-up |
 | Buyer no. | `RBSM-Buyer-2026001` | when the first sector is approved by the Directorate |
 
+## Sellers (Kerala MSMEs)
+
+```
+District office enters a seller (form or bulk Excel upload)  ─┐
+Seller self-registers and chooses a district ─────────────────┴─► with that district office
+   ─► District recommends (one or many at once) ─► Directorate approves / returns to district / rejects
+   ─► approved: seller number RBSM-Seller-2026NNN, login Tradex2027-SNNN e-mailed, visible to FIEO
+```
+
+Seller details: name, district (14 Kerala districts), taluk, local body type (Panchayat / Municipality /
+Corporation) and name, Udyam number (Kerala only, UDYAM-KL-00-0000000, unique), export experience,
+sectors with products ready to export, and promoter contact (name, mobile, WhatsApp, e-mail).
+FIEO sees sellers only after Directorate approval. Seller products use the same sector master as buyer
+requirements, ready for buyer–seller matchmaking (target: 600 sellers, 60 buyers, 10 sellers per buyer).
+
 ## Logins (phase-1 defaults — change before going live)
 
 | Role | User name | Password | Can do |
@@ -33,7 +48,9 @@ another in the same step), with "Recommend all" / "Approve all" shortcuts.
 | FIEO | `fieo` | `pass@123` | See all buyers, approve / return basic details, recommend / return each sector |
 | Directorate | `dic123` | `dic123` | See FIEO-recommended sectors, approve each (first approval adds the buyer to the RBSM list) / return to FIEO |
 | Admin | `admin` | `admin` | Sector & certification masters, users, buyer password reset, e-mail outbox, all reports |
+| District offices (14) | `dic-tvm`, `dic-klm`, `dic-pta`, `dic-alp`, `dic-ktm`, `dic-idk`, `dic-ekm`, `dic-tsr`, `dic-pkd`, `dic-mlp`, `dic-kkd`, `dic-wyd`, `dic-knr`, `dic-ksd` | `pass@123` | Register sellers of their district (form / bulk upload), recommend or reject |
 | Buyer | `Tradex2027-NNN` | `pass@123` (must change on first login) | Own profile and requirement |
+| Seller | `Tradex2027-SNNN` (allotted on approval) | `pass@123` (must change on first login) | Own seller dashboard |
 
 Staff passwords can be changed from **Admin → Users & logins**.
 
@@ -62,9 +79,10 @@ npm run dev              # http://localhost:3000
 ```
 
 To try the dashboards and reports with sample data, run `npm run db:demo` on an empty database
-(loads 40 demo buyers at every stage; demo buyer password `pass@123`).
+(loads 40 demo buyers and about 150 demo sellers at every stage; demo password `pass@123`).
 
-After updating from an older version, run `npx prisma migrate deploy` (database changes) and, once,
+After updating from an older version, run `npx prisma migrate deploy` (database changes) and
+`npm run db:seed` (adds new logins such as the district offices; existing data is kept). Once, run
 `npm run db:normalize` to re-format names already saved.
 
 Production: `npm run build && npm start`. Set `APP_URL` and the `SMTP_*` variables in `.env` so buyers

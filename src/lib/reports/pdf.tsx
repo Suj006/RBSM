@@ -3,9 +3,9 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Document, Font, Image, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { EVENT } from "@/lib/config";
-import { ITEM_META, STATUS_META } from "@/lib/status";
+import { ITEM_META, SELLER_META, STATUS_META } from "@/lib/status";
 import { fmtDate, fmtDateTime } from "@/lib/format";
-import type { BuyerStatus, ItemStatus } from "@/generated/prisma/enums";
+import type { BuyerStatus, ItemStatus, SellerStatus } from "@/generated/prisma/enums";
 import { C, TONE } from "./theme";
 import type { Column, Report, Row, Table } from "./types";
 
@@ -75,6 +75,7 @@ const BAR: Record<string, string> = { green: C.green, red: C.red, yellow: C.yell
 function statusOf(col: Column, v: Row[string]) {
   if (col.kind === "buyerStatus" && typeof v === "string" && v in STATUS_META) return STATUS_META[v as BuyerStatus];
   if (col.kind === "itemStatus" && typeof v === "string" && v in ITEM_META) return ITEM_META[v as ItemStatus];
+  if (col.kind === "sellerStatus" && typeof v === "string" && v in SELLER_META) return SELLER_META[v as SellerStatus];
   return null;
 }
 
@@ -156,7 +157,7 @@ function ReportDocument({ report, logo }: { report: Report; logo: Buffer }) {
         <Text style={s.description}>{report.description}</Text>
         <Text style={s.meta}>
           {`Generated on ${stamp} by ${report.generatedBy}` +
-            (report.id === "buyer-profile" ? "" : `   |   ${report.filters.length ? `Filters: ${report.filters.join("; ")}` : "Filters: none (all records)"}`)}
+            (report.id.endsWith("-profile") ? "" : `   |   ${report.filters.length ? `Filters: ${report.filters.join("; ")}` : "Filters: none (all records)"}`)}
         </Text>
 
         {report.kpis.length > 0 && (

@@ -3,9 +3,9 @@ import ExcelJS from "exceljs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { EVENT } from "@/lib/config";
-import { ITEM_META, STATUS_META } from "@/lib/status";
+import { ITEM_META, SELLER_META, STATUS_META } from "@/lib/status";
 import { fmtDateTime } from "@/lib/format";
-import type { BuyerStatus, ItemStatus } from "@/generated/prisma/enums";
+import type { BuyerStatus, ItemStatus, SellerStatus } from "@/generated/prisma/enums";
 import { C, TONE } from "./theme";
 import type { Column, Report, Row, Table } from "./types";
 
@@ -17,6 +17,7 @@ const fmtStamp = fmtDateTime;
 function statusOf(col: Column, v: Row[string]) {
   if (col.kind === "buyerStatus" && typeof v === "string" && v in STATUS_META) return STATUS_META[v as BuyerStatus];
   if (col.kind === "itemStatus" && typeof v === "string" && v in ITEM_META) return ITEM_META[v as ItemStatus];
+  if (col.kind === "sellerStatus" && typeof v === "string" && v in SELLER_META) return SELLER_META[v as SellerStatus];
   return null;
 }
 
@@ -62,7 +63,7 @@ function addSheet(wb: ExcelJS.Workbook, report: Report, table: Table, logoId: nu
     [`${EVENT.name.toUpperCase()}  ·  ${EVENT.programme.toUpperCase()}  ·  ${EVENT.organiser.toUpperCase()}`, { size: 9, bold: true, color: { argb: argb(C.brand) } }, 16],
     [report.title + (table.heading && report.tables.length > 1 ? ` — ${table.heading.replace(/^\d+\.\s*/, "")}` : ""), { size: 18, bold: true, color: { argb: argb(C.ink) } }, 28],
     [report.description, { size: 10, color: { argb: argb(C.muted) } }, 16],
-    [`Generated on ${fmtStamp(report.generatedAt)} by ${report.generatedBy}` + (report.id === "buyer-profile" ? "" : "   |   " +
+    [`Generated on ${fmtStamp(report.generatedAt)} by ${report.generatedBy}` + (report.id.endsWith("-profile") ? "" : "   |   " +
       (report.filters.length ? `Filters: ${report.filters.join("; ")}` : "Filters: none (all records)")), { size: 9, italic: true, color: { argb: argb(C.muted) } }, 15],
   ];
   lines.forEach(([text, font, height], i) => {
