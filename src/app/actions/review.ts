@@ -10,6 +10,7 @@ import { DIC_ITEM_QUEUE, FIEO_ITEM_QUEUE } from "@/lib/status";
 import type { ItemStatus, ReviewAction } from "@/generated/prisma/enums";
 import type { FormState } from "./auth";
 import { englishText } from "@/lib/text";
+import { itemSnapshot, profileSnapshot } from "@/lib/item-snapshot";
 
 const commentField = englishText({ max: 2000, label: "Comment", multiline: true });
 
@@ -110,12 +111,15 @@ export async function itemReviewAction(_: FormState, form: FormData): Promise<Fo
       const item = items.find((i) => i.id === d.id);
       if (!item || !rules.from.includes(item.status)) continue; // already acted on by someone else
       const rule = (rules as unknown as Record<Decision, { to: ItemStatus; log: ReviewAction }>)[d.decision];
+      const snap = itemSnapshot(item, item.sector.name);
       const moved = await tx.requirementItem.updateMany({
         where: { id: item.id, status: item.status },
         data: {
           status: rule.to,
           ...(rule.to === "FIEO_RECOMMENDED" ? { recommendedAt: now } : {}),
-          ...(rule.to === "APPROVED" ? { approvedAt: now, everApproved: true } : {}),
+          // Keep what was approved / returned so later changes can be highlighted for reviewers.
+          ...(rule.to === "APPROVED" ? { approvedAt: now, everApproved: true, approvedSnapshot: snap, returnedSnapshot: null } : {}),
+          ...(rule.to === "FIEO_RETURNED" ? { returnedSnapshot: snap } : {}),
         },
       });
       if (moved.count !== 1) continue;
@@ -123,6 +127,11 @@ export async function itemReviewAction(_: FormState, form: FormData): Promise<Fo
         data: { buyerId, actorId: user.id, actorRole: role, action: rule.log, comment: d.comment, itemId: item.id, sectorName: item.sector.name },
       });
       done.push({ sector: item.sector.name, decision: d.decision, comment: d.comment });
+    }
+
+    if (done.some((d) => d.decision === "approve")) {
+      const req = await tx.requirement.findUnique({ where: { buyerId } });
+      if (req) await tx.requirement.update({ where: { id: req.id }, data: { approvedProfile: profileSnapshot(req) } });
     }
 
     // First approved sector makes the buyer an approved RBSM buyer.

@@ -8,9 +8,13 @@ import { Alert, Badge, Button, Card, Textarea } from "@/components/ui";
 import { ACTION_LABEL, DIC_ITEM_QUEUE, FIEO_ITEM_QUEUE, ITEM_META, ROLE_LABEL } from "@/lib/status";
 import { useKeepForm } from "@/lib/use-keep-form";
 import { cn } from "@/lib/cn";
+import { SectorContent } from "@/components/changes";
+import type { ItemSnapshot } from "@/lib/item-snapshot";
 
 export type ReviewItem = {
-  id: string; sectorName: string; status: ItemStatus; everApproved: boolean;
+  id: string; sectorId: string; sectorName: string; status: ItemStatus; everApproved: boolean;
+  /** What to compare against: the approved version, or the version FIEO returned. */
+  baseline: { label: "approved version" | "version returned by FIEO"; snap: ItemSnapshot } | null;
   products: string; specifications: string | null; certifications: string[]; quantity: string | null;
   history: { id: string; action: ReviewAction; actorRole: Role; comment: string | null; at: string }[];
 };
@@ -88,16 +92,13 @@ export function ItemReview({ buyerId, role, items }: { buyerId: string; role: Ro
                 <Badge tone={meta.tone}>{meta.label}</Badge>
                 {it.everApproved && it.status !== "APPROVED" && <Badge tone="blue"><History className="size-3" /> Modification of an approved sector</Badge>}
               </div>
-              {it.quantity && <div className="text-xs text-slate-500">Volume: {it.quantity}</div>}
             </div>
             <div className="grid gap-6 px-6 py-4 lg:grid-cols-[1fr_300px]">
-              <div className="space-y-3 text-sm">
-                <div><span className="font-semibold text-slate-600">Products: </span>{it.products}</div>
-                {it.specifications && <div className="whitespace-pre-line"><span className="font-semibold text-slate-600">Specifications: </span>{it.specifications}</div>}
-                {it.certifications.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">{it.certifications.map((c) => <Badge key={c} tone="green">{c}</Badge>)}</div>
-                )}
-              </div>
+              <SectorContent
+                baseline={it.baseline}
+                current={{ sectorId: it.sectorId, sectorName: it.sectorName, products: it.products, specifications: it.specifications ?? "",
+                  certifications: it.certifications, quantity: it.quantity ?? "" }}
+              />
               <div className="space-y-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">History</div>
                 <ul className="space-y-2 text-xs">

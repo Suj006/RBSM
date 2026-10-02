@@ -14,6 +14,16 @@ import { DownloadButtons } from "./download-buttons";
 import { ReviewPanel } from "./review-panel";
 import { ItemReview } from "./item-review";
 import { fmtDateTime, parseCerts } from "@/lib/format";
+import { parseSnapshot, type ItemSnapshot, type ProfileSnapshot } from "@/lib/item-snapshot";
+
+/** Approved sectors being modified compare with the approved version; returned ones with what FIEO returned. */
+function baselineFor(i: { status: string; approvedSnapshot: string | null; returnedSnapshot: string | null }) {
+  if (i.status === "APPROVED") return null;
+  const approved = parseSnapshot<ItemSnapshot>(i.approvedSnapshot);
+  if (approved) return { label: "approved version" as const, snap: approved };
+  const returned = parseSnapshot<ItemSnapshot>(i.returnedSnapshot);
+  return returned ? { label: "version returned by FIEO" as const, snap: returned } : null;
+}
 
 export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; id: string; base: string; extra?: (buyerId: string) => React.ReactNode }) {
   const b = await prisma.buyer.findFirst({
@@ -72,7 +82,7 @@ export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; i
               </div>
             </div>
           </Card>
-          {b.requirement ? <SourcingProfileView req={b.requirement} /> : <Alert tone="slate">The buyer has not started the detailed requirement yet.</Alert>}
+          {b.requirement ? <SourcingProfileView req={b.requirement} before={parseSnapshot<ProfileSnapshot>(b.requirement.approvedProfile)} /> : <Alert tone="slate">The buyer has not started the detailed requirement yet.</Alert>}
         </div>
 
         <div className="space-y-6">
@@ -105,7 +115,8 @@ export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; i
           buyerId={b.id}
           role={role}
           items={(b.requirement?.items ?? []).map((i) => ({
-            id: i.id, sectorName: i.sector.name, status: i.status, everApproved: i.everApproved,
+            id: i.id, sectorId: i.sectorId, sectorName: i.sector.name, status: i.status, everApproved: i.everApproved,
+            baseline: baselineFor(i),
             products: i.products, specifications: i.specifications, certifications: parseCerts(i.certifications), quantity: i.quantity,
             history: i.reviewLogs.map((l) => ({ id: l.id, action: l.action, actorRole: l.actorRole, comment: l.comment, at: fmtDateTime(l.createdAt) })),
           }))}

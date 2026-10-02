@@ -189,6 +189,7 @@ model Requirement {
   annualSourcingValue  String? // bracket, e.g. "USD 1–5 million"
   sourcingTimeline     String? // Immediate / 3–6 months / …
   preferredEngagement  String? // Long-term supply, JV, one-time order…
+  approvedProfile      String? // JSON copy of the sourcing profile at the last sector approval
 
   items RequirementItem[]
 
@@ -208,13 +209,16 @@ model RequirementItem {
   quantity       String? // indicative volume
   sortOrder      Int         @default(0)
 
-  status        ItemStatus @default(DRAFT)
-  submittedAt   DateTime?
-  recommendedAt DateTime?
-  approvedAt    DateTime?
-  everApproved  Boolean    @default(false) // was approved at least once (modified since)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @default(now()) @updatedAt
+  status           ItemStatus @default(DRAFT)
+  submittedAt      DateTime?
+  recommendedAt    DateTime?
+  approvedAt       DateTime?
+  everApproved     Boolean    @default(false) // was approved at least once (modified since)
+  // Copies of the content (JSON) so reviewers can see what changed on resubmission.
+  approvedSnapshot String? // content as last approved by the Directorate
+  returnedSnapshot String? // content as returned by FIEO for correction
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @default(now()) @updatedAt
 
   reviewLogs ReviewLog[]
 
