@@ -18,11 +18,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <span className="h-1.5 w-10 rounded bg-tx-green" /><span className="h-1.5 w-10 rounded bg-tx-blue" />
           </div>
           <h2 className="text-4xl font-extrabold leading-tight tracking-tight">
-            Connecting global buyers with India&apos;s finest MSMEs.
+            Where the world sources from Kerala.
           </h2>
           <p className="mt-4 text-white/70">
-            {EVENT.name} {EVENT.programme} — register your sourcing interests, get verified, and meet
-            pre-qualified suppliers in structured B2B meetings.
+            {EVENT.name} {EVENT.programme} — verified international buyers meet export-ready MSMEs from all
+            14 districts of Kerala in structured B2B meetings.
           </p>
         </div>
         <div className="relative text-xs text-white/50">

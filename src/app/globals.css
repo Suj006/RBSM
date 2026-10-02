@@ -66,3 +66,29 @@ body {
     padding: 0.5rem 1rem; font-size: 0.75rem; color: #94a3b8;
   }
 }
+
+/* Front page: trade routes drawing into Kerala, and a pulsing pin. */
+.tx-arc {
+  stroke-dasharray: 60 800;
+  stroke-dashoffset: 60;
+  animation: tx-arc 4.2s ease-in-out infinite;
+}
+@keyframes tx-arc {
+  0% { stroke-dashoffset: 60; }
+  75%, 100% { stroke-dashoffset: -360; }
+}
+.tx-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tx-pulse 2.4s ease-out infinite;
+}
+@keyframes tx-pulse {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tx-arc, .tx-pulse { animation: none; }
+  .tx-arc { stroke-dasharray: none; }
+}
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
