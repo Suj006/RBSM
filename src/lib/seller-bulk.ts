@@ -46,7 +46,7 @@ export async function buildTemplate(district: string) {
     ["1. Enter one seller per row in the 'Sellers' sheet, starting from row 2. Do not change or move the heading row.", {}],
     ["2. Use English characters only. Names are formatted automatically (e.g. 'abc exports' becomes 'Abc Exports').", {}],
     ["3. Local Body Type: choose Panchayat, Municipality or Corporation from the drop-down.", {}],
-    ["4. Udyam Number: Kerala Udyam numbers only, in the format UDYAM-KL-00-0000000 (e.g. UDYAM-KL-07-0012345).", {}],
+    ["4. Udyam Number: Kerala Udyam numbers only. Type just the numbers, e.g. 07-0012345 — UDYAM-KL- is added automatically (the full UDYAM-KL-07-0012345 is also accepted).", {}],
     ["5. Export Experience: choose Yes or No.", {}],
     ["6. Mobile / WhatsApp: 10-digit Indian mobile numbers (e.g. 9876543210). Repeat the mobile number if WhatsApp is the same.", {}],
     [`7. Sector 1 and Products 1 are required; up to ${SECTOR_SLOTS} sectors can be given. Pick sectors from the drop-down; separate products with commas.`, {}],

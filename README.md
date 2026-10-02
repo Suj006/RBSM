@@ -36,7 +36,7 @@ Seller self-registers and chooses a district ───────────�
 ```
 
 Seller details: name, district (14 Kerala districts), taluk, local body type (Panchayat / Municipality /
-Corporation) and name, Udyam number (Kerala only, UDYAM-KL-00-0000000, unique), export experience,
+Corporation) and name, Udyam number (Kerala only, UDYAM-KL-00-0000000, unique — users type only the digits), export experience,
 sectors with products ready to export, and promoter contact (name, mobile, WhatsApp, e-mail).
 FIEO sees sellers only after Directorate approval. Seller products use the same sector master as buyer
 requirements, ready for buyer–seller matchmaking. Targets (approved sellers overall and per district,
@@ -68,6 +68,11 @@ Staff passwords can be changed from **Admin → Users & logins**.
   with the TRADEX letterhead, coloured headings, status colours, summary boxes and page numbers:
   Buyer Registration Register, Sector-wise Requirement Report, RBSM Approved Buyer List, MIS Summary,
   and a Buyer Profile for any single buyer (from the buyer's page). Filters on the list/report pages apply.
+- **Sector demand** page and report (FIEO, Directorate, Admin): per sector, the buyers, each product requested
+  with the buyers asking for it, required certifications, and the approved sellers offering it (matching
+  products highlighted)
+- Change tracking: when a buyer modifies an approved sector (or resubmits a returned one), reviewers see each
+  change highlighted against the approved / returned version
 
 ## Running locally
 

@@ -4,14 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, UserRound, ClipboardList, Users, ShieldCheck, Layers, Award, Mail, FileDown, BadgeCheck, Inbox,
-  Store, Upload, PlusCircle, Target,
+  Store, Upload, PlusCircle, Target, Boxes,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const ICONS = {
   dashboard: LayoutDashboard, profile: UserRound, requirement: ClipboardList, buyers: Users, review: Inbox,
   approved: BadgeCheck, users: ShieldCheck, sectors: Layers, certs: Award, mail: Mail, reports: FileDown,
-  sellers: Store, upload: Upload, add: PlusCircle, target: Target,
+  sellers: Store, upload: Upload, add: PlusCircle, target: Target, demand: Boxes,
 } as const;
 
 export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; exact?: boolean; badge?: number };

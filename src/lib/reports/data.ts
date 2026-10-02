@@ -13,6 +13,7 @@ import type { SellerStatus } from "@/generated/prisma/enums";
 import { DISTRICT_NAMES, localBodyLabel } from "@/lib/config";
 import { fmtMobile } from "@/lib/text";
 import { getTargets } from "@/lib/targets";
+import { sectorDemandSummary } from "@/lib/demand";
 
 export const REPORTS = {
   "buyer-register": {
@@ -35,6 +36,10 @@ export const REPORTS = {
     title: "District-wise Seller Summary",
     description: "Seller registrations and approvals by district, against the targets set by the Directorate.",
   },
+  "sector-demand": {
+    title: "Sector Demand Report",
+    description: "Sector by sector: buyers, products requested (with the buyers asking for each), certifications, and approved sellers offering the sector.",
+  },
   "mis-summary": {
     title: "MIS Summary Report",
     description: "Programme-level summary: registration pipeline, sector approvals, country-wise and sector-wise position.",
@@ -45,7 +50,7 @@ export type ReportId = keyof typeof REPORTS;
 /** Reports a role may open (district offices: seller reports only). */
 export const reportsFor = (role: User["role"]): ReportId[] =>
   role === "DISTRICT" ? ["seller-register", "seller-district-summary"]
-  : role === "DIC" ? ["sector-requirements", "approved-buyers", "seller-register", "seller-district-summary", "mis-summary"]
+  : role === "DIC" ? ["sector-requirements", "approved-buyers", "sector-demand", "seller-register", "seller-district-summary", "mis-summary"]
   : role === "FIEO" || role === "ADMIN" ? (Object.keys(REPORTS) as ReportId[])
   : [];
 export const isReportId = (s: string): s is ReportId => s in REPORTS;
@@ -346,6 +351,7 @@ async function misSummary(user: User): Promise<Report> {
 export async function buildReport(id: ReportId, user: User, f: BuyerFilters & SellerFilters): Promise<Report> {
   switch (id) {
     case "seller-register": return sellerRegister(user, f);
+    case "sector-demand": return sectorDemandReport(user, f);
     case "seller-district-summary": return sellerDistrictSummary(user);
     case "buyer-register": return buyerRegister(user, f);
     case "sector-requirements": return sectorRequirements(user, f);
@@ -626,6 +632,61 @@ export async function buildSellerProfile(user: User, sellerId: string): Promise<
           by: l.actorRole ? `${ROLE_LABEL[l.actorRole]}${l.actor ? ` — ${l.actor.displayName}` : ""}` : "Seller",
           action: SELLER_ACTION_LABEL[l.action], comment: l.comment,
         })),
+      },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------- sector demand
+
+async function sectorDemandReport(user: User, f: BuyerFilters): Promise<Report> {
+  let rows = await sectorDemandSummary(user);
+  if (f.sector) rows = rows.filter((r) => r.id === f.sector);
+  const filters = f.sector && rows[0] ? [`Sector: ${rows[0].name}`] : [];
+  if (user.role === "DIC") filters.push("Requirements recommended to the Directorate");
+  const productRows = rows.flatMap((r) => r.products.map((p) => ({ sector: r.name, ...p })));
+  return {
+    ...base("sector-demand", user, filters),
+    kpis: [
+      { label: "Sectors with demand", value: rows.filter((r) => r.buyers).length, tone: "blue" },
+      { label: "Buyer-sector requirements", value: rows.reduce((a, r) => a + r.buyers, 0), tone: "violet" },
+      { label: "Distinct products requested", value: productRows.length, tone: "yellow" },
+      { label: "Products with a matching seller", value: productRows.filter((p) => p.sellers > 0).length, tone: "green" },
+    ],
+    tables: [
+      {
+        name: "Sector Summary", heading: "1. Sector summary",
+        columns: [
+          { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+          { key: "sector", header: "Sector", width: 26 },
+          { key: "buyers", header: "Buyers", width: 9, kind: "number", align: "right" },
+          { key: "approved", header: "Approved Req.", width: 11, kind: "number", align: "right" },
+          { key: "pending", header: "Under Review", width: 11, kind: "number", align: "right" },
+          { key: "top", header: "Most Requested Products (buyers)", width: 52 },
+          { key: "sellers", header: "Approved Sellers", width: 11, kind: "number", align: "right" },
+          { key: "ratio", header: "Sellers per Buyer", width: 11, align: "right" },
+        ],
+        rows: rows.map((r, i) => ({
+          sl: i + 1, sector: r.name, buyers: r.buyers, approved: r.approvedReqs, pending: r.pendingReqs,
+          top: r.products.slice(0, 6).map((p) => `${p.product} (${p.buyers})`).join(", "), sellers: r.sellers,
+          ratio: r.buyers ? (r.sellers / r.buyers).toFixed(1) : "—",
+        })),
+        totals: {
+          sector: "Total", buyers: rows.reduce((a, r) => a + r.buyers, 0), approved: rows.reduce((a, r) => a + r.approvedReqs, 0),
+          pending: rows.reduce((a, r) => a + r.pendingReqs, 0), sellers: rows.reduce((a, r) => a + r.sellers, 0),
+        },
+      },
+      {
+        name: "Product Demand", heading: "2. Product-wise demand",
+        columns: [
+          { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+          { key: "sector", header: "Sector", width: 24 },
+          { key: "product", header: "Product", width: 28 },
+          { key: "buyers", header: "Buyers", width: 9, kind: "number", align: "right" },
+          { key: "names", header: "Requested By", width: 60 },
+          { key: "sellers", header: "Sellers Offering", width: 12, kind: "number", align: "right" },
+        ],
+        rows: productRows.map((p, i) => ({ sl: i + 1, sector: p.sector, product: p.product, buyers: p.buyers, names: p.buyerNames.join(", "), sellers: p.sellers })),
       },
     ],
   };

@@ -99,7 +99,8 @@ function Cell({ col, v, total, contentWidth, bold }: { col: Column; v: Row[strin
   }
   // Approximate characters per line: Helvetica averages ~0.55 em per character.
   const maxChars = Math.floor(((col.width / total) * contentWidth - 8) / (7.8 * 0.55));
-  const value = softBreak(text(col, v), maxChars);
+  // Totals rows leave empty cells blank rather than showing a dash.
+  const value = bold && (v === "" || v === null || v === undefined) ? "" : softBreak(text(col, v), maxChars);
   return (
     <Text style={[s.td, { width, textAlign: col.align ?? "left" }, col.kind === "mono" ? { fontFamily: "Helvetica-Bold" } : {},
       bold ? { fontFamily: "Helvetica-Bold" } : {}, value === "—" ? { color: "#94A3B8" } : {}]}>
@@ -110,20 +111,27 @@ function Cell({ col, v, total, contentWidth, bold }: { col: Column; v: Row[strin
 
 function TableView({ table, repeatHeader, contentWidth }: { table: Table; repeatHeader: boolean; contentWidth: number }) {
   const total = table.columns.reduce((n, c) => n + c.width, 0);
-  return (
-    <View style={s.section}>
-      {table.heading && <Text style={s.sectionHeading} minPresenceAhead={40}>{table.heading}</Text>}
+  const head = (
+    <>
+      {table.heading && <Text style={s.sectionHeading}>{table.heading}</Text>}
       {/* In single-table reports the column headings repeat on every page. */}
       <View style={s.thead} fixed={repeatHeader}>
         {table.columns.map((c) => (
           <Text key={c.key} style={[s.th, { width: `${(c.width / total) * 100}%`, textAlign: c.align ?? "left" }]}>{c.header}</Text>
         ))}
       </View>
-      {table.rows.map((r, i) => (
-        <View key={i} style={[s.tr, i % 2 ? { backgroundColor: hex(C.zebra) } : {}]} wrap={false}>
-          {table.columns.map((c) => <Cell key={c.key} col={c} v={r[c.key]} total={total} contentWidth={contentWidth} />)}
-        </View>
-      ))}
+    </>
+  );
+  const row = (r: Row, i: number) => (
+    <View key={i} style={[s.tr, i % 2 ? { backgroundColor: hex(C.zebra) } : {}]} wrap={false}>
+      {table.columns.map((c) => <Cell key={c.key} col={c} v={r[c.key]} total={total} contentWidth={contentWidth} />)}
+    </View>
+  );
+  const KEEP = 2; // heading + column headings never sit alone at the foot of a page
+  return (
+    <View style={s.section}>
+      {repeatHeader ? head : <View wrap={false}>{head}{table.rows.slice(0, KEEP).map(row)}</View>}
+      {(repeatHeader ? table.rows : table.rows.slice(KEEP)).map((r, i) => row(r, repeatHeader ? i : i + KEEP))}
       {!table.rows.length && <Text style={s.empty}>No records match the selected filters.</Text>}
       {table.totals && (
         <View style={s.totals} wrap={false}>

@@ -7,6 +7,7 @@ import { saveSellerAction, selfRegisterSellerAction } from "@/app/actions/seller
 import { Alert, Button, ButtonLink, Card, CardHeader, Field, Input, Select, Textarea } from "@/components/ui";
 import { DISTRICT_NAMES, LOCAL_BODY_TYPES } from "@/lib/config";
 import { useKeepForm } from "@/lib/use-keep-form";
+import { UdyamInput } from "./udyam-input";
 import { cn } from "@/lib/cn";
 import { EMPTY_SELLER, type SellerFormValues } from "@/lib/seller-form-defaults";
 
@@ -86,8 +87,8 @@ export function SellerForm({ mode, initial, sectors, district, backHref }: {
           <Field label="Local body name" htmlFor="localBodyName" required error={fe.localBodyName}>
             <Input id="localBodyName" name="localBodyName" defaultValue={initial.localBodyName} maxLength={80} />
           </Field>
-          <Field label="Udyam registration number" htmlFor="udyamNo" required error={fe.udyamNo} hint="Kerala Udyam numbers only — format UDYAM-KL-00-0000000">
-            <Input id="udyamNo" name="udyamNo" defaultValue={initial.udyamNo} maxLength={24} placeholder="UDYAM-KL-07-0012345" className="font-mono uppercase" />
+          <Field label="Udyam registration number" htmlFor="udyamNo" required error={fe.udyamNo} hint="Enter only the numbers — e.g. 07 and 0012345. UDYAM-KL- is filled in for you.">
+            <UdyamInput name="udyamNo" defaultValue={initial.udyamNo} invalid={!!fe.udyamNo} />
           </Field>
           <Field label="Export experience" required error={fe.exportExperience}>
             <div className="flex gap-3 pt-1" role="radiogroup">

@@ -185,7 +185,12 @@ export function placeName(label: string) {
 export function udyamField() {
   return z
     .string()
-    .transform((v) => toPlainText(v).toUpperCase().replace(/\s+/g, "").replace(/[–—_]/g, "-"))
+    .transform((v) => {
+      const t = toPlainText(v).toUpperCase().replace(/\s+/g, "").replace(/[–—_]/g, "-");
+      // Only the numbers given (07-0012345, 070012345 or KL-07-0012345): add the fixed UDYAM-KL- part.
+      const m = t.match(/^(?:KL-?)?(\d{2})-?(\d{7})$/);
+      return m ? `UDYAM-KL-${m[1]}-${m[2]}` : t;
+    })
     .pipe(
       z
         .string()
