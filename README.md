@@ -56,7 +56,7 @@ approved buyers, sellers per buyer — default 600 / 60 / 10) are set by the Dir
 | Role | User name | Password | Can do |
 |---|---|---|---|
 | FIEO | `fieo` | `pass@123` | See all buyers, approve / return basic details, recommend / return each sector |
-| Directorate | `dic123` | `dic123` | See FIEO-recommended sectors, approve each (first approval adds the buyer to the RBSM list) / return to FIEO |
+| Directorate | `dic123` | `dic123` | Central team: sees the whole programme — every buyer, sector and seller at every stage, all documents and all reports. Approves FIEO-recommended sectors (first approval adds the buyer to the RBSM list) / returns to FIEO; approves district-recommended sellers; sets targets |
 | Admin | `admin` | `admin` | Sector & certification masters, users, buyer password reset, e-mail outbox, all reports |
 | District offices (14) | `dic-tvm`, `dic-klm`, `dic-pta`, `dic-alp`, `dic-ktm`, `dic-idk`, `dic-ekm`, `dic-tsr`, `dic-pkd`, `dic-mlp`, `dic-kkd`, `dic-wyd`, `dic-knr`, `dic-ksd` | `pass@123` | Register sellers of their district (form / bulk Excel upload, up to 5 sectors per row), recommend or reject |
 | Buyer | `Tradex2027-NNN` | `pass@123` (must change on first login) | Own profile and requirement |
@@ -78,6 +78,10 @@ Staff passwords can be changed from **Admin → Users & logins**.
 - Easy navigation: "Back to …" on every inner page returns to the list you came from with its filters kept;
   after a decision, **Next pending application** opens the next item in your queue; sector rows jump straight
   to that sector on the buyer's page; on phones a shortcut jumps to the decision panel
+- **RBSM buyer list** and **RBSM seller list** (Directorate, FIEO, Admin): every approved buyer / seller on screen,
+  with one-click **Complete details** downloads (Excel and PDF) — buyers with contacts, sourcing profile and every
+  approved sector (products, specifications, certifications, volumes); sellers with Udyam, location, promoter
+  contact, export experience and every sector with products
 - Reports (Reports page for FIEO, Directorate and Admin) — each as a formatted **Excel** workbook and a **PDF**
   with the TRADEX letterhead, coloured headings, status colours, summary boxes and page numbers:
   Buyer Registration Register, Sector-wise Requirement Report, RBSM Approved Buyer List, MIS Summary,

@@ -63,12 +63,14 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
       { label: "Districts represented", value: new Set(byDistrict.map((d) => d.district)).size, accent: "yellow" as const },
     ]
     : [
-      { label: "Sellers awaiting approval", value: n("RECOMMENDED"), accent: "violet" as const, href: `${base}/sellers?status=RECOMMENDED` },
-      { label: "Returned to districts", value: n("RETURNED"), accent: "red" as const, href: `${base}/sellers?status=RETURNED` },
-      { label: "Approved sellers", value: approved, accent: "green" as const, href: `${base}/sellers?status=APPROVED` },
-      ...(user.role === "ADMIN"
-        ? [{ label: "Pending with districts", value: n("WITH_DISTRICT"), accent: "yellow" as const, href: `${base}/sellers?status=WITH_DISTRICT` }]
-        : [{ label: "Approved, with export experience", value: expCount(true, "APPROVED"), accent: "blue" as const, href: `${base}/sellers?status=APPROVED&exp=yes` }]),
+      // Directorate and Admin: the whole seller picture across all 14 districts.
+      { label: "Sellers registered", value: total, accent: "blue" as const, href: `${base}/sellers`,
+        hint: `${expCount(true)} with export experience` },
+      { label: "Pending with districts", value: n("WITH_DISTRICT"), accent: "yellow" as const, href: `${base}/sellers?status=WITH_DISTRICT`,
+        hint: [n("WITH_SELLER") && `${n("WITH_SELLER")} with applicants`, n("RETURNED") && `${n("RETURNED")} returned by Directorate`].filter(Boolean).join(" · ") || undefined },
+      { label: user.role === "DIC" ? "Sellers awaiting my approval" : "Sellers with Directorate", value: n("RECOMMENDED"), accent: "violet" as const, href: `${base}/sellers?status=RECOMMENDED` },
+      { label: "Approved sellers", value: approved, accent: "green" as const, href: `${base}/sellers?status=APPROVED`,
+        hint: `${expCount(true, "APPROVED")} with export experience` },
     ];
 
   const sectorCounts = new Map<string, { id: string; name: string; n: number }>();
@@ -77,7 +79,7 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
     e.n++; sectorCounts.set(p.sectorId, e);
   }
   const topSectors = [...sectorCounts.values()].sort((a, b) => b.n - a.n).slice(0, 10);
-  const statuses = (Object.keys(SELLER_META) as SellerStatus[]).filter((s) => user.role === "DISTRICT" || user.role === "ADMIN" || byStatus.some((x) => x.status === s));
+  const statuses = (Object.keys(SELLER_META) as SellerStatus[]).filter((s) => user.role !== "FIEO" || byStatus.some((x) => x.status === s));
   const districtRows = DISTRICT_NAMES.map((d) => {
     const c = (...s: SellerStatus[]) => byDistrict.filter((x) => x.district === d && s.includes(x.status)).reduce((a, x) => a + x._count, 0);
     return { d, pending: c("WITH_DISTRICT"), dic: c("RECOMMENDED"), returned: c("RETURNED"), approved: c("APPROVED") };
@@ -184,7 +186,7 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
                 <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-4 py-2.5 text-left">District</th>
-                    {user.role === "ADMIN" && <th className="px-3 py-2.5 text-right">With district</th>}
+                    <th className="px-3 py-2.5 text-right">With district</th>
                     <th className="px-3 py-2.5 text-right">With Directorate</th>
                     <th className="px-3 py-2.5 text-right">Returned</th>
                     <th className="px-3 py-2.5 text-right">Approved</th>
@@ -198,7 +200,7 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
                     return (
                       <tr key={r.d} className="hover:bg-slate-50">
                         <td className="px-4 py-2"><Link href={`${base}/sellers?district=${encodeURIComponent(r.d)}`} className="hover:text-brand-700">{r.d}</Link></td>
-                        {user.role === "ADMIN" && <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.pending}</td>}
+                        <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.pending}</td>
                         <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.dic}</td>
                         <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.returned}</td>
                         <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{r.approved}</td>

@@ -23,7 +23,10 @@ function softBreak(value: string, maxChars: number) {
     .split("\n")
     .map((line) => line.split(" ").map((tok) => {
       if (tok.length <= maxChars) return tok;
-      const parts = tok.split(/(?<=[-@./])/);
+      // Break after "-", "@", "." or "/"; a part still too long (a long place name) is cut to fit.
+      // (The width estimate is an average, so allow some slack before cutting a word.)
+      const hard = Math.ceil(maxChars * 1.25);
+      const parts = tok.split(/(?<=[-@./])/).flatMap((p) => (p.length > hard ? p.match(new RegExp(`.{1,${hard}}`, "g")) ?? [p] : [p]));
       const out: string[] = [];
       let cur = "";
       for (const p of parts) {
@@ -109,7 +112,8 @@ function Cell({ col, v, total, contentWidth, bold }: { col: Column; v: Row[strin
   );
 }
 
-function TableView({ table, repeatHeader, contentWidth }: { table: Table; repeatHeader: boolean; contentWidth: number }) {
+function TableView({ table: full, repeatHeader, contentWidth }: { table: Table; repeatHeader: boolean; contentWidth: number }) {
+  const table = { ...full, columns: full.columns.filter((c) => !c.excelOnly) };
   const total = table.columns.reduce((n, c) => n + c.width, 0);
   const head = (
     <>

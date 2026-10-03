@@ -1,7 +1,7 @@
 import type { Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { buyerWhere, itemScope, PAGE_SIZE, scopeFor, type BuyerFilters as F } from "@/lib/buyer-query";
-import { ALL_ITEM_STATUSES, ALL_STATUSES, DIC_VISIBLE_ITEMS, ITEM_META } from "@/lib/status";
+import { ALL_ITEM_STATUSES, ALL_STATUSES, ITEM_META } from "@/lib/status";
 import { Card, PageHeader } from "@/components/ui";
 import { BuyerFilters } from "./buyer-filters";
 import { BuyerTable } from "./buyer-table";
@@ -39,8 +39,8 @@ export async function BuyerListPage({ role, base, filters, title, subtitle }: {
         subtitle={subtitle}
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <DownloadButtons href={`/api/reports/${role === "DIC" ? "sector-requirements" : "buyer-register"}${qs ? `?${qs}` : ""}`} label={role === "DIC" ? "Sector report" : "Register"} compact />
-            {role !== "DIC" && <DownloadButtons href={`/api/reports/sector-requirements${qs ? `?${qs}` : ""}`} label="Sector-wise" compact />}
+            <DownloadButtons href={`/api/reports/buyer-register${qs ? `?${qs}` : ""}`} label="Register" compact />
+            <DownloadButtons href={`/api/reports/sector-requirements${qs ? `?${qs}` : ""}`} label="Sector-wise" compact />
           </div>
         }
       />
@@ -48,15 +48,15 @@ export async function BuyerListPage({ role, base, filters, title, subtitle }: {
         <BuyerFilters
           action={base}
           filters={filters}
-          statuses={role === "DIC" ? ["BASIC_APPROVED", "APPROVED"] : ALL_STATUSES}
-          itemStatuses={role === "DIC" ? DIC_VISIBLE_ITEMS : ALL_ITEM_STATUSES}
+          statuses={ALL_STATUSES}
+          itemStatuses={ALL_ITEM_STATUSES}
           countries={countries.map((c) => c.country)}
           sectors={sectors}
           actionLabel={role === "DIC" ? "Awaiting my approval" : "Needs FIEO action"}
         />
         <BuyerTable rows={rows} base={base} />
         <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 px-4 py-2 text-[11px] text-slate-500">
-          {(role === "DIC" ? DIC_VISIBLE_ITEMS : ALL_ITEM_STATUSES).map((s) => (
+          {(ALL_ITEM_STATUSES).map((s) => (
             <span key={s} className="inline-flex items-center gap-1.5"><span className={`size-1.5 rounded-full ${ITEM_META[s].dot}`} />{ITEM_META[s].short}</span>
           ))}
         </div>

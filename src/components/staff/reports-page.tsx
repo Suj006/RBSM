@@ -4,21 +4,21 @@ import type { SellerStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { scopeFor, type BuyerFilters as F } from "@/lib/buyer-query";
 import { REPORTS, reportsFor, type ReportId } from "@/lib/reports/data";
-import { ALL_ITEM_STATUSES, ALL_SELLER_STATUSES, ALL_STATUSES, DIC_VISIBLE_ITEMS, SELLER_META, SELLER_VISIBLE } from "@/lib/status";
+import { ALL_ITEM_STATUSES, ALL_SELLER_STATUSES, ALL_STATUSES, SELLER_META, SELLER_VISIBLE } from "@/lib/status";
 import { DISTRICT_NAMES } from "@/lib/config";
 import { Button, Card, PageHeader, Select } from "@/components/ui";
 import { BuyerFilters } from "./buyer-filters";
 import { DownloadButtons } from "./download-buttons";
 
 const ICON: Record<ReportId, typeof Users> = {
-  "buyer-register": Users, "sector-requirements": ClipboardList, "approved-buyers": BadgeCheck,
+  "buyer-register": Users, "sector-requirements": ClipboardList, "approved-buyers": BadgeCheck, "approved-sellers": BadgeCheck,
   "seller-register": Store, "seller-district-summary": MapPinned, "mis-summary": BarChart3, "sector-demand": Boxes,
 };
 const ACCENT: Record<ReportId, string> = {
-  "buyer-register": "bg-tx-blue", "sector-requirements": "bg-tx-yellow", "approved-buyers": "bg-tx-green",
+  "buyer-register": "bg-tx-blue", "sector-requirements": "bg-tx-yellow", "approved-buyers": "bg-tx-green", "approved-sellers": "bg-tx-green",
   "seller-register": "bg-tx-green", "seller-district-summary": "bg-tx-blue", "mis-summary": "bg-tx-red", "sector-demand": "bg-violet-500",
 };
-const SELLER_REPORTS: ReportId[] = ["seller-register", "seller-district-summary"];
+const SELLER_REPORTS: ReportId[] = ["approved-sellers", "seller-register", "seller-district-summary"];
 
 type Params = F & { s_status?: string; s_district?: string; s_sector?: string; s_exp?: string };
 
@@ -52,13 +52,32 @@ export async function ReportsPage({ user, base, filters }: { user: User; base: s
   const pick = (o: Record<string, string | undefined>) => new URLSearchParams(Object.entries(o).filter(([, v]) => v) as [string, string][]).toString();
   const bqs = pick({ q: filters.q, status: filters.status, item: filters.item, country: filters.country, sector: filters.sector });
   const sqs = pick({ status: filters.s_status, district: filters.s_district, sector: filters.s_sector, exp: filters.s_exp });
-  const sellerStatuses: SellerStatus[] = role === "DISTRICT" || role === "ADMIN" ? ALL_SELLER_STATUSES : SELLER_VISIBLE[role] ?? [];
+  const sellerStatuses: SellerStatus[] = role === "DISTRICT" || role === "ADMIN" || role === "DIC" ? ALL_SELLER_STATUSES : SELLER_VISIBLE[role] ?? [];
   const keep = (prefix: "s_" | "b") => Object.entries(filters).filter(([k, v]) => v && (prefix === "s_" ? !k.startsWith("s_") : k.startsWith("s_")));
 
   return (
     <>
       <PageHeader eyebrow="Reports" title="Reports & downloads"
         subtitle="Formatted Excel workbooks and PDF reports with the TRADEX letterhead. Choose filters, then download." />
+
+      {/* The two lists the central team needs most, one click away. */}
+      {(allowed.includes("approved-buyers") || allowed.includes("approved-sellers")) && (
+        <Card className="mb-10 overflow-hidden">
+          <div className="tx-ribbon h-1" />
+          <div className="grid gap-px bg-slate-100 sm:grid-cols-2">
+            {(["approved-buyers", "approved-sellers"] as const).filter((id) => allowed.includes(id)).map((id) => (
+              <div key={id} className="flex flex-col gap-3 bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-brand-700">Complete details</div>
+                  <div className="mt-0.5 text-lg font-bold text-ink">{id === "approved-buyers" ? "All approved buyers" : "All approved sellers"}</div>
+                  <div className="text-sm text-slate-500">{id === "approved-buyers" ? "Contacts, sourcing profile, every approved sector" : "Udyam, location, promoter contact, sectors & products"}</div>
+                </div>
+                <DownloadButtons href={`/api/reports/${id}`} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {buyerIds.length > 0 && (
         <section className="mb-10">
@@ -67,8 +86,8 @@ export async function ReportsPage({ user, base, filters }: { user: User; base: s
             <BuyerFilters
               action={base}
               filters={filters}
-              statuses={role === "DIC" ? ["BASIC_APPROVED", "APPROVED"] : ALL_STATUSES}
-              itemStatuses={role === "DIC" ? DIC_VISIBLE_ITEMS : ALL_ITEM_STATUSES}
+              statuses={ALL_STATUSES}
+              itemStatuses={ALL_ITEM_STATUSES}
               countries={countries.map((c) => c.country)}
               sectors={sectors}
               actionLabel={role === "DIC" ? "Awaiting my approval" : "Needs FIEO action"}
@@ -116,7 +135,8 @@ export async function ReportsPage({ user, base, filters }: { user: User; base: s
           <div className="grid gap-5 md:grid-cols-2">
             {sellerIds.map((id) => (
               <ReportCard key={id} id={id} href={`/api/reports/${id}${id === "seller-district-summary" || !sqs ? "" : `?${sqs}`}`}
-                note={id === "seller-district-summary" ? "Covers all sellers you can see (filters not applied)." : undefined} />
+                note={id === "seller-district-summary" ? "Covers all sellers you can see (filters not applied)."
+                  : id === "approved-sellers" ? "Approved sellers only — the status filter is not applied." : undefined} />
             ))}
           </div>
         </section>

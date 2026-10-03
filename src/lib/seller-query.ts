@@ -4,12 +4,12 @@ import { ALL_SELLER_STATUSES, SELLER_VISIBLE } from "@/lib/status";
 
 export type SellerFilters = { q?: string; status?: string; sector?: string; district?: string; exp?: string; source?: string; page?: string };
 
-/** Sellers a user may see at all. Districts see their own district; FIEO only approved sellers. */
+/** Sellers a user may see at all. Districts see their own district; FIEO only approved sellers; the Directorate and Admin all. */
 export function sellerScope(user: Pick<User, "role" | "district">): Prisma.SellerWhereInput {
   if (user.role === "DISTRICT") return { district: user.district ?? "__none__" };
   const visible = SELLER_VISIBLE[user.role];
   if (visible) return { status: { in: visible } };
-  if (user.role === "ADMIN") return {};
+  if (user.role === "ADMIN" || user.role === "DIC") return {};
   return { id: "__none__" };
 }
 

@@ -9,6 +9,8 @@ export type Column = {
   width: number;
   kind?: ColumnKind;
   align?: "left" | "center" | "right";
+  /** Excel only: left out of the PDF where an A4 page cannot hold every column. */
+  excelOnly?: boolean;
 };
 
 export type Row = Record<string, string | number | Date | null | undefined | BuyerStatus | ItemStatus | SellerStatus>;

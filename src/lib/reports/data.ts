@@ -3,7 +3,7 @@ import type { User } from "@/generated/prisma/client";
 import type { BuyerStatus, ItemStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { buyerWhere, itemScope, scopeFor, type BuyerFilters } from "@/lib/buyer-query";
-import { ACTION_LABEL, ALL_ITEM_STATUSES, ALL_STATUSES, DIC_VISIBLE_ITEMS, ITEM_META, ROLE_LABEL, STATUS_META } from "@/lib/status";
+import { ACTION_LABEL, ALL_ITEM_STATUSES, ALL_STATUSES, ITEM_META, ROLE_LABEL, STATUS_META } from "@/lib/status";
 import { parseCerts } from "@/lib/format";
 import { EVENT } from "@/lib/config";
 import type { Kpi, Report, Row, Table } from "./types";
@@ -26,7 +26,11 @@ export const REPORTS = {
   },
   "approved-buyers": {
     title: "RBSM Approved Buyer List",
-    description: "Buyers approved by the Directorate, with their approved sectors and products.",
+    description: "Complete details of buyers approved by the Directorate: contact, sourcing profile, and every approved sector with products, specifications, certifications and volumes.",
+  },
+  "approved-sellers": {
+    title: "RBSM Approved Seller List",
+    description: "Complete details of sellers approved by the Directorate: Udyam number, location, promoter contact, export experience, and every sector with the products ready to export.",
   },
   "seller-register": {
     title: "Seller Registration Register",
@@ -49,9 +53,8 @@ export const REPORTS = {
 export type ReportId = keyof typeof REPORTS;
 /** Reports a role may open (district offices: seller reports only). */
 export const reportsFor = (role: User["role"]): ReportId[] =>
-  role === "DISTRICT" ? ["seller-register", "seller-district-summary"]
-  : role === "DIC" ? ["sector-requirements", "approved-buyers", "sector-demand", "seller-register", "seller-district-summary", "mis-summary"]
-  : role === "FIEO" || role === "ADMIN" ? (Object.keys(REPORTS) as ReportId[])
+  role === "DISTRICT" ? ["approved-sellers", "seller-register", "seller-district-summary"]
+  : role === "FIEO" || role === "DIC" || role === "ADMIN" ? (Object.keys(REPORTS) as ReportId[])
   : [];
 export const isReportId = (s: string): s is ReportId => s in REPORTS;
 
@@ -213,29 +216,124 @@ async function approvedBuyers(user: User, f: BuyerFilters): Promise<Report> {
       { label: "Sectors covered", value: sectors.size, tone: "violet" },
       { label: "Countries", value: new Set(buyers.map((b) => b.country)).size, tone: "yellow" },
     ],
-    tables: [{
-      name: "Approved Buyers",
-      columns: [
-        { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
-        { key: "approvedNo", header: "Buyer No.", width: 19, kind: "mono" },
-        { key: "name", header: "Buyer Name", width: 28 },
-        { key: "country", header: "Country", width: 16 },
-        { key: "pocName", header: "Contact Person", width: 20 },
-        { key: "pocDesignation", header: "Designation", width: 18 },
-        { key: "email", header: "E-mail", width: 28 },
-        { key: "mobile", header: "Mobile", width: 17 },
-        { key: "sectors", header: "Approved Sectors", width: 28 },
-        { key: "products", header: "Products", width: 36 },
-        { key: "approvedAt", header: "Approved On", width: 15, kind: "date" },
-      ],
-      rows: buyers.map((b, i) => ({
-        sl: i + 1, approvedNo: b.approvedNo, name: b.name, country: b.country, pocName: b.pocName, pocDesignation: b.pocDesignation,
-        email: b.pocEmail ?? b.signupEmail, mobile: b.pocMobile,
-        sectors: b.requirement?.items.map((it) => it.sector.name).join("\n"),
-        products: b.requirement?.items.map((it) => `${it.sector.name}: ${it.products}`).join("\n"),
-        approvedAt: b.approvedAt,
-      })),
-    }],
+    tables: [
+      {
+        name: "Approved Buyers",
+        heading: "1. Approved buyers",
+        columns: [
+          { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+          { key: "approvedNo", header: "Buyer No.", width: 19, kind: "mono" },
+          { key: "regNo", header: "Reg. No.", width: 13, kind: "mono", excelOnly: true },
+          { key: "name", header: "Buyer Name", width: 26 },
+          { key: "country", header: "Country", width: 15 },
+          { key: "pocName", header: "Contact Person", width: 20 },
+          { key: "pocDesignation", header: "Designation", width: 18 },
+          { key: "email", header: "E-mail", width: 28 },
+          { key: "mobile", header: "Mobile", width: 17 },
+          { key: "orgType", header: "Organisation Type", width: 18 },
+          { key: "value", header: "Annual Sourcing Value", width: 18 },
+          { key: "timeline", header: "Sourcing Timeline", width: 18, excelOnly: true },
+          { key: "engagement", header: "Preferred Engagement", width: 18, excelOnly: true },
+          { key: "interests", header: "Procurement Interests", width: 40 },
+          { key: "sectors", header: "Approved Sectors", width: 26 },
+          { key: "approvedAt", header: "Approved On", width: 14, kind: "date" },
+        ],
+        rows: buyers.map((b, i) => ({
+          sl: i + 1, approvedNo: b.approvedNo, regNo: b.regNo, name: b.name, country: b.country, pocName: b.pocName, pocDesignation: b.pocDesignation,
+          email: b.pocEmail ?? b.signupEmail, mobile: b.pocMobile,
+          orgType: b.requirement?.organisationType, value: b.requirement?.annualSourcingValue, timeline: b.requirement?.sourcingTimeline,
+          engagement: b.requirement?.preferredEngagement, interests: b.requirement?.procurementInterests,
+          sectors: b.requirement?.items.map((it) => it.sector.name).join("\n"),
+          approvedAt: b.approvedAt,
+        })),
+      },
+      {
+        name: "Approved Sector Requirements",
+        heading: "2. Approved sector requirements",
+        columns: [
+          { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+          { key: "approvedNo", header: "Buyer No.", width: 19, kind: "mono" },
+          { key: "name", header: "Buyer Name", width: 24 },
+          { key: "country", header: "Country", width: 14 },
+          { key: "sector", header: "Sector", width: 22 },
+          { key: "products", header: "Products", width: 30 },
+          { key: "specifications", header: "Specifications", width: 30 },
+          { key: "certifications", header: "Certifications Required", width: 26 },
+          { key: "quantity", header: "Indicative Volume", width: 18 },
+          { key: "approvedAt", header: "Approved On", width: 14, kind: "date" },
+        ],
+        rows: buyers.flatMap((b) => (b.requirement?.items ?? []).map((it) => ({ b, it }))).map(({ b, it }, i) => ({
+          sl: i + 1, approvedNo: b.approvedNo, name: b.name, country: b.country, sector: it.sector.name, products: it.products,
+          specifications: it.specifications, certifications: parseCerts(it.certifications).join(", "), quantity: it.quantity, approvedAt: it.approvedAt,
+        })),
+      },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------- approved sellers (complete details)
+
+async function approvedSellers(user: User, f: SellerFilters): Promise<Report> {
+  const sellers = await prisma.seller.findMany({
+    where: { AND: [sellerWhere(user, { ...f, status: undefined }), { status: "APPROVED" }] },
+    orderBy: { approvedSeq: "asc" },
+    include: { products: { orderBy: { sortOrder: "asc" }, include: { sector: true } } },
+  });
+  const filters = (await describeSellerFilters(user, { ...f, status: undefined })).filter((x) => x !== "Approved sellers only");
+  return {
+    ...base("approved-sellers", user, filters),
+    kpis: [
+      { label: "Approved sellers", value: sellers.length, tone: "green" },
+      { label: "With export experience", value: sellers.filter((x) => x.exportExperience).length, tone: "blue" },
+      { label: "Sectors covered", value: new Set(sellers.flatMap((x) => x.products.map((p) => p.sectorId))).size, tone: "violet" },
+      { label: "Districts", value: new Set(sellers.map((x) => x.district)).size, tone: "yellow" },
+    ],
+    tables: [
+      {
+        name: "Approved Sellers",
+        heading: "1. Approved sellers",
+        columns: [
+          { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+          { key: "approvedNo", header: "Seller No.", width: 19, kind: "mono" },
+          { key: "regNo", header: "Reg. No.", width: 13, kind: "mono", excelOnly: true },
+          { key: "name", header: "Name of Seller", width: 26 },
+          { key: "district", header: "District", width: 16 },
+          { key: "taluk", header: "Taluk", width: 16, excelOnly: true },
+          { key: "localBody", header: "Local Body", width: 20 },
+          { key: "udyamNo", header: "Udyam Number", width: 21, kind: "mono" },
+          { key: "exp", header: "Export Exp.", width: 9, align: "center" },
+          { key: "contact", header: "Promoter / Contact", width: 18 },
+          { key: "mobile", header: "Mobile", width: 15 },
+          { key: "whatsapp", header: "WhatsApp", width: 15, excelOnly: true },
+          { key: "email", header: "E-mail", width: 26 },
+          { key: "sectors", header: "Sectors", width: 26 },
+          { key: "approvedAt", header: "Approved On", width: 14, kind: "date" },
+        ],
+        rows: sellers.map((x, i) => ({
+          sl: i + 1, approvedNo: x.approvedNo, regNo: x.regNo, name: x.name, district: x.district, taluk: x.taluk,
+          localBody: `${x.localBodyName} ${localBodyLabel(x.localBodyType)}`, udyamNo: x.udyamNo, exp: x.exportExperience ? "Yes" : "No",
+          contact: x.contactName, mobile: fmtMobile(x.contactMobile), whatsapp: fmtMobile(x.contactWhatsapp), email: x.contactEmail,
+          sectors: x.products.map((p) => p.sector.name).join("\n"), approvedAt: x.approvedAt,
+        })),
+      },
+      {
+        name: "Sectors & Products",
+        heading: "2. Sectors and products ready to export",
+        columns: [
+          { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+          { key: "approvedNo", header: "Seller No.", width: 19, kind: "mono" },
+          { key: "name", header: "Name of Seller", width: 26 },
+          { key: "district", header: "District", width: 16 },
+          { key: "sector", header: "Sector", width: 24 },
+          { key: "products", header: "Products Ready to Export", width: 44 },
+          { key: "exp", header: "Export Exp.", width: 9, align: "center" },
+        ],
+        rows: sellers.flatMap((x) => x.products.map((p) => ({ x, p }))).map(({ x, p }, i) => ({
+          sl: i + 1, approvedNo: x.approvedNo, name: x.name, district: x.district, sector: p.sector.name, products: p.products,
+          exp: x.exportExperience ? "Yes" : "No",
+        })),
+      },
+    ],
   };
 }
 
@@ -269,7 +367,7 @@ async function misSummary(user: User): Promise<Report> {
     totals: { label: "Total", count: buyers.length, share: buyers.length ? 1 : null },
   };
 
-  const itemStatuses = user.role === "DIC" ? DIC_VISIBLE_ITEMS : ALL_ITEM_STATUSES;
+  const itemStatuses = ALL_ITEM_STATUSES;
   const itemTable: Table = {
     name: "Sector Approvals",
     heading: "2. Sector requirement approvals",
@@ -336,7 +434,7 @@ async function misSummary(user: User): Promise<Report> {
   };
 
   return {
-    ...base("mis-summary", user, user.role === "DIC" ? ["Scope: buyers with sectors recommended to the Directorate"] : [], "portrait"),
+    ...base("mis-summary", user, [], "portrait"),
     kpis: [
       { label: "Registered buyers", value: buyers.length, tone: "blue" },
       { label: "Approved buyers", value: buyers.filter((b) => b.status === "APPROVED").length, tone: "green" },
@@ -356,6 +454,7 @@ export async function buildReport(id: ReportId, user: User, f: BuyerFilters & Se
     case "buyer-register": return buyerRegister(user, f);
     case "sector-requirements": return sectorRequirements(user, f);
     case "approved-buyers": return approvedBuyers(user, f);
+    case "approved-sellers": return approvedSellers(user, f);
     case "mis-summary": return misSummary(user);
   }
 }
@@ -535,7 +634,7 @@ async function sellerDistrictSummary(user: User): Promise<Report> {
     ...base("seller-district-summary", user,
       user.role === "DISTRICT" ? [`District: ${user.district}`]
       : fieo ? ["Approved sellers only"]
-      : user.role === "DIC" ? ["Sellers recommended to the Directorate (with Directorate, returned or approved)"] : [], "portrait"),
+      : [], "portrait"),
     kpis: [
       { label: "Sellers", value: sellers.length, tone: "blue" },
       { label: "Approved sellers", value: totalApproved, tone: "green" },
@@ -643,7 +742,6 @@ async function sectorDemandReport(user: User, f: BuyerFilters): Promise<Report> 
   let rows = await sectorDemandSummary(user);
   if (f.sector) rows = rows.filter((r) => r.id === f.sector);
   const filters = f.sector && rows[0] ? [`Sector: ${rows[0].name}`] : [];
-  if (user.role === "DIC") filters.push("Requirements recommended to the Directorate");
   const productRows = rows.flatMap((r) => r.products.map((p) => ({ sector: r.name, ...p })));
   return {
     ...base("sector-demand", user, filters),

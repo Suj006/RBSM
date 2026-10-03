@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 import type { BuyerStatus, ItemStatus, Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { actionWhere, itemScope, scopeFor } from "@/lib/buyer-query";
-import { DIC_ITEM_QUEUE, DIC_VISIBLE_ITEMS, FIEO_ITEM_QUEUE, ITEM_META, ROLE_LABEL } from "@/lib/status";
+import { DIC_ITEM_QUEUE, FIEO_ITEM_QUEUE, ITEM_META, ROLE_LABEL } from "@/lib/status";
 import { Card, CardHeader, PageHeader, StatCard, ButtonLink } from "@/components/ui";
 import { BarList, ColumnChart, PipelineBar } from "@/components/charts";
 import { StatusBadge } from "@/components/status-badge";
@@ -50,14 +50,8 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
     value: recent.filter((r) => r.createdAt.toDateString() === d.toDateString()).length,
   }));
 
-  const stats = role === "DIC"
-    ? [
-        { label: "Sectors awaiting my approval", value: items("FIEO_RECOMMENDED"), accent: "violet" as const, href: `${base}/requirements?item=FIEO_RECOMMENDED` },
-        { label: "Sectors returned to FIEO", value: items("DIC_RETURNED"), accent: "red" as const, href: `${base}/requirements?item=DIC_RETURNED` },
-        { label: "Approved sectors", value: items("APPROVED"), accent: "green" as const, href: `${base}/requirements?item=APPROVED` },
-        { label: "Approved buyers", value: count("APPROVED"), accent: "blue" as const, href: `${base}/buyers?status=APPROVED` },
-      ]
-    : [
+  // Every staff role sees the whole programme; the Directorate's own queue is highlighted in row 2.
+  const stats = [
         // Row 1 — basic details
         { label: "Total sign-ups", value: total, accent: "blue" as const, href: `${base}/buyers` },
         { label: "Basic details not submitted / returned", value: count("SIGNED_UP", "BASIC_RETURNED"), accent: "slate" as const,
@@ -66,8 +60,9 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
         { label: "Basic details approved", value: count("BASIC_APPROVED", "APPROVED"), accent: "green" as const,
           hint: `${count("APPROVED")} already approved buyers`, href: `${base}/buyers?status=basic_approved` },
         // Row 2 — sector requirements
-        { label: "Sectors pending with FIEO", value: items(...FIEO_ITEM_QUEUE), accent: "yellow" as const, hint: items("DIC_RETURNED") ? `${items("DIC_RETURNED")} returned by Directorate` : undefined, href: `${base}/requirements?item=action` },
-        { label: "Sectors with Directorate", value: items("FIEO_RECOMMENDED"), accent: "violet" as const, href: `${base}/requirements?item=FIEO_RECOMMENDED` },
+        { label: "Sectors pending with FIEO", value: items(...FIEO_ITEM_QUEUE), accent: "yellow" as const, hint: items("DIC_RETURNED") ? `${items("DIC_RETURNED")} returned by Directorate` : undefined,
+          href: `${base}/requirements?item=${role === "DIC" ? "with_fieo" : "action"}` },
+        { label: role === "DIC" ? "Sectors awaiting my approval" : "Sectors with Directorate", value: items("FIEO_RECOMMENDED"), accent: "violet" as const, href: `${base}/requirements?item=FIEO_RECOMMENDED` },
         { label: "Approved sectors", value: items("APPROVED"), accent: "green" as const, href: `${base}/requirements?item=APPROVED` },
         { label: "Approved buyers", value: count("APPROVED"), accent: "green" as const, href: `${base}/buyers?status=APPROVED` },
       ];
@@ -78,7 +73,7 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
     { label: "Requirement stage", value: count("BASIC_APPROVED"), color: "bg-tx-blue", href: `${base}/buyers?status=BASIC_APPROVED` },
     { label: "Approved buyers", value: count("APPROVED"), color: "bg-tx-green", href: `${base}/buyers?status=APPROVED` },
   ];
-  const itemPipeline = (role === "DIC" ? DIC_VISIBLE_ITEMS : (Object.keys(ITEM_META) as ItemStatus[])).map((s) => ({
+  const itemPipeline = (Object.keys(ITEM_META) as ItemStatus[]).map((s) => ({
     label: ITEM_META[s].short, value: items(s), color: ITEM_META[s].dot, href: `${base}/requirements?item=${s}`,
   }));
 
@@ -96,12 +91,10 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
         <Card className="lg:col-span-2">
           <CardHeader title="Pipeline" subtitle={`${total} buyers · ${totalItems} sector requirements in view`} />
           <div className="space-y-8 p-6">
-            {role !== "DIC" && (
-              <div>
-                <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Buyers</div>
-                <PipelineBar segments={buyerPipeline} />
-              </div>
-            )}
+            <div>
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Buyers</div>
+              <PipelineBar segments={buyerPipeline} />
+            </div>
             <div>
               <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Sector requirements</div>
               <PipelineBar segments={itemPipeline} />

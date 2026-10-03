@@ -12,7 +12,7 @@ export default async function FieoLayout({ children }: { children: React.ReactNo
       { href: "/fieo/buyers", label: "Buyer applications", icon: "buyers", badge: pending },
       { href: "/fieo/requirements", label: "Sector requirements", icon: "requirement" },
       { href: "/fieo/approved", label: "RBSM buyer list", icon: "approved" },
-      { href: "/fieo/sellers", label: "Approved sellers", icon: "sellers" },
+      { href: "/fieo/seller-list", label: "RBSM seller list", icon: "sellers" },
       { href: "/fieo/demand", label: "Sector demand", icon: "demand" },
       { href: "/fieo/reports", label: "Reports", icon: "reports" },
     ]}>{children}</AppShell>

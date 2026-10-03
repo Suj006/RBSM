@@ -27,7 +27,7 @@ export async function SellerListPage({ user, base, filters, title, subtitle }: {
     prisma.seller.count({ where }),
     prisma.sector.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
   ]);
-  const statuses: SellerStatus[] = user.role === "DISTRICT" || user.role === "ADMIN" ? ALL_SELLER_STATUSES : SELLER_VISIBLE[user.role] ?? [];
+  const statuses: SellerStatus[] = user.role === "DISTRICT" || user.role === "ADMIN" || user.role === "DIC" ? ALL_SELLER_STATUSES : SELLER_VISIBLE[user.role] ?? [];
   const { page: _p, ...rest } = filters;
   void _p;
   const qs = new URLSearchParams(Object.entries(rest).filter(([, v]) => v) as [string, string][]).toString();

@@ -12,10 +12,11 @@ export default async function DicLayout({ children }: { children: React.ReactNod
   return (
     <AppShell role="DIC" user={user} nav={[
       { href: "/dic", label: "Dashboard", icon: "dashboard", exact: true },
-      { href: "/dic/buyers", label: "For approval", icon: "review", badge: pending },
+      { href: "/dic/buyers", label: "Buyers", icon: "buyers", badge: pending },
       { href: "/dic/requirements", label: "Sector requirements", icon: "requirement" },
       { href: "/dic/approved", label: "RBSM buyer list", icon: "approved" },
-      { href: "/dic/sellers", label: "Seller approvals", icon: "sellers", badge: sellerPending },
+      { href: "/dic/sellers", label: "Sellers", icon: "sellers", badge: sellerPending },
+      { href: "/dic/seller-list", label: "RBSM seller list", icon: "approved" },
       { href: "/dic/demand", label: "Sector demand", icon: "demand" },
       { href: "/dic/targets", label: "Targets", icon: "target" },
       { href: "/dic/reports", label: "Reports", icon: "reports" },

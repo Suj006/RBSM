@@ -4,7 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { ItemStatus, Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { itemScope, scopeFor } from "@/lib/buyer-query";
-import { ALL_ITEM_STATUSES, DIC_ITEM_QUEUE, DIC_VISIBLE_ITEMS, FIEO_ITEM_QUEUE, ITEM_META } from "@/lib/status";
+import { ALL_ITEM_STATUSES, DIC_ITEM_QUEUE, FIEO_ITEM_QUEUE, ITEM_META } from "@/lib/status";
 import { fmtDate, parseCerts } from "@/lib/format";
 import { Badge, Button, Card, EmptyState, Input, PageHeader, Select } from "@/components/ui";
 import { Pagination } from "./pagination";
@@ -18,6 +18,7 @@ export async function RequirementListPage({ role, base, buyerBase, filters }: { 
   // Drafts are hidden unless asked for explicitly (the dashboard pipeline links to them).
   const and: Prisma.RequirementItemWhereInput[] = [itemScope(role), filters.item === "DRAFT" ? {} : { status: { not: "DRAFT" } }];
   if (filters.item === "action") and.push({ status: { in: role === "DIC" ? DIC_ITEM_QUEUE : FIEO_ITEM_QUEUE } });
+  else if (filters.item === "with_fieo") and.push({ status: { in: FIEO_ITEM_QUEUE } });
   else if (filters.item && ALL_ITEM_STATUSES.includes(filters.item as ItemStatus)) and.push({ status: filters.item as ItemStatus });
   if (filters.sector) and.push({ sectorId: filters.sector });
   if (filters.country) and.push({ requirement: { buyer: { country: filters.country } } });
@@ -25,7 +26,7 @@ export async function RequirementListPage({ role, base, buyerBase, filters }: { 
   if (q) and.push({ OR: [{ products: { contains: q } }, { requirement: { buyer: { name: { contains: q } } } }, { requirement: { buyer: { regNo: { contains: q } } } }] });
   const where: Prisma.RequirementItemWhereInput = { AND: and };
   const page = Math.max(1, Number(filters.page) || 1);
-  const statuses = role === "DIC" ? DIC_VISIBLE_ITEMS : ALL_ITEM_STATUSES;
+  const statuses = ALL_ITEM_STATUSES;
 
   const [rows, total, sectors, countries] = await Promise.all([
     prisma.requirementItem.findMany({
@@ -38,7 +39,7 @@ export async function RequirementListPage({ role, base, buyerBase, filters }: { 
   ]);
   const { page: _p, ...rest } = filters;
   void _p;
-  const qs = new URLSearchParams(Object.entries({ item: filters.item === "action" ? undefined : filters.item, sector: filters.sector, country: filters.country })
+  const qs = new URLSearchParams(Object.entries({ item: filters.item === "action" || filters.item === "with_fieo" ? undefined : filters.item, sector: filters.sector, country: filters.country })
     .filter(([, v]) => v) as [string, string][]).toString();
 
   return (
@@ -55,6 +56,7 @@ export async function RequirementListPage({ role, base, buyerBase, filters }: { 
           <Select name="item" defaultValue={filters.item ?? ""} aria-label="Status">
             <option value="">All statuses</option>
             <option value="action">{role === "ADMIN" ? "Pending with FIEO" : "⚑ Waiting for my decision"}</option>
+            {role === "DIC" && <option value="with_fieo">Pending with FIEO</option>}
             {statuses.map((s) => <option key={s} value={s}>{ITEM_META[s].label}</option>)}
           </Select>
           <Select name="sector" defaultValue={filters.sector ?? ""} aria-label="Sector">

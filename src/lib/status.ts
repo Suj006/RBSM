@@ -69,7 +69,6 @@ export const JOURNEY = ["Sign up", "Basic details", "FIEO approval", "Sector req
 export const FIEO_ITEM_QUEUE: ItemStatus[] = ["SUBMITTED", "DIC_RETURNED"];
 export const DIC_ITEM_QUEUE: ItemStatus[] = ["FIEO_RECOMMENDED"];
 // Sector rows the Directorate can see at all.
-export const DIC_VISIBLE_ITEMS: ItemStatus[] = ["FIEO_RECOMMENDED", "DIC_RETURNED", "APPROVED"];
 
 export const canEditBasic = (s: BuyerStatus) => s === "SIGNED_UP" || s === "BASIC_RETURNED";
 /** Buyer may work on sector requirements once FIEO has approved the basic details. */
@@ -104,7 +103,6 @@ export const SELLER_ACTION_LABEL: Record<SellerAction, string> = {
 /** Seller records each role may see. FIEO sees sellers only once approved. */
 export const SELLER_VISIBLE: Partial<Record<Role, SellerStatus[]>> = {
   FIEO: ["APPROVED"],
-  DIC: ["RECOMMENDED", "RETURNED", "APPROVED"],
 };
 /** The district can edit (and recommend) these. */
 export const SELLER_DISTRICT_EDITABLE: SellerStatus[] = ["WITH_DISTRICT", "RETURNED"];

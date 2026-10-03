@@ -9,6 +9,7 @@ export function backFor(base: string, label: string) {
       { href: `${root}/requirements`, label: "Back to sector requirements" },
       { href: `${root}/approved`, label: "Back to approved buyers" },
       { href: `${root}/sellers`, label: "Back to sellers" },
+      { href: `${root}/seller-list`, label: "Back to RBSM seller list" },
       { href: `${root}/demand`, label: "Back to sector demand" },
       { href: `${root}/demand/`, label: "Back to sector demand" },
     ],

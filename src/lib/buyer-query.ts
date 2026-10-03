@@ -1,17 +1,20 @@
 import type { Prisma } from "@/generated/prisma/client";
 import type { BuyerStatus, ItemStatus, Role } from "@/generated/prisma/enums";
-import { ALL_ITEM_STATUSES, ALL_STATUSES, DIC_ITEM_QUEUE, DIC_VISIBLE_ITEMS, FIEO_ITEM_QUEUE } from "@/lib/status";
+import { ALL_ITEM_STATUSES, ALL_STATUSES, DIC_ITEM_QUEUE, FIEO_ITEM_QUEUE } from "@/lib/status";
 
 export type BuyerFilters = { q?: string; status?: string; item?: string; country?: string; sector?: string; page?: string };
 
-/** Sector rows a role may see (the Directorate sees only what FIEO recommended onwards). */
-export function itemScope(role: Role): Prisma.RequirementItemWhereInput {
-  return role === "DIC" ? { status: { in: DIC_VISIBLE_ITEMS } } : {};
+/**
+ * Sector rows a staff role may see. FIEO, the Directorate (the central team) and Admin
+ * all see every buyer and every sector, at every stage; decisions stay with each role's queue.
+ */
+export function itemScope(_role: Role): Prisma.RequirementItemWhereInput {
+  return {};
 }
 
-/** Which buyers a staff role may see at all. */
-export function scopeFor(role: Role): Prisma.BuyerWhereInput {
-  return role === "DIC" ? { requirement: { items: { some: itemScope("DIC") } } } : {};
+/** Which buyers a staff role may see at all (all of them; see itemScope). */
+export function scopeFor(_role: Role): Prisma.BuyerWhereInput {
+  return {};
 }
 
 /** Buyers waiting for this role's decision (basic details or any sector). */
