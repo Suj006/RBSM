@@ -135,7 +135,6 @@ async function main() {
       data: {
         buyerId: buyer.id, organisationType: ORG[i % ORG.length], annualSourcingValue: VALUE[i % VALUE.length], sourcingTimeline: TIME[i % TIME.length],
         preferredEngagement: "Regular / long-term supply",
-        procurementInterests: `Sourcing quality products from Indian MSMEs for our ${country} customers, with consistent supply and competitive pricing.`,
       },
     });
     for (const [j, st] of plan.items.entries()) {

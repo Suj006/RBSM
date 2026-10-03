@@ -39,7 +39,8 @@ export function SourcingProfileView({ req, before }: { req: Profile; before?: Pr
         {field("annualSourcingValue")}
         {field("sourcingTimeline")}
         {field("preferredEngagement")}
-        {field("procurementInterests", true)}
+        {/* No longer asked; shown only for buyers who filled it in earlier. */}
+        {now.procurementInterests && field("procurementInterests", true)}
       </dl>
     </Card>
   );

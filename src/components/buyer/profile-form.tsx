@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { Save } from "lucide-react";
 import { saveProfileAction } from "@/app/actions/buyer";
-import { Alert, Button, Card, CardHeader, Field, Select, Textarea } from "@/components/ui";
+import { Alert, Button, Card, CardHeader, Field, Select } from "@/components/ui";
 import { ENGAGEMENT_TYPES, ORGANISATION_TYPES, SOURCING_TIMELINES, SOURCING_VALUES } from "@/lib/config";
 import { useKeepForm } from "@/lib/use-keep-form";
 
@@ -45,10 +45,6 @@ export function ProfileForm({ profile, complete }: { profile: Profile; complete:
               <option value="">Select…</option>
               {ENGAGEMENT_TYPES.map((o) => <option key={o}>{o}</option>)}
             </Select>
-          </Field>
-          <Field label="Procurement interests" htmlFor="procurementInterests" required error={fe.procurementInterests} className="sm:col-span-2"
-            hint="What you are looking to source, target price points, quality expectations, markets you supply to…">
-            <Textarea id="procurementInterests" name="procurementInterests" rows={4} maxLength={3000} defaultValue={profile.procurementInterests} />
           </Field>
         </div>
         <div className="flex justify-end">

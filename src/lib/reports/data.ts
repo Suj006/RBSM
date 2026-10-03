@@ -244,7 +244,6 @@ async function approvedBuyers(user: User, f: BuyerFilters): Promise<Report> {
           { key: "value", header: "Annual Sourcing Value", width: 18 },
           { key: "timeline", header: "Sourcing Timeline", width: 18, excelOnly: true },
           { key: "engagement", header: "Preferred Engagement", width: 18, excelOnly: true },
-          { key: "interests", header: "Procurement Interests", width: 40 },
           { key: "sectors", header: "Approved Sectors & Products", width: 44 },
           { key: "approvedAt", header: "Approved On", width: 14, kind: "date" },
         ],
@@ -252,7 +251,7 @@ async function approvedBuyers(user: User, f: BuyerFilters): Promise<Report> {
           sl: i + 1, approvedNo: b.approvedNo, regNo: b.regNo, name: b.name, country: b.country, pocName: b.pocName, pocDesignation: b.pocDesignation,
           email: b.pocEmail ?? b.signupEmail, mobile: b.pocMobile,
           orgType: b.requirement?.organisationType, value: b.requirement?.annualSourcingValue, timeline: b.requirement?.sourcingTimeline,
-          engagement: b.requirement?.preferredEngagement, interests: b.requirement?.procurementInterests,
+          engagement: b.requirement?.preferredEngagement,
           sectors: b.requirement?.items.map((it) => `${it.sector.name}: ${it.products}`).join("\n"),
           approvedAt: b.approvedAt,
         })),
@@ -521,7 +520,8 @@ export async function buildDossier(user: User, buyerId: string): Promise<Report 
         name: "Sourcing Profile", heading: "2. Sourcing profile", columns: kvCols,
         rows: kv([
           ["Organisation type", r?.organisationType], ["Annual sourcing value", r?.annualSourcingValue], ["Sourcing timeline", r?.sourcingTimeline],
-          ["Preferred engagement", r?.preferredEngagement], ["Procurement interests", r?.procurementInterests],
+          ["Preferred engagement", r?.preferredEngagement],
+          ...(r?.procurementInterests ? [["Procurement interests", r.procurementInterests] as [string, string]] : []),
         ]),
       },
       {

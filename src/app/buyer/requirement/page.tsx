@@ -61,7 +61,7 @@ export default async function RequirementPage() {
     sourcingTimeline: req?.sourcingTimeline ?? "",
     preferredEngagement: req?.preferredEngagement ?? "",
   };
-  const profileComplete = Boolean(profile.organisationType && profile.procurementInterests.length >= 20 && profile.annualSourcingValue && profile.sourcingTimeline);
+  const profileComplete = Boolean(profile.organisationType && profile.annualSourcingValue && profile.sourcingTimeline);
 
   return (
     <>

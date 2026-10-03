@@ -119,17 +119,15 @@ export async function saveBasicAction(_: FormState, form: FormData): Promise<For
 
 const profileSchema = z.object({
   organisationType: opt(80, "Organisation type"),
-  procurementInterests: englishText({ max: 3000, label: "Procurement interests", multiline: true }).transform((v) => v || null),
   annualSourcingValue: opt(80, "Annual sourcing value"),
   sourcingTimeline: opt(80, "Sourcing timeline"),
   preferredEngagement: opt(120, "Preferred engagement"),
 });
 
 /** What is still missing from the sourcing profile before a sector can be submitted. */
-function profileGaps(req: { organisationType: string | null; procurementInterests: string | null; annualSourcingValue: string | null; sourcingTimeline: string | null } | null) {
+function profileGaps(req: { organisationType: string | null; annualSourcingValue: string | null; sourcingTimeline: string | null } | null) {
   const gaps: string[] = [];
   if (!req?.organisationType) gaps.push("organisation type");
-  if (!req?.procurementInterests || req.procurementInterests.length < 20) gaps.push("procurement interests (at least 20 characters)");
   if (!req?.annualSourcingValue) gaps.push("annual sourcing value");
   if (!req?.sourcingTimeline) gaps.push("sourcing timeline");
   return gaps;
@@ -145,7 +143,7 @@ export async function saveProfileAction(_: FormState, form: FormData): Promise<F
   const ctx = await requireRequirementBuyer();
   if (!ctx) return { error: "Sector requirements open after FIEO approves your basic details." };
   const parsed = profileSchema.safeParse(Object.fromEntries(
-    ["organisationType", "procurementInterests", "annualSourcingValue", "sourcingTimeline", "preferredEngagement"].map((k) => [k, String(form.get(k) ?? "")]),
+    ["organisationType", "annualSourcingValue", "sourcingTimeline", "preferredEngagement"].map((k) => [k, String(form.get(k) ?? "")]),
   ));
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error), error: "Please correct the highlighted fields." };
   await prisma.requirement.upsert({
