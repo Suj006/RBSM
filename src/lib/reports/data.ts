@@ -13,7 +13,8 @@ import type { SellerStatus } from "@/generated/prisma/enums";
 import { DISTRICT_NAMES, localBodyLabel } from "@/lib/config";
 import { fmtMobile } from "@/lib/text";
 import { getTargets } from "@/lib/targets";
-import { sectorDemandSummary } from "@/lib/demand";
+import { productDemand, sectorDemandSummary } from "@/lib/demand";
+import { AGE_BUCKETS, buildInsights } from "@/lib/insights";
 
 export const REPORTS = {
   "buyer-register": {
@@ -44,6 +45,14 @@ export const REPORTS = {
     title: "Sector Demand Report",
     description: "Sector by sector: buyers, products requested (with the buyers asking for each), certifications, and approved sellers offering the sector.",
   },
+  "product-demand": {
+    title: "Product Demand Report",
+    description: "Every product buyers have requested, by sector: buyers asking for it (approved / pending), their countries, and the approved sellers offering it — supply gaps highlighted.",
+  },
+  "insights": {
+    title: "Directorate Insights",
+    description: "Matchmaking readiness of approved buyers, supply gaps, district × sector supply, markets × sectors demand, certifications required, turnaround and ageing.",
+  },
   "mis-summary": {
     title: "MIS Summary Report",
     description: "Programme-level summary: registration pipeline, sector approvals, country-wise and sector-wise position.",
@@ -54,7 +63,8 @@ export type ReportId = keyof typeof REPORTS;
 /** Reports a role may open (district offices: seller reports only). */
 export const reportsFor = (role: User["role"]): ReportId[] =>
   role === "DISTRICT" ? ["approved-sellers", "seller-register", "seller-district-summary"]
-  : role === "FIEO" || role === "DIC" || role === "ADMIN" ? (Object.keys(REPORTS) as ReportId[])
+  : role === "FIEO" ? (Object.keys(REPORTS) as ReportId[]).filter((id) => id !== "insights")
+  : role === "DIC" || role === "ADMIN" ? (Object.keys(REPORTS) as ReportId[])
   : [];
 export const isReportId = (s: string): s is ReportId => s in REPORTS;
 
@@ -456,6 +466,8 @@ export async function buildReport(id: ReportId, user: User, f: BuyerFilters & Se
     case "approved-buyers": return approvedBuyers(user, f);
     case "approved-sellers": return approvedSellers(user, f);
     case "mis-summary": return misSummary(user);
+    case "product-demand": return productDemandReport(user, f as BuyerFilters & { view?: string });
+    case "insights": return insightsReport(user);
   }
 }
 
@@ -785,6 +797,126 @@ async function sectorDemandReport(user: User, f: BuyerFilters): Promise<Report> 
           { key: "sellers", header: "Sellers Offering", width: 12, kind: "number", align: "right" },
         ],
         rows: productRows.map((p, i) => ({ sl: i + 1, sector: p.sector, product: p.product, buyers: p.buyers, names: p.buyerNames.join(", "), sellers: p.sellers })),
+      },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------- product demand
+
+async function productDemandReport(user: User, f: BuyerFilters & { view?: string }): Promise<Report> {
+  const all = await productDemand(user);
+  const q = f.q?.trim().toLowerCase();
+  const rows = all.filter((r) => (!f.sector || r.sectorId === f.sector) && (!q || r.product.toLowerCase().includes(q)) &&
+    (f.view === "gaps" ? !r.sellers.length : f.view === "approved" ? r.approvedBuyers > 0 : true));
+  const filters: string[] = [];
+  if (f.sector && rows[0]) filters.push(`Sector: ${rows[0].sectorName}`);
+  if (q) filters.push(`Search: "${f.q}"`);
+  if (f.view === "gaps") filters.push("Supply gaps only");
+  if (f.view === "approved") filters.push("With approved buyer demand");
+  return {
+    ...base("product-demand", user, filters),
+    kpis: [
+      { label: "Products requested", value: rows.length, tone: "blue" },
+      { label: "With approved demand", value: rows.filter((r) => r.approvedBuyers).length, tone: "green" },
+      { label: "Supplied by approved sellers", value: rows.filter((r) => r.sellers.length).length, tone: "violet" },
+      { label: "Supply gaps", value: rows.filter((r) => !r.sellers.length).length, tone: "red" },
+    ],
+    tables: [{
+      name: "Product Demand",
+      columns: [
+        { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+        { key: "product", header: "Product", width: 24 },
+        { key: "sector", header: "Sector", width: 22 },
+        { key: "total", header: "Buyers", width: 8, kind: "number", align: "right" },
+        { key: "approved", header: "Approved", width: 9, kind: "number", align: "right" },
+        { key: "pending", header: "Pending", width: 8, kind: "number", align: "right" },
+        { key: "countries", header: "Countries", width: 24 },
+        { key: "buyers", header: "Buyers Asking", width: 30 },
+        { key: "nSellers", header: "Approved Sellers", width: 9, kind: "number", align: "right" },
+        { key: "sellers", header: "Sellers Offering (District)", width: 34 },
+      ],
+      rows: rows.map((r, i) => ({
+        sl: i + 1, product: r.product, sector: r.sectorName, total: r.approvedBuyers + r.pendingBuyers, approved: r.approvedBuyers, pending: r.pendingBuyers,
+        countries: r.countries.join(", "),
+        buyers: r.buyers.map((b) => `${b.name}${b.approved ? "" : " (pending)"}`).join("\n"),
+        nSellers: r.sellers.length,
+        sellers: r.sellers.length ? r.sellers.map((s) => `${s.name} (${s.district})`).join("\n") : "NO SUPPLIER YET",
+      })),
+    }],
+  };
+}
+
+// ---------------------------------------------------------------- Directorate insights
+
+async function insightsReport(user: User): Promise<Report> {
+  const d = await buildInsights(user);
+  const label = { ready: "Ready", sector: "Sector match only", short: "Short of sellers" } as const;
+  const num = (key: string, header: string, width = 10) => ({ key, header, width, kind: "number" as const, align: "right" as const });
+  return {
+    ...base("insights", user, []),
+    kpis: [
+      { label: "Buyers ready for matchmaking", value: `${d.summary.ready} / ${d.summary.approvedBuyers}`, tone: "green" },
+      { label: "Buyers short of sellers", value: d.summary.short, tone: "red" },
+      { label: "Products with no supplier", value: `${d.summary.productGaps} / ${d.summary.products}`, tone: "yellow" },
+      { label: "Pending > 7 days", value: d.summary.overdue, tone: "violet" },
+    ],
+    tables: [
+      {
+        name: "Matchmaking Readiness", heading: `1. Matchmaking readiness (target ${d.target} sellers per buyer)`,
+        columns: [
+          { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+          { key: "approvedNo", header: "Buyer No.", width: 19, kind: "mono" },
+          { key: "name", header: "Buyer", width: 26 }, { key: "country", header: "Country", width: 15 },
+          { key: "sectors", header: "Approved Sectors", width: 34 },
+          num("sectorSellers", "Sellers in Sectors", 12), num("productSellers", "Product-matched Sellers", 13),
+          { key: "status", header: "Status", width: 16 },
+        ],
+        rows: d.readiness.map((r, i) => ({ sl: i + 1, approvedNo: r.approvedNo, name: r.name, country: r.country, sectors: r.sectors.join("\n"),
+          sectorSellers: r.sectorSellers, productSellers: r.productSellers, status: label[r.status] })),
+      },
+      {
+        name: "Sector Supply Gaps", heading: "2. Sectors short of sellers",
+        columns: [
+          { key: "sector", header: "Sector", width: 28 }, num("buyers", "Approved Buyers"), num("needed", "Sellers Needed"),
+          num("sellers", "Approved Sellers"), num("exp", "Export-ready"), num("shortfall", "Shortfall"),
+        ],
+        rows: d.sectorGaps.map((g) => ({ sector: g.name, buyers: g.approvedBuyers, needed: g.needed, sellers: g.sellers, exp: g.exportReady, shortfall: g.shortfall })),
+      },
+      {
+        name: "Products No Supplier", heading: "3. Requested products with no approved supplier",
+        columns: [
+          { key: "product", header: "Product", width: 26 }, { key: "sector", header: "Sector", width: 24 },
+          num("buyers", "Buyers"), num("approved", "Approved"), { key: "countries", header: "Countries", width: 30 },
+        ],
+        rows: d.productGaps.map((p) => ({ product: p.product, sector: p.sectorName, buyers: p.approvedBuyers + p.pendingBuyers, approved: p.approvedBuyers, countries: p.countries.join(", ") })),
+      },
+      {
+        name: "District x Sector", heading: "4. Approved sellers by district and sector",
+        columns: [{ key: "district", header: "District", width: 18 },
+          ...d.supplySectors.map((s, i) => num(`c${i}`, s.name, 10)), num("total", "Sellers")],
+        rows: d.districtSector.map((r) => ({ district: r.district, total: r.total, ...Object.fromEntries(r.cells.map((v, i) => [`c${i}`, v])) })),
+      },
+      {
+        name: "Country x Sector", heading: "5. Buyer requirements by country and sector",
+        columns: [{ key: "country", header: "Country", width: 18 },
+          ...d.demandSectors.map((s, i) => num(`c${i}`, s.name, 11)), num("total", "All Sectors")],
+        rows: d.countrySector.map((r) => ({ country: r.country, total: r.total, ...Object.fromEntries(r.cells.map((v, i) => [`c${i}`, v])) })),
+      },
+      {
+        name: "Certifications", heading: "6. Certifications required by buyers",
+        columns: [{ key: "name", header: "Certification", width: 34 }, num("all", "All Requirements", 14), num("approved", "Approved", 12)],
+        rows: d.certifications.map((c) => ({ name: c.name, all: c.all, approved: c.approved })),
+      },
+      {
+        name: "Turnaround", heading: "7. Average turnaround (including correction rounds)",
+        columns: [{ key: "stage", header: "Stage", width: 50 }, { key: "days", header: "Average Days", width: 14, align: "right" }, num("n", "Files", 10)],
+        rows: d.turnaround.map((t) => ({ stage: t.stage, days: t.days === null ? "" : t.days.toFixed(1), n: t.n })),
+      },
+      {
+        name: "Pending Ageing", heading: "8. Pending now, by waiting time",
+        columns: [{ key: "stage", header: "Stage", width: 40 }, ...AGE_BUCKETS.map((b, i) => num(`b${i}`, b, 11)), num("total", "Total"), num("oldest", "Oldest (days)", 12)],
+        rows: d.ageing.map((a) => ({ stage: a.stage, total: a.total, oldest: a.oldest ?? "", ...Object.fromEntries(a.buckets.map((v, i) => [`b${i}`, v])) })),
       },
     ],
   };

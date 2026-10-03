@@ -37,7 +37,11 @@ export async function SectorPosition({ user, base }: { user: User; base: string 
   return (
     <section className="mt-10">
       <SectionBand id="sectors" kind="programme" title="Sector-wise position"
-        summary="Buyer requirements and sellers in every sector, approved and still pending — live" />
+        summary="Buyer requirements and sellers in every sector, approved and still pending — live"
+        links={[
+          { href: `${base}/products`, label: "Product demand" },
+          ...(fieo ? [] : [{ href: `${base}/insights`, label: "Insights →", primary: true }]),
+        ]} />
       <Card>
         <CardHeader title="Approved and pending, by sector" subtitle={fieo ? "Sellers: approved only" : "Pending = still in verification (drafts and rejected not counted)"} />
         <div className="table-scroll relative overflow-x-auto">

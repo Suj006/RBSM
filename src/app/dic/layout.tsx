@@ -18,6 +18,8 @@ export default async function DicLayout({ children }: { children: React.ReactNod
       { href: "/dic/sellers", label: "Sellers", icon: "sellers", badge: sellerPending, group: "Sellers" },
       { href: "/dic/seller-list", label: "RBSM seller list", icon: "approved", group: "Sellers" },
       { href: "/dic/demand", label: "Sector demand", icon: "demand", group: "Programme" },
+      { href: "/dic/products", label: "Product demand", icon: "products", group: "Programme" },
+      { href: "/dic/insights", label: "Insights", icon: "insights", group: "Programme" },
       { href: "/dic/targets", label: "Targets", icon: "target", group: "Programme" },
       { href: "/dic/reports", label: "Reports", icon: "reports", group: "Programme" },
     ]}>{children}</AppShell>

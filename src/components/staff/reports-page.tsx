@@ -1,4 +1,4 @@
-import { BarChart3, BadgeCheck, Boxes, ClipboardList, MapPinned, Store, Users } from "lucide-react";
+import { BarChart3, BadgeCheck, Boxes, ClipboardList, Lightbulb, MapPinned, PackageSearch, Store, Users } from "lucide-react";
 import type { User } from "@/generated/prisma/client";
 import type { SellerStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
@@ -13,10 +13,12 @@ import { DownloadButtons } from "./download-buttons";
 const ICON: Record<ReportId, typeof Users> = {
   "buyer-register": Users, "sector-requirements": ClipboardList, "approved-buyers": BadgeCheck, "approved-sellers": BadgeCheck,
   "seller-register": Store, "seller-district-summary": MapPinned, "mis-summary": BarChart3, "sector-demand": Boxes,
+  "product-demand": PackageSearch, "insights": Lightbulb,
 };
 const ACCENT: Record<ReportId, string> = {
   "buyer-register": "bg-tx-blue", "sector-requirements": "bg-tx-yellow", "approved-buyers": "bg-tx-green", "approved-sellers": "bg-tx-green",
   "seller-register": "bg-tx-green", "seller-district-summary": "bg-tx-blue", "mis-summary": "bg-tx-red", "sector-demand": "bg-violet-500",
+  "product-demand": "bg-violet-500", "insights": "bg-ink",
 };
 const SELLER_REPORTS: ReportId[] = ["approved-sellers", "seller-register", "seller-district-summary"];
 
@@ -97,8 +99,8 @@ export async function ReportsPage({ user, base, filters }: { user: User; base: s
           <div className="grid gap-5 md:grid-cols-2">
             {buyerIds.map((id) => (
               <ReportCard key={id} id={id}
-                href={`/api/reports/${id}${id === "mis-summary" ? "" : id === "sector-demand" ? (filters.sector ? `?sector=${filters.sector}` : "") : bqs ? `?${bqs}` : ""}`}
-                note={id === "mis-summary" ? "Always covers the whole programme (filters not applied)." : id === "sector-demand" ? "Uses the Sector filter only." : undefined} />
+                href={`/api/reports/${id}${id === "mis-summary" || id === "insights" ? "" : id === "sector-demand" || id === "product-demand" ? (filters.sector ? `?sector=${filters.sector}` : "") : bqs ? `?${bqs}` : ""}`}
+                note={id === "mis-summary" || id === "insights" ? "Always covers the whole programme (filters not applied)." : id === "sector-demand" || id === "product-demand" ? "Uses the Sector filter only." : undefined} />
             ))}
           </div>
         </section>

@@ -102,3 +102,62 @@ export async function sectorDemandDetail(user: User, sectorId: string) {
     certifications: [...certs.entries()].sort((a, b) => b[1] - a[1]).map(([name, n]) => ({ name, n })),
   };
 }
+
+// ---------------------------------------------------------------- product-wise demand
+
+export type ProductDemandRow = {
+  key: string; product: string; sectorId: string; sectorName: string;
+  approvedBuyers: number; pendingBuyers: number; countries: string[];
+  buyers: { id: string; name: string; country: string; approved: boolean; itemId: string }[];
+  sellers: { id: string; name: string; district: string }[];
+};
+
+/**
+ * Every product buyers have asked for (submitted requirements, drafts excluded), within its
+ * sector: how many buyers want it (approved / still in verification), from which countries,
+ * and which approved sellers offer the same product in that sector.
+ */
+export async function productDemand(user: User): Promise<ProductDemandRow[]> {
+  const [items, offers] = await Promise.all([
+    prisma.requirementItem.findMany({
+      where: demandWhere(user),
+      select: {
+        id: true, sectorId: true, status: true, products: true, sector: { select: { name: true } },
+        requirement: { select: { buyer: { select: { id: true, name: true, country: true } } } },
+      },
+    }),
+    prisma.sellerProduct.findMany({
+      where: { seller: { status: "APPROVED" } },
+      select: { sectorId: true, products: true, seller: { select: { id: true, name: true, district: true } } },
+    }),
+  ]);
+  const supply = new Map<string, Map<string, { id: string; name: string; district: string }>>();
+  for (const o of offers) for (const p of splitProducts(o.products)) {
+    const k = `${o.sectorId}|${key(p)}`;
+    const m = supply.get(k) ?? new Map();
+    m.set(o.seller.id, o.seller);
+    supply.set(k, m);
+  }
+  const rows = new Map<string, ProductDemandRow>();
+  for (const it of items) for (const p of splitProducts(it.products)) {
+    const k = `${it.sectorId}|${key(p)}`;
+    if (!key(p)) continue;
+    const r = rows.get(k) ?? {
+      key: k, product: p, sectorId: it.sectorId, sectorName: it.sector.name, approvedBuyers: 0, pendingBuyers: 0, countries: [], buyers: [],
+      sellers: [...(supply.get(k)?.values() ?? [])],
+    };
+    const b = it.requirement.buyer;
+    if (!r.buyers.some((x) => x.id === b.id)) {
+      const approved = it.status === "APPROVED";
+      r.buyers.push({ id: b.id, name: b.name, country: b.country, approved, itemId: it.id });
+      if (approved) r.approvedBuyers++; else r.pendingBuyers++;
+      if (!r.countries.includes(b.country)) r.countries.push(b.country);
+    }
+    rows.set(k, r);
+  }
+  return [...rows.values()].sort((a, b) =>
+    (b.approvedBuyers + b.pendingBuyers) - (a.approvedBuyers + a.pendingBuyers) || a.sellers.length - b.sellers.length || a.product.localeCompare(b.product));
+}
+
+/** Product keys a seller offers in a sector, for matching against buyer products. */
+export const productKeys = (products: string) => splitProducts(products).map(key).filter(Boolean);

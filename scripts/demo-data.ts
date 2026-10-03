@@ -103,6 +103,8 @@ async function main() {
   const needSectors = Object.keys(NEEDS).map((n) => sectors.find((s) => s.name === n)).filter(Boolean) as typeof sectors;
   let approvedSeq = 0;
   const day = 86400000;
+  // Staggered stage dates (never in the future) so turnaround figures look realistic.
+  const after = (d: Date, days: number) => new Date(Math.min(d.getTime() + days * day, Date.now() - 3600000));
 
   for (const [i, [name, country, poc, desig]] of BUYERS.entries()) {
     const seq = i + 1;
@@ -139,21 +141,25 @@ async function main() {
     for (const [j, st] of plan.items.entries()) {
       const sector = needSectors[(i + j * 5) % needSectors.length];
       const [products, spec] = NEEDS[Object.keys(NEEDS).find((k) => sector.name.startsWith(k.slice(0, 10)))!][0];
-      const at = new Date(created.getTime() + day * 0.7);
+      const at = after(created, 0.7);
+      const recAt = after(at, 1 + (i % 3));
+      const apprAt = after(recAt, 1 + ((i + j) % 4));
       const item = await prisma.requirementItem.create({
         data: {
-          requirementId: req.id, sectorId: sector.id, products, specifications: spec, quantity: `${1 + (i % 4)} container${i % 4 ? "s" : ""} per quarter`,
+          // Some buyers also ask for products no demo seller offers (shows up as supply gaps).
+          requirementId: req.id, sectorId: sector.id, products: i % 3 === 0 ? `${products}, ${["Private-label retail packs", "Organic certified range", "Gift hampers"][(i + j) % 3]}` : products,
+          specifications: spec, updatedAt: st === "APPROVED" ? apprAt : ["FIEO_RECOMMENDED", "DIC_RETURNED"].includes(st) ? recAt : at, quantity: `${1 + (i % 4)} container${i % 4 ? "s" : ""} per quarter`,
           certifications: JSON.stringify([CERTS[(i + j) % CERTS.length], CERTS[(i + j + 3) % CERTS.length]]), sortOrder: j, status: st,
-          submittedAt: st === "DRAFT" ? null : at, recommendedAt: ["FIEO_RECOMMENDED", "DIC_RETURNED", "APPROVED"].includes(st) ? at : null,
-          approvedAt: st === "APPROVED" ? new Date(created.getTime() + day) : null, everApproved: st === "APPROVED",
+          submittedAt: st === "DRAFT" ? null : at, recommendedAt: ["FIEO_RECOMMENDED", "DIC_RETURNED", "APPROVED"].includes(st) ? recAt : null,
+          approvedAt: st === "APPROVED" ? apprAt : null, everApproved: st === "APPROVED",
         },
       });
       const extra = { itemId: item.id, sectorName: sector.name };
       if (st !== "DRAFT") await log("REQ_SUBMITTED", user.id, "BUYER", at, extra);
       if (st === "FIEO_RETURNED") await log("REQ_RETURNED", fieo.id, "FIEO", at, { ...extra, comment: "Please add packaging and quantity details." });
-      if (["FIEO_RECOMMENDED", "DIC_RETURNED", "APPROVED"].includes(st)) await log("FIEO_RECOMMENDED", fieo.id, "FIEO", at, extra);
+      if (["FIEO_RECOMMENDED", "DIC_RETURNED", "APPROVED"].includes(st)) await log("FIEO_RECOMMENDED", fieo.id, "FIEO", recAt, extra);
       if (st === "DIC_RETURNED") await log("DIC_RETURNED", dic.id, "DIC", at, { ...extra, comment: "Verify the export licence before recommending." });
-      if (st === "APPROVED") await log("DIC_APPROVED", dic.id, "DIC", new Date(created.getTime() + day), extra);
+      if (st === "APPROVED") await log("DIC_APPROVED", dic.id, "DIC", apprAt, extra);
     }
   }
   await prisma.counter.upsert({ where: { name: "buyer" }, create: { name: "buyer", value: BUYERS.length }, update: { value: BUYERS.length } });
@@ -201,8 +207,9 @@ async function main() {
           udyamNo: `UDYAM-KL-${String(di + 1).padStart(2, "0")}-${String(1000000 + sSeq * 37).slice(0, 7)}`,
           exportExperience: k % 3 !== 0, contactName: person, contactMobile: mobile, contactWhatsapp: mobile,
           contactEmail: `${person.split(" ")[0].toLowerCase()}${sSeq}@msme.example`, source, createdById: source === "SELF" ? null : du?.id,
-          status, createdAt: created, recommendedAt: ["RECOMMENDED", "RETURNED", "APPROVED"].includes(status) ? created : null,
-          approvedAt: status === "APPROVED" ? created : null, approvedSeq: aSeq, approvedNo, userId,
+          status, createdAt: created, recommendedAt: ["RECOMMENDED", "RETURNED", "APPROVED"].includes(status) ? after(created, 1 + (k % 4)) : null,
+          approvedAt: status === "APPROVED" ? after(created, 3 + (k % 4) + (sSeq % 3)) : null,
+          updatedAt: ["RECOMMENDED", "RETURNED", "APPROVED"].includes(status) ? after(created, 1 + (k % 4)) : created, approvedSeq: aSeq, approvedNo, userId,
           products: {
             create: [0, 1].slice(0, 1 + (k % 2)).map((j) => {
               const sector = needSectors[(sSeq + j * 3) % needSectors.length];
