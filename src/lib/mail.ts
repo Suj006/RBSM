@@ -131,7 +131,7 @@ Further details on matchmaking and B2B meeting schedules will follow.${signature
 };
 
 export const sellerMail = {
-  received: (name: string, regNo: string, district: string) => ({
+  received: (name: string, regNo: string, district: string, username: string, password: string) => ({
     subject: `${EVENT.name} ${EVENT.short} — seller registration received (${regNo})`,
     text: `Dear ${name},
 
@@ -139,9 +139,31 @@ Thank you for registering as a seller for ${EVENT.name} ${EVENT.programme}.
 
 Your registration number: ${regNo}
 
-Your details will be verified by the District Industries Centre, ${district}, and recommended to the Directorate of Industries & Commerce. Once approved, your login credentials will be sent to this e-mail address.${signature}`,
+Your details will be verified by the District Industries Centre, ${district}, and recommended to the Directorate of Industries & Commerce.
+
+Temporary login to track your application:
+User name: ${username}
+Password: ${password}
+
+Sign in at ${APP_URL}/login to see the status of your application. If the District Industries Centre asks for a correction, you can correct your details and resubmit them with this login. Once the Directorate approves your registration, the same login becomes your permanent seller login.${signature}`,
   }),
-  approved: (name: string, approvedNo: string, username: string, password: string) => ({
+  /** Applicant login given when a district office sends an application back for correction. */
+  sentBack: (name: string, regNo: string, district: string, comment: string, login: { username: string; password: string | null }) => ({
+    subject: `${EVENT.name} ${EVENT.short} — please correct your seller registration (${regNo})`,
+    text: `Dear ${name},
+
+The District Industries Centre, ${district}, has returned your seller registration ${regNo} for correction:
+
+"${comment}"
+
+Please sign in at ${APP_URL}/login, correct the details and resubmit them to the district centre.
+${login.password ? `
+User name: ${login.username}
+Password: ${login.password}
+(You will be asked to set your own password when you sign in.)` : `
+User name: ${login.username} (use the password you have set)`}${signature}`,
+  }),
+  approved: (name: string, approvedNo: string, username: string, password: string | null) => ({
     subject: `${EVENT.name} ${EVENT.short} — seller registration approved (${approvedNo})`,
     text: `Dear ${name},
 
@@ -149,11 +171,11 @@ We are pleased to inform you that your registration has been approved by the Dir
 
 Your seller number: ${approvedNo}
 
-Your login credentials:
+${password ? `Your login credentials:
 User name: ${username}
 Password: ${password}
 
-Sign in at ${APP_URL}/login. You will be asked to change your password on first login. Buyer meeting details will be shared through the portal.${signature}`,
+Sign in at ${APP_URL}/login. You will be asked to change your password on first login.` : `Your login (${username}) is now your permanent seller login. Sign in at ${APP_URL}/login with the password you have set to see your full seller dashboard.`} Buyer meeting details will be shared through the portal.${signature}`,
   }),
   rejected: (name: string, regNo: string, comment: string) => ({
     subject: `${EVENT.name} ${EVENT.short} — seller registration ${regNo} not accepted`,

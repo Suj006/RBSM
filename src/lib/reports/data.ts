@@ -480,7 +480,7 @@ async function sellerRegister(user: User, f: SellerFilters): Promise<Report> {
     kpis: [
       { label: "Sellers", value: sellers.length, tone: "blue" },
       { label: "Approved", value: n(["APPROVED"]), tone: "green" },
-      { label: "Awaiting approval", value: n(["WITH_DISTRICT", "RECOMMENDED", "RETURNED"]), tone: "yellow" },
+      { label: "Awaiting approval", value: n(["WITH_DISTRICT", "WITH_SELLER", "RECOMMENDED", "RETURNED"]), tone: "yellow" },
       { label: "With export experience", value: sellers.filter((x) => x.exportExperience).length, tone: "violet" },
     ],
     tables: [{
@@ -523,7 +523,7 @@ async function sellerDistrictSummary(user: User): Promise<Report> {
     const c = (...st: SellerStatus[]) => ds.filter((x) => st.includes(x.status)).length;
     const approved = c("APPROVED");
     return {
-      district: d, total: ds.length, pending: c("WITH_DISTRICT", "RETURNED"), recommended: c("RECOMMENDED"),
+      district: d, total: ds.length, pending: c("WITH_DISTRICT", "WITH_SELLER", "RETURNED"), recommended: c("RECOMMENDED"),
       approved, rejected: c("REJECTED"), exp: ds.filter((x) => x.exportExperience).length, target: targets.district[d] ?? 0,
       achieved: targets.district[d] ? approved / targets.district[d] : null,
     };
@@ -547,7 +547,7 @@ async function sellerDistrictSummary(user: User): Promise<Report> {
         { key: "district", header: "District", width: 22 },
         ...(fieo ? [] : [
           { key: "total", header: "Registered", width: 11, kind: "number" as const, align: "right" as const },
-          { key: "pending", header: "With District", width: 11, kind: "number" as const, align: "right" as const },
+          { key: "pending", header: "With District / Applicant", width: 13, kind: "number" as const, align: "right" as const },
           { key: "recommended", header: "With Directorate", width: 13, kind: "number" as const, align: "right" as const },
         ]),
         { key: "approved", header: "Approved", width: 11, kind: "number", align: "right" },

@@ -32,6 +32,7 @@ export async function SellerDetailPage({ user, id, base, done }: { user: User; i
   });
   if (!s) notFound();
   const lastReturn = s.logs.find((l) => l.action === "RETURNED");
+  const lastSentBack = s.logs.find((l) => l.action === "SENT_TO_SELLER");
   const districtCan = user.role === "DISTRICT" && SELLER_DISTRICT_EDITABLE.includes(s.status);
   const dicCan = user.role === "DIC" && s.status === "RECOMMENDED";
   const next = user.role === "DISTRICT" || user.role === "DIC"
@@ -51,6 +52,12 @@ export async function SellerDetailPage({ user, id, base, done }: { user: User; i
       {done && DONE[done] && <Alert tone="green" className="mb-6">{DONE[done]}</Alert>}
       {s.status === "RETURNED" && lastReturn?.comment && (
         <Alert tone="red" className="mb-6" title="Returned by the Directorate">{lastReturn.comment}</Alert>
+      )}
+      {s.status === "WITH_SELLER" && (
+        <Alert tone="blue" className="mb-6" title={`With the applicant for correction${lastSentBack ? ` since ${fmtDateTime(lastSentBack.createdAt)}` : ""}`}>
+          {lastSentBack?.comment && <>&ldquo;{lastSentBack.comment}&rdquo; </>}
+          The applicant corrects the details with their login ({s.user?.username ?? "—"}); the registration comes back to the district centre when they resubmit.
+        </Alert>
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -100,6 +107,7 @@ export async function SellerDetailPage({ user, id, base, done }: { user: User; i
                 { label: "Recommended on", value: fmtDateTime(s.recommendedAt) },
                 { label: "Approved on", value: fmtDateTime(s.approvedAt) },
                 { label: "Seller login", value: s.user ? <span className="font-mono">{s.user.username}</span> : "Allotted on approval" },
+                { label: "Login", value: s.user ? <><span className="font-mono">{s.user.username}</span>{s.status !== "APPROVED" && <span className="text-slate-500"> (applicant — status and corrections only)</span>}</> : "Allotted on approval" },
                 { label: "Last login", value: s.user ? fmtDateTime(s.user.lastLoginAt) : "—" },
               ]} />
             </div>

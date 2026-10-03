@@ -176,16 +176,21 @@ async function main() {
     const count = 8 + ((di * 5) % 7);
     for (let k = 0; k < count; k++) {
       sSeq++;
-      const status = STATES[(sSeq + di) % STATES.length];
+      const source = k % 4 === 0 ? "SELF" : k % 4 === 1 ? "BULK" : "DISTRICT";
+      // Some online applications are back with the applicant for correction.
+      const status = source === "SELF" && STATES[(sSeq + di) % STATES.length] === "WITH_DISTRICT" && k % 8 === 0
+        ? "WITH_SELLER" : STATES[(sSeq + di) % STATES.length];
       const firm = `${district.slice(0, 3)}${["ra", "vi", "ka", "na", "sha"][k % 5]} ${FIRMS[(sSeq + k) % FIRMS.length]}`;
       const created = new Date(Date.now() - (200 - sSeq) * day * 0.15);
-      const source = k % 4 === 0 ? "SELF" : k % 4 === 1 ? "BULK" : "DISTRICT";
       const mobile = `9${String(400000000 + sSeq * 7351).slice(0, 9)}`;
       const person = PEOPLE[(sSeq + di) % PEOPLE.length];
       let userId: string | undefined, approvedNo: string | undefined, aSeq: number | undefined;
       if (status === "APPROVED") {
         sApproved++; aSeq = sApproved;
         approvedNo = `RBSM-Seller-2026${String(sApproved).padStart(3, "0")}`;
+      }
+      // Approved sellers have a login; online applicants have one from registration.
+      if (status === "APPROVED" || source === "SELF") {
         const u = await prisma.user.create({ data: { username: `Tradex2027-S${String(sSeq).padStart(3, "0")}`, passwordHash: hash, role: "SELLER", displayName: firm } });
         userId = u.id;
       }
@@ -213,6 +218,7 @@ async function main() {
       if (["RECOMMENDED", "RETURNED", "APPROVED"].includes(status)) await slog("RECOMMENDED", du?.id, "DISTRICT");
       if (status === "RETURNED") await slog("RETURNED", dic.id, "DIC", "Udyam certificate details do not match. Please verify.");
       if (status === "APPROVED") await slog("APPROVED", dic.id, "DIC");
+      if (status === "WITH_SELLER") await slog("SENT_TO_SELLER", du?.id, "DISTRICT", "Please upload the correct Udyam number and add the products you can export.");
       if (status === "REJECTED") await slog("REJECTED", du?.id, "DISTRICT", "Enterprise is not export-ready at present.");
     }
   }

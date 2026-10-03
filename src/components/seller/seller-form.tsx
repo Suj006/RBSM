@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Plus, Save, Send, Trash2 } from "lucide-react";
-import { saveSellerAction, selfRegisterSellerAction } from "@/app/actions/seller";
+import { applicantSaveSellerAction, saveSellerAction, selfRegisterSellerAction } from "@/app/actions/seller";
 import { Alert, Button, ButtonLink, Card, CardHeader, Field, Input, Select, Textarea } from "@/components/ui";
 import { DISTRICT_NAMES, LOCAL_BODY_TYPES } from "@/lib/config";
 import { useKeepForm } from "@/lib/use-keep-form";
@@ -12,13 +12,14 @@ import { cn } from "@/lib/cn";
 import { EMPTY_SELLER, type SellerFormValues } from "@/lib/seller-form-defaults";
 
 export function SellerForm({ mode, initial, sectors, district, backHref }: {
-  mode: "district" | "self";
+  /** district: a district office; self: public self-registration; applicant: the applicant correcting their own registration. */
+  mode: "district" | "self" | "applicant";
   initial: SellerFormValues;
   sectors: { id: string; name: string }[];
   district?: string;
   backHref?: string;
 }) {
-  const [state, action, pending] = useActionState(mode === "self" ? selfRegisterSellerAction : saveSellerAction, undefined);
+  const [state, action, pending] = useActionState(mode === "self" ? selfRegisterSellerAction : mode === "applicant" ? applicantSaveSellerAction : saveSellerAction, undefined);
   const onSubmit = useKeepForm(action);
   const [rows, setRows] = useState(initial.products.length ? initial.products : EMPTY_SELLER.products);
   const [same, setSame] = useState(!initial.contactWhatsapp || initial.contactWhatsapp === initial.contactMobile);
@@ -36,10 +37,20 @@ export function SellerForm({ mode, initial, sectors, district, backHref }: {
           </div>
         </div>
         <Alert tone="green" className="mt-6">
-          Your details have been sent to the District Industries Centre, {state.data.district}, for verification. After the Directorate
-          approves your registration, your login credentials will be e-mailed to {state.data.email}.
+          Your details have been sent to the District Industries Centre, {state.data.district}, for verification.
         </Alert>
-        <ButtonLink href="/" variant="secondary" className="mt-6">Back to home</ButtonLink>
+        <div className="mt-4 rounded-xl bg-slate-50 p-5 ring-1 ring-slate-200">
+          <div className="font-bold text-ink">Your temporary login</div>
+          <p className="mt-1 text-sm text-slate-600">
+            User name <span className="font-mono font-semibold text-ink">{state.data.username}</span> — the password has been e-mailed to {state.data.email}.
+            Use it to track your application and to correct your details if the district centre asks. Once the Directorate approves
+            your registration, the same login becomes your permanent seller login.
+          </p>
+        </div>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <ButtonLink href="/login">Sign in to track your application</ButtonLink>
+          <ButtonLink href="/" variant="secondary">Back to home</ButtonLink>
+        </div>
       </Card>
     );
   }
@@ -110,7 +121,7 @@ export function SellerForm({ mode, initial, sectors, district, backHref }: {
             <Input id="contactName" name="contactName" defaultValue={initial.contactName} maxLength={120} autoComplete="name" />
           </Field>
           <Field label="E-mail ID" htmlFor="contactEmail" required error={fe.contactEmail}
-            hint={mode === "self" ? "Login credentials are sent here after approval" : "Login credentials are sent here after approval"}>
+            hint={mode === "district" ? "Login credentials are sent here after approval" : "Login details and updates on your application are sent here"}>
             <Input id="contactEmail" name="contactEmail" type="email" defaultValue={initial.contactEmail} maxLength={160} autoComplete="email" />
           </Field>
           <Field label="Mobile number" htmlFor="contactMobile" required error={fe.contactMobile} hint="10-digit mobile number">
@@ -167,6 +178,8 @@ export function SellerForm({ mode, initial, sectors, district, backHref }: {
             <Button type="submit" name="intent" value="save" variant="secondary" disabled={pending}><Save className="size-4" /> Save</Button>
             <Button type="submit" name="intent" value="recommend" disabled={pending}><Send className="size-4" /> {pending ? "Saving…" : "Save & recommend to Directorate"}</Button>
           </>
+        ) : mode === "applicant" ? (
+          <Button type="submit" disabled={pending} className="px-6"><Send className="size-4" /> {pending ? "Submitting…" : "Save & submit to district centre"}</Button>
         ) : (
           <Button type="submit" disabled={pending} className="px-6"><Send className="size-4" /> {pending ? "Submitting…" : "Submit registration"}</Button>
         )}

@@ -31,9 +31,18 @@ another in the same step), with "Recommend all" / "Approve all" shortcuts.
 ```
 District office enters a seller (form or bulk Excel upload)  ─┐
 Seller self-registers and chooses a district ─────────────────┴─► with that district office
-   ─► District recommends (one or many at once) ─► Directorate approves / returns to district / rejects
-   ─► approved: seller number RBSM-Seller-2026NNN, login Tradex2027-SNNN e-mailed, visible to FIEO
+   (online applicants get a temporary login Tradex2027-SNNN at once)
+   ─► District recommends (one or many at once) / returns to the applicant for correction / rejects
+        └─ applicant corrects and resubmits with the temporary login ─► back with the district
+   ─► Directorate approves / returns to district / rejects
+   ─► approved: seller number RBSM-Seller-2026NNN, visible to FIEO; the applicant's login becomes the
+      permanent seller login (district-entered sellers get their login e-mailed now)
 ```
+
+Until approval, a seller login shows only **My application**: progress, the district's comments, and (while
+with the district or returned to the applicant) the form to correct and resubmit the details. After approval
+it opens the full seller dashboard. A district can also return a district-entered seller to the applicant;
+a login is then created and e-mailed.
 
 Seller details: name, district (14 Kerala districts), taluk, local body type (Panchayat / Municipality /
 Corporation) and name, Udyam number (Kerala only, UDYAM-KL-00-0000000, unique — users type only the digits), export experience,

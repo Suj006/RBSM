@@ -3,26 +3,38 @@ import { notFound } from "next/navigation";
 import { CalendarClock, Handshake } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Badge, Card, CardHeader, DL, PageHeader } from "@/components/ui";
+import { Alert, Badge, Card, CardHeader, DL, PageHeader } from "@/components/ui";
 import { SellerBadge } from "@/components/seller/seller-badge";
+import { ApplicantView } from "@/components/seller/applicant-view";
 import { EVENT, localBodyLabel } from "@/lib/config";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, withinDays } from "@/lib/format";
 import { fmtMobile } from "@/lib/text";
 
-export const metadata: Metadata = { title: "Seller dashboard" };
+export const metadata: Metadata = { title: "Seller portal" };
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<{ done?: string }> }) {
   const user = await requireUser("SELLER");
+  const { done } = await searchParams;
   const s = await prisma.seller.findUnique({
     where: { userId: user.id },
-    include: { products: { orderBy: { sortOrder: "asc" }, include: { sector: true } } },
+    include: {
+      products: { orderBy: { sortOrder: "asc" }, include: { sector: true } },
+      logs: { orderBy: { createdAt: "desc" } },
+    },
   });
   if (!s) notFound();
+  // Until the Directorate approves, the login is a temporary applicant login: status and corrections only.
+  if (s.status !== "APPROVED") return <ApplicantView seller={s} done={done} />;
   return (
     <>
       <PageHeader eyebrow={`${EVENT.name} · ${EVENT.short}`} title={`Welcome, ${s.name}`}
         subtitle={<>Seller no. <span className="font-semibold text-brand-700">{s.approvedNo}</span> · Registration no. <span className="font-semibold text-ink">{s.regNo}</span></>}
         actions={<SellerBadge status={s.status} />} />
+      {withinDays(s.approvedAt, 14) && (
+        <Alert tone="green" className="mb-6" title="Welcome — your registration has been approved">
+          This login is now your permanent seller login. Your seller number is {s.approvedNo}.
+        </Alert>
+      )}
 
       <Card className="mb-6 overflow-hidden">
         <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center">

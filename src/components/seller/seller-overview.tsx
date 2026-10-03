@@ -52,7 +52,7 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
   const stats =
     user.role === "DISTRICT" ? [
       { label: "Sellers registered", value: total, accent: "blue" as const, href: `${base}/sellers` },
-      { label: "Pending my recommendation", value: n("WITH_DISTRICT", "RETURNED"), accent: "yellow" as const, hint: n("RETURNED") ? `${n("RETURNED")} returned by Directorate` : undefined, href: `${base}/sellers?status=action` },
+      { label: "Pending my recommendation", value: n("WITH_DISTRICT", "RETURNED"), accent: "yellow" as const, hint: [n("RETURNED") && `${n("RETURNED")} returned by Directorate`, n("WITH_SELLER") && `${n("WITH_SELLER")} with applicants for correction`].filter(Boolean).join(" · ") || undefined, href: `${base}/sellers?status=action` },
       { label: "With Directorate", value: n("RECOMMENDED"), accent: "violet" as const, href: `${base}/sellers?status=RECOMMENDED` },
       { label: "Approved sellers", value: approved, accent: "green" as const, href: `${base}/sellers?status=APPROVED` },
     ]

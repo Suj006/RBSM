@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { Alert, PageHeader } from "@/components/ui";
 import { SellerForm } from "@/components/seller/seller-form";
 import { SELLER_DISTRICT_EDITABLE } from "@/lib/status";
+import { sellerFormValues } from "@/lib/seller-form-defaults";
 
 export const metadata: Metadata = { title: "Edit seller" };
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
@@ -18,11 +19,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <PageHeader back={{ href: `/district/sellers/${s.id}`, label: "Back to seller" }} eyebrow={s.regNo} title={`Edit — ${s.name}`} />
       {SELLER_DISTRICT_EDITABLE.includes(s.status) ? (
         <SellerForm mode="district" district={s.district} backHref={`/district/sellers/${s.id}`} sectors={sectors}
-          initial={{
-            id: s.id, name: s.name, district: s.district, taluk: s.taluk, localBodyType: s.localBodyType, localBodyName: s.localBodyName,
-            udyamNo: s.udyamNo, exportExperience: s.exportExperience ? "YES" : "NO", contactName: s.contactName, contactMobile: s.contactMobile,
-            contactWhatsapp: s.contactWhatsapp, contactEmail: s.contactEmail, products: s.products.map((p) => ({ sectorId: p.sectorId, products: p.products })),
-          }} />
+          initial={sellerFormValues(s)} />
       ) : (
         <Alert tone="amber">This seller is with the Directorate or already decided, so it can no longer be edited.</Alert>
       )}

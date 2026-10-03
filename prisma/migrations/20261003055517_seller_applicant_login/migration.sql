@@ -1,0 +1,1 @@
+-- New enum values only (SellerStatus.WITH_SELLER, SellerAction.SENT_TO_SELLER / RESUBMITTED); SQLite stores enums as TEXT, so no table changes.

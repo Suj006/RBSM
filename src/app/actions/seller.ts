@@ -8,7 +8,7 @@ import { approvedSellerNo, EVENT, sellerUsername } from "@/lib/config";
 import { sendMail, sellerMail } from "@/lib/mail";
 import { nextSeq } from "@/lib/sequence";
 import { sellerSchema, type SellerData } from "@/lib/seller-schema";
-import { SELLER_DISTRICT_EDITABLE } from "@/lib/status";
+import { SELLER_APPLICANT_EDITABLE, SELLER_DISTRICT_EDITABLE } from "@/lib/status";
 import { englishText, firstErrors } from "@/lib/text";
 import type { Prisma } from "@/generated/prisma/client";
 import { createSeller } from "@/lib/seller-create";
@@ -97,34 +97,99 @@ export async function selfRegisterSellerAction(_: FormState, form: FormData): Pr
   if (await prisma.seller.findUnique({ where: { udyamNo: d.udyamNo } })) {
     return { fieldErrors: { udyamNo: "This Udyam number is already registered. Please contact your District Industries Centre." }, error: "Please correct the highlighted fields." };
   }
-  const seller = await prisma.$transaction((tx) => createSeller(tx, d, "SELF", null));
-  const m = sellerMail.received(seller.name, seller.regNo, seller.district);
+  const passwordHash = await hashPassword(EVENT.defaultBuyerPassword);
+  const { seller, username } = await prisma.$transaction(async (tx) => {
+    const s = await createSeller(tx, d, "SELF", null);
+    // Temporary applicant login: application status and corrections only, until approval.
+    const login = await ensureSellerLogin(tx, s, passwordHash);
+    return { seller: s, username: login.username };
+  });
+  const m = sellerMail.received(seller.name, seller.regNo, seller.district, username, EVENT.defaultBuyerPassword);
   await sendMail(seller.contactEmail, m.subject, m.text);
   revalidateAll();
-  return { ok: true, data: { regNo: seller.regNo, district: seller.district, email: seller.contactEmail } };
+  return { ok: true, data: { regNo: seller.regNo, district: seller.district, email: seller.contactEmail, username } };
+}
+
+/**
+ * The seller's login (Tradex2027-S + registration sequence). Created when missing, with the
+ * default password to be changed at first sign-in; an existing login keeps its password.
+ * `created` is true while the initial password is still in force (it is then e-mailed again).
+ */
+async function ensureSellerLogin(tx: Prisma.TransactionClient, s: { id: string; seq: number; name: string; userId: string | null }, passwordHash: string) {
+  if (s.userId) {
+    const u = await tx.user.update({ where: { id: s.userId }, data: { displayName: s.name, isActive: true } });
+    // Never signed in yet: the e-mail repeats the initial password.
+    return { id: u.id, username: u.username, created: u.mustChangePassword };
+  }
+  const username = sellerUsername(s.seq);
+  const u = await tx.user.upsert({
+    where: { username },
+    create: { username, passwordHash, role: "SELLER", displayName: s.name, mustChangePassword: true },
+    update: { passwordHash, role: "SELLER", displayName: s.name, mustChangePassword: true, isActive: true },
+  });
+  await tx.seller.update({ where: { id: s.id }, data: { userId: u.id } });
+  return { id: u.id, username, created: true };
+}
+
+// ---------------------------------------------------------------- applicant: correct and resubmit
+
+export async function applicantSaveSellerAction(_: FormState, form: FormData): Promise<FormState> {
+  const user = await requireUser("SELLER");
+  const current = await prisma.seller.findUnique({ where: { userId: user.id } });
+  if (!current || !SELLER_APPLICANT_EDITABLE.includes(current.status)) {
+    return { error: "Your application is with the Directorate or already decided, so it can no longer be changed." };
+  }
+  const parsed = sellerSchema.safeParse(readForm(form));
+  if (!parsed.success) return { fieldErrors: firstErrors(parsed.error, true), error: "Please correct the highlighted fields." };
+  const d = parsed.data;
+  const sectorErr = await checkSectors(d);
+  if (sectorErr) return { error: sectorErr };
+  const dup = await prisma.seller.findUnique({ where: { udyamNo: d.udyamNo } });
+  if (dup && dup.id !== current.id) {
+    return { fieldErrors: { udyamNo: "This Udyam number is already registered. Please contact your District Industries Centre." }, error: "Please correct the highlighted fields." };
+  }
+  const resubmitted = current.status === "WITH_SELLER";
+  const ok = await prisma.$transaction(async (tx) => {
+    const fresh = await tx.seller.findUnique({ where: { id: current.id } });
+    if (!fresh || !SELLER_APPLICANT_EDITABLE.includes(fresh.status)) return false;
+    const { products, ...rest } = d;
+    await tx.sellerProduct.deleteMany({ where: { sellerId: fresh.id } });
+    await tx.seller.update({
+      where: { id: fresh.id },
+      data: { ...rest, status: "WITH_DISTRICT", products: { create: products.map((p, i) => ({ sectorId: p.sectorId, products: p.products, sortOrder: i })) } },
+    });
+    await tx.user.update({ where: { id: user.id }, data: { displayName: d.name } });
+    await tx.sellerLog.create({
+      data: { sellerId: fresh.id, actorId: user.id, actorRole: "SELLER", action: fresh.status === "WITH_SELLER" ? "RESUBMITTED" : "UPDATED" },
+    });
+    return true;
+  });
+  if (!ok) return { error: "Your application has just moved on and can no longer be changed. Please refresh." };
+  revalidateAll();
+  redirect(`/seller?done=${resubmitted ? "resubmitted" : "updated"}`);
 }
 
 // ---------------------------------------------------------------- decisions (district / Directorate)
 
-type Decision = "recommend" | "reject" | "approve" | "return";
+type Decision = "recommend" | "reject" | "approve" | "return" | "to_seller";
 
 const commentField = englishText({ max: 2000, label: "Comment", multiline: true });
 
 /**
  * One or many sellers at once (form fields: sellerIds…, decision, comment).
- * District: recommend / reject. Directorate: approve / return / reject.
+ * District: recommend / return to the applicant / reject. Directorate: approve / return / reject.
  */
 export async function sellerDecisionAction(_: FormState, form: FormData): Promise<FormState> {
   const user = await requireUser(["DISTRICT", "DIC"]);
   const decision = String(form.get("decision")) as Decision;
-  const allowed: Decision[] = user.role === "DISTRICT" ? ["recommend", "reject"] : ["approve", "return", "reject"];
+  const allowed: Decision[] = user.role === "DISTRICT" ? ["recommend", "to_seller", "reject"] : ["approve", "return", "reject"];
   if (!allowed.includes(decision)) return { error: "Unknown action." };
   const ids = [...new Set(form.getAll("sellerIds").map(String).filter(Boolean))];
   if (!ids.length) return { error: "Select at least one seller." };
   const pc = commentField.safeParse(String(form.get("comment") ?? ""));
   if (!pc.success) return { fieldErrors: { comment: pc.error.issues[0].message } };
   const comment = pc.data || null;
-  if ((decision === "return" || decision === "reject") && (!comment || comment.length < 5)) {
+  if (decision !== "recommend" && decision !== "approve" && (!comment || comment.length < 5)) {
     return { fieldErrors: { comment: "A comment (at least 5 characters) is required when returning or rejecting." }, error: "Please add a comment." };
   }
 
@@ -135,8 +200,8 @@ export async function sellerDecisionAction(_: FormState, form: FormData): Promis
   if (!sellers.length) return { error: "These sellers have already been acted on. Refresh the page." };
 
   const now = new Date();
-  const passwordHash = decision === "approve" ? await hashPassword(EVENT.defaultBuyerPassword) : "";
-  const done: { name: string; email: string; regNo: string; approvedNo?: string; username?: string }[] = [];
+  const passwordHash = decision === "approve" || decision === "to_seller" ? await hashPassword(EVENT.defaultBuyerPassword) : "";
+  const done: { name: string; email: string; regNo: string; district: string; approvedNo?: string; username?: string; newLogin?: boolean }[] = [];
   for (const s of sellers) {
     await prisma.$transaction(async (tx) => {
       const fresh = await tx.seller.findUnique({ where: { id: s.id } });
@@ -145,16 +210,18 @@ export async function sellerDecisionAction(_: FormState, form: FormData): Promis
         await recommendOne(tx, s.id, fresh.status, user.id, comment);
       } else if (decision === "approve") {
         const seq = await nextSeq(tx, `seller-approved-${EVENT.approvedYear}`);
-        const username = sellerUsername(fresh.seq);
-        const login = await tx.user.upsert({
-          where: { username },
-          create: { username, passwordHash, role: "SELLER", displayName: fresh.name, mustChangePassword: true },
-          update: { passwordHash, role: "SELLER", displayName: fresh.name, mustChangePassword: true, isActive: true },
-        });
+        // An applicant's temporary login becomes the permanent one (password unchanged).
+        const login = await ensureSellerLogin(tx, fresh, passwordHash);
         const approvedNo = approvedSellerNo(seq);
-        await tx.seller.update({ where: { id: s.id }, data: { status: "APPROVED", approvedAt: now, approvedSeq: seq, approvedNo, userId: login.id } });
+        await tx.seller.update({ where: { id: s.id }, data: { status: "APPROVED", approvedAt: now, approvedSeq: seq, approvedNo } });
         await tx.sellerLog.create({ data: { sellerId: s.id, actorId: user.id, actorRole: "DIC", action: "APPROVED", comment } });
-        done.push({ name: fresh.name, email: fresh.contactEmail, regNo: fresh.regNo, approvedNo, username });
+        done.push({ name: fresh.name, email: fresh.contactEmail, regNo: fresh.regNo, district: fresh.district, approvedNo, username: login.username, newLogin: login.created });
+        return;
+      } else if (decision === "to_seller") {
+        const login = await ensureSellerLogin(tx, fresh, passwordHash);
+        await tx.seller.update({ where: { id: s.id }, data: { status: "WITH_SELLER" } });
+        await tx.sellerLog.create({ data: { sellerId: s.id, actorId: user.id, actorRole: "DISTRICT", action: "SENT_TO_SELLER", comment } });
+        done.push({ name: fresh.name, email: fresh.contactEmail, regNo: fresh.regNo, district: fresh.district, username: login.username, newLogin: login.created });
         return;
       } else {
         const status: SellerStatus = decision === "return" ? "RETURNED" : "REJECTED";
@@ -163,13 +230,16 @@ export async function sellerDecisionAction(_: FormState, form: FormData): Promis
           data: { sellerId: s.id, actorId: user.id, actorRole: user.role, action: decision === "return" ? "RETURNED" : "REJECTED", comment },
         });
       }
-      done.push({ name: fresh.name, email: fresh.contactEmail, regNo: fresh.regNo });
+      done.push({ name: fresh.name, email: fresh.contactEmail, regNo: fresh.regNo, district: fresh.district });
     });
   }
 
   for (const d of done) {
     if (decision === "approve") {
-      const m = sellerMail.approved(d.name, d.approvedNo!, d.username!, EVENT.defaultBuyerPassword);
+      const m = sellerMail.approved(d.name, d.approvedNo!, d.username!, d.newLogin ? EVENT.defaultBuyerPassword : null);
+      await sendMail(d.email, m.subject, m.text);
+    } else if (decision === "to_seller") {
+      const m = sellerMail.sentBack(d.name, d.regNo, d.district, comment!, { username: d.username!, password: d.newLogin ? EVENT.defaultBuyerPassword : null });
       await sendMail(d.email, m.subject, m.text);
     } else if (decision === "reject") {
       const m = sellerMail.rejected(d.name, d.regNo, comment!);
@@ -180,6 +250,7 @@ export async function sellerDecisionAction(_: FormState, form: FormData): Promis
   const verb: Record<Decision, string> = {
     recommend: "recommended to the Directorate", approve: "approved — logins allotted and e-mailed",
     return: "returned to the district", reject: "rejected",
+    to_seller: "returned to the applicant for correction — login details e-mailed",
   };
   return { ok: true, message: `${done.length} seller${done.length === 1 ? "" : "s"} ${verb[decision]}${done.length === 1 ? ` (${done[0].name})` : ""}.` };
 }

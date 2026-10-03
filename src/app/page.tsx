@@ -33,9 +33,9 @@ const BUYER_STEPS = [
   { icon: BadgeCheck, title: "Approved by the Directorate", body: "You receive your RBSM buyer number and are matched with suppliers." },
 ];
 const SELLER_STEPS = [
-  { icon: Store, title: "Register your enterprise", body: "Self-register online, or through your District Industries Centre." },
-  { icon: Landmark, title: "Verified by your district centre", body: "Udyam number and contact details are checked locally." },
-  { icon: BadgeCheck, title: "Approved by the Directorate", body: "You receive your RBSM seller number and a portal login." },
+  { icon: Store, title: "Register your enterprise", body: "Self-register online and get a login to track your application — or register through your District Industries Centre." },
+  { icon: Landmark, title: "Verified by your district centre", body: "Udyam number and contact details are checked locally. If anything needs correcting, you fix it yourself online." },
+  { icon: BadgeCheck, title: "Approved by the Directorate", body: "You receive your RBSM seller number; your login becomes your permanent seller login." },
   { icon: Handshake, title: "Meet international buyers", body: "Matched on sector and products for one-to-one B2B meetings." },
 ];
 const MODULES = [
@@ -56,7 +56,8 @@ const FAQ = [
   { q: "Who can register as a buyer?", a: "International importers, distributors, retailers and sourcing companies looking to buy from Indian MSMEs. Registration is free; FIEO verifies every buyer before the Directorate approves them." },
   { q: "Who can register as a seller?", a: "MSMEs located in Kerala with a valid Udyam registration (UDYAM-KL-…). You can register online yourself or through your District Industries Centre." },
   { q: "How are buyers and sellers matched?", a: "On the sectors and products each buyer needs and each seller is ready to export. The aim is for every buyer to meet at least ten relevant sellers." },
-  { q: "I registered but have not received my login.", a: "Buyers receive their login immediately after sign-up — please check your spam folder. Sellers receive their login after the Directorate approves the registration." },
+  { q: "I registered but have not received my login.", a: "Buyers receive their login immediately after sign-up — please check your spam folder. Sellers who register online also receive a login immediately, to track the application and make corrections; it becomes the permanent seller login on approval." },
+  { q: "My district centre asked for a correction. What do I do?", a: "Sign in with the login e-mailed to you, correct the details shown on your application page and click \u201cSave & submit to district centre\u201d. The district centre's comment is shown at the top of the page." },
   { q: "Can I change my requirement after approval?", a: "Yes. Approved buyers can modify a sector or add new sectors at any time; the change goes through the same verification." },
 ];
 
@@ -370,7 +371,7 @@ export default async function Home() {
           <div className="relative grid gap-8 lg:grid-cols-[1.3fr_1fr] lg:items-center">
             <div>
               <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Be part of {EVENT.name}.</h2>
-              <p className="mt-3 max-w-xl text-white/70">Registration takes a few minutes. Buyers get their login immediately; sellers after Directorate approval.</p>
+              <p className="mt-3 max-w-xl text-white/70">Registration takes a few minutes. Buyers and online seller applicants get their login by e-mail straight away.</p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
               <Link href="/signup" className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-6 py-3 font-semibold text-ink hover:bg-brand-50">

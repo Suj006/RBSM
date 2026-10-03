@@ -30,3 +30,8 @@ export function parseCerts(json: string): string[] {
     return [];
   }
 }
+
+/** True when `d` lies within the last `days` days. */
+export function withinDays(d: Date | null | undefined, days: number) {
+  return !!d && Date.now() - d.getTime() < days * 864e5;
+}

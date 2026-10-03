@@ -82,6 +82,7 @@ export const ITEM_EDITABLE: ItemStatus[] = ["DRAFT", "FIEO_RETURNED", "APPROVED"
 
 export const SELLER_META: Record<SellerStatus, { label: string; short: string; tone: Tone; dot: string }> = {
   WITH_DISTRICT: { label: "Pending district recommendation", short: "With district", tone: "amber", dot: "bg-tx-yellow" },
+  WITH_SELLER: { label: "Returned to applicant for correction", short: "With applicant", tone: "blue", dot: "bg-tx-blue" },
   RECOMMENDED: { label: "Awaiting Directorate approval", short: "With Directorate", tone: "violet", dot: "bg-violet-500" },
   RETURNED: { label: "Returned to district", short: "Returned", tone: "red", dot: "bg-tx-red" },
   APPROVED: { label: "Approved seller", short: "Approved", tone: "green", dot: "bg-tx-green" },
@@ -92,6 +93,8 @@ export const ALL_SELLER_STATUSES = Object.keys(SELLER_META) as SellerStatus[];
 export const SELLER_ACTION_LABEL: Record<SellerAction, string> = {
   REGISTERED: "Registered",
   UPDATED: "Details updated",
+  SENT_TO_SELLER: "Returned to applicant for correction",
+  RESUBMITTED: "Corrected and resubmitted by applicant",
   RECOMMENDED: "Recommended to Directorate",
   RETURNED: "Returned to district",
   APPROVED: "Approved — login allotted",
@@ -105,3 +108,5 @@ export const SELLER_VISIBLE: Partial<Record<Role, SellerStatus[]>> = {
 };
 /** The district can edit (and recommend) these. */
 export const SELLER_DISTRICT_EDITABLE: SellerStatus[] = ["WITH_DISTRICT", "RETURNED"];
+/** An applicant with a temporary login can correct their own details in these (and resubmit to the district). */
+export const SELLER_APPLICANT_EDITABLE: SellerStatus[] = ["WITH_DISTRICT", "WITH_SELLER"];

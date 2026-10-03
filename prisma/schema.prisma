@@ -258,6 +258,7 @@ model EmailLog {
 
 enum SellerStatus {
   WITH_DISTRICT // entered by the district office or self-registered; awaiting district recommendation
+  WITH_SELLER // returned by the district to the applicant, who corrects it with the temporary login
   RECOMMENDED // recommended by the district to the Directorate
   RETURNED // Directorate returned it to the district with a comment
   APPROVED // approved by the Directorate — login allotted, visible to FIEO
@@ -279,6 +280,8 @@ enum LocalBodyType {
 enum SellerAction {
   REGISTERED
   UPDATED
+  SENT_TO_SELLER // district returned the application to the applicant for correction
+  RESUBMITTED // applicant corrected and resubmitted it
   RECOMMENDED
   RETURNED
   APPROVED
@@ -313,7 +316,9 @@ model Seller {
   approvedSeq   Int?         @unique
   approvedNo    String?      @unique // RBSM-Seller-2026001
 
-  userId String? @unique // login, created on approval
+  // Login. Online applicants get it at registration (limited "application" access until
+  // approved); district-entered sellers get it on approval or when returned to the applicant.
+  userId String? @unique
   user   User?   @relation("SellerLogin", fields: [userId], references: [id], onDelete: SetNull)
 
   products SellerProduct[]
