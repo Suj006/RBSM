@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import type { BuyerStatus, ItemStatus, Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { actionWhere, itemScope, scopeFor } from "@/lib/buyer-query";
 import { DIC_ITEM_QUEUE, FIEO_ITEM_QUEUE, ITEM_META, ROLE_LABEL } from "@/lib/status";
-import { Card, CardHeader, PageHeader, StatCard, ButtonLink } from "@/components/ui";
+import { Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
+import { SectionBand, SectionJumps } from "@/components/section-band";
 import { BarList, ColumnChart, PipelineBar } from "@/components/charts";
 import { StatusBadge } from "@/components/status-badge";
 import { ItemChips } from "@/components/item-chips";
@@ -80,16 +80,22 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
   return (
     <>
       <PageHeader eyebrow={`${ROLE_LABEL[role]} · ${EVENT.name} ${EVENT.short}`} title="Dashboard"
-        subtitle="Real-time view of buyer registrations and sector-wise approvals."
-        actions={<ButtonLink href={`${base}/buyers?status=action`}>Open work queue <ArrowRight className="size-4" /></ButtonLink>} />
+        subtitle="Real-time view of the whole programme — international buyers first, then Kerala MSME sellers."
+        actions={<SectionJumps />} />
 
+      <SectionBand id="buyers" kind="buyers" title="Buyer registration & sector approvals"
+        summary={`${total} buyers registered · ${count("APPROVED")} approved · ${totalItems} sector requirements`}
+        links={[
+          { href: `${base}/buyers`, label: "All buyers" },
+          ...(role === "ADMIN" ? [] : [{ href: `${base}/buyers?status=action`, label: "Buyer work queue →", primary: true }]),
+        ]} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s) => <StatCard key={s.label} {...s} />)}
       </div>
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader title="Pipeline" subtitle={`${total} buyers · ${totalItems} sector requirements in view`} />
+          <CardHeader title="Buyer pipeline" subtitle={`${total} buyers · ${totalItems} sector requirements in view`} />
           <div className="space-y-8 p-6">
             <div>
               <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Buyers</div>

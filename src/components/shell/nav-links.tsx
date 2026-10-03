@@ -15,7 +15,11 @@ const ICONS = {
   sellers: Store, upload: Upload, add: PlusCircle, target: Target, demand: Boxes,
 } as const;
 
-export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; exact?: boolean; badge?: number };
+export type NavItem = {
+  href: string; label: string; icon: keyof typeof ICONS; exact?: boolean; badge?: number;
+  /** Sidebar heading shown above the first item of a group (e.g. "Buyers", "Sellers"). */
+  group?: string;
+};
 
 export function NavLinks({ items, horizontal }: { items: NavItem[]; horizontal?: boolean }) {
   const path = usePathname();
@@ -29,11 +33,13 @@ export function NavLinks({ items, horizontal }: { items: NavItem[]; horizontal?:
   }, [horizontal, best]);
   return (
     <ul ref={ref} className={cn(horizontal ? "flex gap-1" : "space-y-1")}>
-      {items.map((it) => {
+      {items.map((it, i) => {
         const active = it.href === best;
         const Icon = ICONS[it.icon];
+        const heading = !horizontal && it.group && it.group !== items[i - 1]?.group ? it.group : null;
         return (
           <li key={it.href}>
+            {heading && <div className="mb-1 mt-4 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">{heading}</div>}
             <Link
               href={it.href}
               aria-current={active ? "page" : undefined}

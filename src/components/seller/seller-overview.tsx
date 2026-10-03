@@ -9,6 +9,7 @@ import { getTargets } from "@/lib/targets";
 import { SELLER_META } from "@/lib/status";
 import { fmtDate } from "@/lib/format";
 import { Badge, Card, CardHeader, StatCard } from "@/components/ui";
+import { SectionBand } from "@/components/section-band";
 import { BarList, PipelineBar } from "@/components/charts";
 import { cn } from "@/lib/cn";
 
@@ -98,15 +99,13 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
 
   return (
     <section className={standalone ? "" : "mt-10"}>
-      {!standalone && (
-        <div className="mb-4 flex items-end justify-between">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-brand-700">Sellers (MSMEs)</div>
-            <h2 className="text-xl font-extrabold tracking-tight text-ink">Seller registration</h2>
-          </div>
-          <Link href={`${base}/sellers`} className="text-sm font-semibold text-brand-700 hover:underline">All sellers →</Link>
-        </div>
-      )}
+      <SectionBand id="sellers" kind="sellers"
+        title={user.role === "DISTRICT" ? `Sellers — ${user.district}` : "Seller registration & approvals"}
+        summary={`${total} sellers in view · ${approved} approved${user.role === "DIC" || user.role === "ADMIN" ? " · all 14 districts" : ""}`}
+        links={[
+          { href: user.role === "FIEO" ? `${base}/seller-list` : `${base}/sellers`, label: user.role === "FIEO" ? "RBSM seller list" : "All sellers" },
+          ...(user.role === "DIC" || user.role === "DISTRICT" ? [{ href: `${base}/sellers?status=action`, label: "Seller work queue →", primary: true }] : []),
+        ]} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s) => <StatCard key={s.label} {...s} />)}
       </div>

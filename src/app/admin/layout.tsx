@@ -6,18 +6,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <AppShell role="ADMIN" user={user} nav={[
       { href: "/admin", label: "Dashboard", icon: "dashboard", exact: true },
-      { href: "/admin/buyers", label: "All buyers", icon: "buyers" },
-      { href: "/admin/requirements", label: "Sector requirements", icon: "requirement" },
-      { href: "/admin/approved", label: "RBSM buyer list", icon: "approved" },
-      { href: "/admin/sellers", label: "All sellers", icon: "sellers" },
-      { href: "/admin/seller-list", label: "RBSM seller list", icon: "approved" },
-      { href: "/admin/demand", label: "Sector demand", icon: "demand" },
-      { href: "/admin/targets", label: "Targets", icon: "target" },
-      { href: "/admin/reports", label: "Reports", icon: "reports" },
-      { href: "/admin/sectors", label: "Sector master", icon: "sectors" },
-      { href: "/admin/certifications", label: "Certification master", icon: "certs" },
-      { href: "/admin/users", label: "Users & logins", icon: "users" },
-      { href: "/admin/emails", label: "E-mail outbox", icon: "mail" },
+      { href: "/admin/buyers", label: "All buyers", icon: "buyers", group: "Buyers" },
+      { href: "/admin/requirements", label: "Sector requirements", icon: "requirement", group: "Buyers" },
+      { href: "/admin/approved", label: "RBSM buyer list", icon: "approved", group: "Buyers" },
+      { href: "/admin/sellers", label: "All sellers", icon: "sellers", group: "Sellers" },
+      { href: "/admin/seller-list", label: "RBSM seller list", icon: "approved", group: "Sellers" },
+      { href: "/admin/demand", label: "Sector demand", icon: "demand", group: "Programme" },
+      { href: "/admin/targets", label: "Targets", icon: "target", group: "Programme" },
+      { href: "/admin/reports", label: "Reports", icon: "reports", group: "Programme" },
+      { href: "/admin/sectors", label: "Sector master", icon: "sectors", group: "Administration" },
+      { href: "/admin/certifications", label: "Certification master", icon: "certs", group: "Administration" },
+      { href: "/admin/users", label: "Users & logins", icon: "users", group: "Administration" },
+      { href: "/admin/emails", label: "E-mail outbox", icon: "mail", group: "Administration" },
     ]}>{children}</AppShell>
   );
 }
