@@ -56,7 +56,7 @@ export default async function BuyerDashboard() {
       <Card className="mb-6 p-5 sm:p-6"><JourneyStepper status={b.status} /></Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           <Card className="overflow-hidden">
             <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center">
               <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700"><Icon className="size-6" /></div>
