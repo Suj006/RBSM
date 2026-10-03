@@ -23,7 +23,8 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
     prisma.buyer.groupBy({ by: ["status"], where: scope, _count: true }),
     prisma.requirementItem.groupBy({ by: ["status"], where: iScope, _count: true }),
     prisma.buyer.groupBy({ by: ["country"], where: scope, _count: true, orderBy: { _count: { country: "desc" } }, take: 8 }),
-    prisma.requirementItem.findMany({ where: { AND: [iScope, { status: { not: "DRAFT" } }] }, select: { sectorId: true, sector: { select: { name: true } } } }),
+    // Sectors of interest: approved requirements only.
+    prisma.requirementItem.findMany({ where: { AND: [iScope, { status: "APPROVED" }] }, select: { sectorId: true, sector: { select: { name: true } } } }),
     prisma.buyer.findMany({ where: { AND: [scope, { createdAt: { gte: since } }] }, select: { createdAt: true } }),
     prisma.buyer.findMany({
       where: { AND: [scope, actionWhere(role)] },
@@ -137,9 +138,9 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
           </div>
         </Card>
         <Card>
-          <CardHeader title="Sectors of interest" subtitle="Buyer requirements per sector" />
+          <CardHeader title="Sectors of interest" subtitle="Approved buyer requirements per sector" />
           <div className="p-6">
-            <BarList data={topSectors.map((s) => ({ label: s.name, value: s.n, href: `${base}/requirements?sector=${s.id}` }))} color="bg-tx-red" empty="No sector requirements yet." />
+            <BarList data={topSectors.map((s) => ({ label: s.name, value: s.n, href: `${base}/requirements?item=APPROVED&sector=${s.id}` }))} color="bg-tx-red" empty="No approved sector requirements yet." />
           </div>
         </Card>
       </div>
