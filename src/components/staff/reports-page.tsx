@@ -1,4 +1,4 @@
-import { BarChart3, BadgeCheck, Boxes, ChartPie, ClipboardList, Handshake, Lightbulb, MapPinned, PackageSearch, Star, Store, Users } from "lucide-react";
+import { BarChart3, BadgeCheck, Boxes, ChartPie, ClipboardList, Handshake, Lightbulb, MapPinned, PackageSearch, Star, Store, Users, UsersRound } from "lucide-react";
 import type { User } from "@/generated/prisma/client";
 import type { SellerStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
@@ -9,21 +9,23 @@ import { DISTRICT_NAMES } from "@/lib/config";
 import { Button, Card, PageHeader, Select } from "@/components/ui";
 import { BuyerFilters } from "./buyer-filters";
 import { DownloadButtons } from "./download-buttons";
+import { ProfileFilters } from "@/components/seller/profile-filters";
 
 const ICON: Record<ReportId, typeof Users> = {
   "buyer-register": Users, "sector-requirements": ClipboardList, "approved-buyers": BadgeCheck, "approved-sellers": BadgeCheck,
-  "seller-register": Store, "seller-district-summary": MapPinned, "mis-summary": BarChart3, "sector-demand": Boxes,
+  "seller-register": Store, "seller-district-summary": MapPinned, "seller-profile-analysis": UsersRound, "mis-summary": BarChart3, "sector-demand": Boxes,
   "product-demand": PackageSearch, "insights": Lightbulb, "match-list": Handshake, "seller-preferences": Star, "match-coverage": ChartPie,
 };
 const ACCENT: Record<ReportId, string> = {
   "buyer-register": "bg-tx-blue", "sector-requirements": "bg-tx-yellow", "approved-buyers": "bg-tx-green", "approved-sellers": "bg-tx-green",
-  "seller-register": "bg-tx-green", "seller-district-summary": "bg-tx-blue", "mis-summary": "bg-tx-red", "sector-demand": "bg-violet-500",
+  "seller-register": "bg-tx-green", "seller-district-summary": "bg-tx-blue", "seller-profile-analysis": "bg-violet-500", "mis-summary": "bg-tx-red", "sector-demand": "bg-violet-500",
   "product-demand": "bg-violet-500", "insights": "bg-ink", "match-list": "bg-tx-green", "seller-preferences": "bg-violet-500", "match-coverage": "bg-tx-red",
 };
-const SELLER_REPORTS: ReportId[] = ["approved-sellers", "seller-register", "seller-district-summary"];
+const SELLER_REPORTS: ReportId[] = ["approved-sellers", "seller-register", "seller-district-summary", "seller-profile-analysis"];
 const MATCH_REPORTS: ReportId[] = ["match-list", "seller-preferences", "match-coverage"];
 
-type Params = F & { s_status?: string; s_district?: string; s_sector?: string; s_exp?: string };
+type Params = F & { s_status?: string; s_district?: string; s_sector?: string; s_exp?: string;
+  s_profile?: string; s_cat?: string; s_utype?: string; s_promoter?: string; s_iec?: string; s_cert?: string };
 
 function ReportCard({ id, href, note }: { id: ReportId; href: string; note?: string }) {
   const Icon = ICON[id];
@@ -55,7 +57,8 @@ export async function ReportsPage({ user, base, filters }: { user: User; base: s
   ]);
   const pick = (o: Record<string, string | undefined>) => new URLSearchParams(Object.entries(o).filter(([, v]) => v) as [string, string][]).toString();
   const bqs = pick({ q: filters.q, status: filters.status, item: filters.item, country: filters.country, sector: filters.sector });
-  const sqs = pick({ status: filters.s_status, district: filters.s_district, sector: filters.s_sector, exp: filters.s_exp });
+  const sqs = pick({ status: filters.s_status, district: filters.s_district, sector: filters.s_sector, exp: filters.s_exp,
+    profile: filters.s_profile, cat: filters.s_cat, utype: filters.s_utype, promoter: filters.s_promoter, iec: filters.s_iec, cert: filters.s_cert });
   const sellerStatuses: SellerStatus[] = role === "DISTRICT" || role === "ADMIN" || role === "DIC" ? ALL_SELLER_STATUSES : SELLER_VISIBLE[role] ?? [];
   const keep = (prefix: "s_" | "b") => Object.entries(filters).filter(([k, v]) => v && (prefix === "s_" ? !k.startsWith("s_") : k.startsWith("s_")));
 
@@ -112,7 +115,8 @@ export async function ReportsPage({ user, base, filters }: { user: User; base: s
         <section>
           <h2 className="mb-3 text-lg font-bold text-ink">Seller reports</h2>
           <Card className="mb-5 overflow-hidden">
-            <form action={base} className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+            <form action={base} className="space-y-3 p-4">
+             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
               {keep("s_").map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
               <Select name="s_status" defaultValue={filters.s_status ?? ""} aria-label="Seller status">
                 <option value="">All seller statuses</option>
@@ -134,12 +138,16 @@ export async function ReportsPage({ user, base, filters }: { user: User; base: s
                 <option value="no">Export experience: No</option>
               </Select>
               <Button type="submit" variant="secondary">Apply</Button>
+             </div>
+             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <ProfileFilters prefix="s_" personal={role !== "FIEO"} f={{ profile: filters.s_profile, cat: filters.s_cat, utype: filters.s_utype, promoter: filters.s_promoter, iec: filters.s_iec, cert: filters.s_cert }} />
+             </div>
             </form>
           </Card>
           <div className="grid gap-5 md:grid-cols-2">
             {sellerIds.map((id) => (
-              <ReportCard key={id} id={id} href={`/api/reports/${id}${id === "seller-district-summary" || !sqs ? "" : `?${sqs}`}`}
-                note={id === "seller-district-summary" ? "Covers all sellers you can see (filters not applied)."
+              <ReportCard key={id} id={id} href={`/api/reports/${id}${id === "seller-district-summary" || id === "seller-profile-analysis" || !sqs ? "" : `?${sqs}`}`}
+                note={id === "seller-district-summary" || id === "seller-profile-analysis" ? "Covers all sellers you can see (filters not applied)."
                   : id === "approved-sellers" ? "Approved sellers only — the status filter is not applied." : undefined} />
             ))}
           </div>

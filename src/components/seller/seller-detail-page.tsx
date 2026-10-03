@@ -11,6 +11,7 @@ import { ROLE_LABEL, SELLER_ACTION_LABEL, SELLER_DISTRICT_EDITABLE } from "@/lib
 import { Alert, Badge, ButtonLink, Card, CardHeader, DL, PageHeader } from "@/components/ui";
 import { DownloadButtons } from "@/components/staff/download-buttons";
 import { SellerBadge } from "./seller-badge";
+import { ExportCredentials, ProfileDetails } from "./profile-summary";
 import { DIRECTORATE_OPTIONS, DISTRICT_OPTIONS, SellerDecision } from "./seller-decision";
 import { cn } from "@/lib/cn";
 
@@ -74,19 +75,30 @@ export async function SellerDetailPage({ user, id, base, done }: { user: User; i
                 { label: "Taluk", value: s.taluk },
                 { label: "Local body", value: `${s.localBodyName} ${localBodyLabel(s.localBodyType)}` },
               ]} />
+              <div className="mt-5 border-t border-slate-100 pt-5"><ExportCredentials s={s} /></div>
             </div>
           </Card>
           <Card>
-            <CardHeader title="Promoter / contact person" />
+            <CardHeader title="Promoter details" />
             <div className="p-6">
               <DL cols={2} items={[
-                { label: "Name", value: s.contactName },
+                { label: "Name of the promoter", value: s.contactName },
                 { label: "E-mail ID", value: <a href={`mailto:${s.contactEmail}`} className="text-brand-700 hover:underline">{s.contactEmail}</a> },
                 { label: "Mobile number", value: fmtMobile(s.contactMobile) },
                 { label: "WhatsApp number", value: fmtMobile(s.contactWhatsapp) },
               ]} />
             </div>
           </Card>
+          {s.status === "APPROVED" && (
+            <Card>
+              <CardHeader title="Seller profile" subtitle="Promoter and unit details completed by the seller after approval."
+                action={s.profileCompletedAt ? <Badge tone="green">Completed</Badge> : <Badge tone="amber">Pending with seller</Badge>} />
+              <div className="p-6">
+                {s.profileCompletedAt ? <ProfileDetails s={s} personal={user.role !== "FIEO"} />
+                  : <p className="text-sm text-slate-500">The seller has not completed the profile yet (gender, date of birth, social category, specially abled, block, constitution, category and type of unit). It is asked for on the seller&apos;s dashboard.</p>}
+              </div>
+            </Card>
+          )}
           <Card>
             <CardHeader title={`Sectors & products ready to export (${s.products.length})`} />
             <ul className="divide-y divide-slate-100">
@@ -106,7 +118,6 @@ export async function SellerDetailPage({ user, id, base, done }: { user: User; i
                 { label: "Registered on", value: fmtDateTime(s.createdAt) },
                 { label: "Recommended on", value: fmtDateTime(s.recommendedAt) },
                 { label: "Approved on", value: fmtDateTime(s.approvedAt) },
-                { label: "Seller login", value: s.user ? <span className="font-mono">{s.user.username}</span> : "Allotted on approval" },
                 { label: "Login", value: s.user ? <><span className="font-mono">{s.user.username}</span>{s.status !== "APPROVED" && <span className="text-slate-500"> (applicant — status and corrections only)</span>}</> : "Allotted on approval" },
                 { label: "Last login", value: s.user ? fmtDateTime(s.user.lastLoginAt) : "—" },
               ]} />
@@ -120,10 +131,10 @@ export async function SellerDetailPage({ user, id, base, done }: { user: User; i
               {districtCan ? (
                 <SellerDecision sellerId={s.id} options={DISTRICT_OPTIONS} nav={nav}
                   heading={s.status === "RETURNED" ? "Correct and recommend again" : "Recommend to Directorate"}
-                  note="Verify the Udyam number and contact details before recommending." />
+                  note="Verify the Udyam number, IEC number, certifications and promoter details before recommending." />
               ) : dicCan ? (
                 <SellerDecision sellerId={s.id} options={DIRECTORATE_OPTIONS} nav={nav} heading="Directorate decision"
-                  note="Approving adds the seller to the RBSM seller list and e-mails a login to the contact person." />
+                  note="Approving adds the seller to the RBSM seller list and e-mails a login to the promoter." />
               ) : (
                 <SellerDecision sellerId={s.id} options={[]} heading="No action pending" note="This seller is not at a stage that needs your decision." />
               )}

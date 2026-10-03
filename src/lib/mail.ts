@@ -175,7 +175,9 @@ ${password ? `Your login credentials:
 User name: ${username}
 Password: ${password}
 
-Sign in at ${APP_URL}/login. You will be asked to change your password on first login.` : `Your login (${username}) is now your permanent seller login. Sign in at ${APP_URL}/login with the password you have set to see your full seller dashboard.`} Buyer meeting details will be shared through the portal.${signature}`,
+Sign in at ${APP_URL}/login. You will be asked to change your password on first login.` : `Your login (${username}) is now your permanent seller login. Sign in at ${APP_URL}/login with the password you have set to see your full seller dashboard.`}
+
+Next step: please complete your seller profile (promoter and unit details) from "My profile" in the portal. It is needed before you can send your buyer preferences. Buyer meeting details will be shared through the portal.${signature}`,
   }),
   rejected: (name: string, regNo: string, comment: string) => ({
     subject: `${EVENT.name} ${EVENT.short} — seller registration ${regNo} not accepted`,

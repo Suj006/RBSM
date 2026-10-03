@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Handshake, Star } from "lucide-react";
+import { Handshake, Star, UserRoundPen } from "lucide-react";
 import { SellerMeetings } from "@/components/match/my-matches";
 import { getMatchState } from "@/lib/matchmaking";
 import { requireUser } from "@/lib/auth";
@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { Alert, Badge, Card, CardHeader, DL, PageHeader } from "@/components/ui";
 import { SellerBadge } from "@/components/seller/seller-badge";
 import { ApplicantView } from "@/components/seller/applicant-view";
+import { ExportCredentials, ProfileDetails } from "@/components/seller/profile-summary";
 import { EVENT, localBodyLabel } from "@/lib/config";
 import { fmtDate, withinDays } from "@/lib/format";
 import { fmtMobile } from "@/lib/text";
@@ -40,6 +41,14 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
         </Alert>
       )}
 
+      {!s.profileCompletedAt && (
+        <Link href="/seller/profile" className="mb-6 flex items-center justify-between gap-4 rounded-2xl bg-amber-50 px-5 py-4 text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100">
+          <span className="flex items-center gap-3"><UserRoundPen className="size-5 shrink-0" />
+            <span><b>Please complete your seller profile.</b> A few promoter and unit details (gender, date of birth, social category, block,
+              constitution, category and type of unit) are needed — before you can send buyer preferences.</span></span>
+          <span className="shrink-0 text-sm font-semibold">Complete profile →</span>
+        </Link>
+      )}
       {match.buyersVisible && !s.prefSubmittedAt && !match.prefsFrozen && (
         <Link href="/seller/buyers" className="mb-6 flex items-center justify-between gap-4 rounded-2xl bg-violet-50 px-5 py-4 text-violet-900 ring-1 ring-violet-200 hover:bg-violet-100">
           <span className="flex items-center gap-3"><Star className="size-5 shrink-0" />
@@ -77,7 +86,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
             </ul>
           </Card>
           <Card>
-            <CardHeader title="Registration details" subtitle="To change these details, please contact your District Industries Centre." />
+            <CardHeader title="Registration details" subtitle="To change these details, please contact your District Industries Centre. Export history, IEC number and certifications can be updated under My profile." />
             <div className="p-6">
               <DL cols={3} items={[
                 { label: "Udyam number", value: <span className="font-mono">{s.udyamNo}</span> },
@@ -86,10 +95,18 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
                 { label: "Local body", value: `${s.localBodyName} ${localBodyLabel(s.localBodyType)}` },
                 { label: "Export experience", value: s.exportExperience ? <Badge tone="green">Yes</Badge> : <Badge tone="slate">No</Badge> },
                 { label: "Approved on", value: fmtDate(s.approvedAt) },
-                { label: "Contact person", value: s.contactName },
+                { label: "Name of the promoter", value: s.contactName },
                 { label: "Mobile / WhatsApp", value: `${fmtMobile(s.contactMobile)}${s.contactWhatsapp !== s.contactMobile ? ` / ${fmtMobile(s.contactWhatsapp)}` : ""}` },
                 { label: "E-mail ID", value: s.contactEmail },
               ]} />
+              <div className="mt-5 border-t border-slate-100 pt-5"><ExportCredentials s={s} /></div>
+            </div>
+          </Card>
+          <Card>
+            <CardHeader title="Seller profile" subtitle={s.profileCompletedAt ? "Promoter and unit details you have given." : "Not completed yet."}
+              action={<Link href="/seller/profile" className="text-sm font-semibold text-brand-700 hover:underline">{s.profileCompletedAt ? "Update" : "Complete profile"}</Link>} />
+            <div className="p-6">
+              {s.profileCompletedAt ? <ProfileDetails s={s} /> : <p className="text-sm text-slate-500">Please complete your profile — it is needed before you can send buyer preferences.</p>}
             </div>
           </Card>
         </div>

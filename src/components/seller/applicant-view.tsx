@@ -1,8 +1,10 @@
 import { Check, Clock, Lock, XCircle } from "lucide-react";
 import type { Seller, SellerLog, SellerProduct, Sector } from "@/generated/prisma/client";
+import { certificationNames } from "@/lib/masters";
 import type { SellerStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { Alert, Badge, Card, CardHeader, DL, PageHeader } from "@/components/ui";
+import { ExportCredentials } from "./profile-summary";
 import { SellerBadge } from "./seller-badge";
 import { SellerForm } from "./seller-form";
 import { EVENT, localBodyLabel } from "@/lib/config";
@@ -33,6 +35,7 @@ export async function ApplicantView({ seller: s, done }: { seller: Full; done?: 
   const sectors = editable
     ? await prisma.sector.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } })
     : [];
+  const certs = editable ? await certificationNames() : [];
   const step = STEP[s.status];
 
   return (
@@ -89,7 +92,7 @@ export async function ApplicantView({ seller: s, done }: { seller: Full; done?: 
         <div className="min-w-0 space-y-6">
           {editable ? (
             s.status === "WITH_SELLER" ? (
-              <SellerForm mode="applicant" initial={sellerFormValues(s)} sectors={sectors} />
+              <SellerForm mode="applicant" initial={sellerFormValues(s)} sectors={sectors} certifications={certs} />
             ) : (
               <>
                 <Summary s={s} />
@@ -99,7 +102,7 @@ export async function ApplicantView({ seller: s, done }: { seller: Full; done?: 
                     <span className="hidden group-open:inline">Update my details</span>
                   </summary>
                   <div className="border-t border-slate-100 p-4 sm:p-6">
-                    <SellerForm mode="applicant" initial={sellerFormValues(s)} sectors={sectors} />
+                    <SellerForm mode="applicant" initial={sellerFormValues(s)} sectors={sectors} certifications={certs} />
                   </div>
                 </details>
               </>
@@ -148,10 +151,11 @@ function Summary({ s }: { s: Full }) {
           { label: "District", value: s.district },
           { label: "Taluk", value: s.taluk },
           { label: "Local body", value: `${s.localBodyName} ${localBodyLabel(s.localBodyType)}` },
-          { label: "Contact person", value: s.contactName },
+          { label: "Name of the promoter", value: s.contactName },
           { label: "Mobile / WhatsApp", value: `${fmtMobile(s.contactMobile)}${s.contactWhatsapp !== s.contactMobile ? ` / ${fmtMobile(s.contactWhatsapp)}` : ""}` },
           { label: "E-mail ID", value: s.contactEmail },
         ]} />
+        <ExportCredentials s={s} />
         <div>
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Sectors &amp; products ready to export</div>
           <ul className="divide-y divide-slate-100 rounded-xl ring-1 ring-slate-200">

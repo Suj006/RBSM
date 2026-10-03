@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Award, Clock, Gauge, Handshake, Map, PackageX, Globe2, Compass, Filter, TrendingUp, RotateCcw, Building2, ArrowRight } from "lucide-react";
+import { AlertTriangle, Award, Clock, Gauge, Handshake, Map, PackageX, Globe2, Compass, Filter, TrendingUp, RotateCcw, Building2, ArrowRight, UsersRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { User } from "@/generated/prisma/client";
 import { AGE_BUCKETS, buildInsights } from "@/lib/insights";
@@ -67,6 +67,8 @@ export async function InsightsPage({ user, root }: { user: User; root: string })
   const d = await buildInsights(user);
   const v = await buildDecisionView(d, root);
   const s = d.summary;
+  const P = v.profile.summary;
+  const pc = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
   const maxDS = Math.max(0, ...d.districtSector.flatMap((r) => r.cells));
   const maxCS = Math.max(0, ...d.countrySector.flatMap((r) => r.cells));
   const STATUS = {
@@ -90,7 +92,7 @@ export async function InsightsPage({ user, root }: { user: User; root: string })
       </div>
 
       <nav className="mt-6 flex flex-wrap gap-2 text-sm" aria-label="Sections">
-        {[["findings", "Key findings"], ["funnel", "Funnels"], ["pace", "Targets & pace"], ["districts", "Districts"], ["readiness", "Matchmaking readiness"], ["gaps", "Supply gaps"], ["supply", "District × sector supply"], ["markets", "Markets × sectors"], ["certs", "Certifications"], ["rework", "Rework"], ["speed", "Turnaround & ageing"], ["matching", "Matchmaking position"]].map(([h, l]) => (
+        {[["findings", "Key findings"], ["funnel", "Funnels"], ["pace", "Targets & pace"], ["districts", "Districts"], ["profile", "Seller profile"], ["readiness", "Matchmaking readiness"], ["gaps", "Supply gaps"], ["supply", "District × sector supply"], ["markets", "Markets × sectors"], ["certs", "Certifications"], ["rework", "Rework"], ["speed", "Turnaround & ageing"], ["matching", "Matchmaking position"]].map(([h, l]) => (
           <a key={h} href={`#${h}`} className="rounded-lg bg-white px-3 py-1.5 font-medium text-slate-600 ring-1 ring-slate-200 hover:text-brand-700">{l}</a>
         ))}
       </nav>
@@ -173,6 +175,61 @@ export async function InsightsPage({ user, root }: { user: User; root: string })
                     <td className={cn("px-3 py-2 text-right tabular-nums", r.waitingOver7 ? "font-bold text-tx-red" : "text-slate-400")}>{r.waitingOver7}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.avgDaysToRecommend === null ? "—" : r.avgDaysToRecommend.toFixed(1)}</td>
                     <td className="px-4 py-2 text-right tabular-nums text-slate-500">{r.rejected}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </Section>
+
+      <Section id="profile" icon={<UsersRound className="size-4" />} title="Seller profile — who the approved sellers are"
+        note="From the profile each approved seller completes after approval: promoters (women, SC / ST, specially abled), unit category, type and constitution, and export credentials. Percentages are of completed profiles.">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Profiles completed" value={`${P.completed} / ${P.approved}`} accent="green"
+            hint={P.pending ? `${P.pending} pending with sellers` : "All approved sellers"} href={`${root}/seller-list?profile=pending`} />
+          <StatCard label="Women promoters" value={P.women} accent="violet" hint={`${pc(P.women, P.completed)}% of completed profiles`} href={`${root}/seller-list?promoter=women`} />
+          <StatCard label="SC / ST promoters" value={P.scst} accent="blue" hint={`${pc(P.scst, P.completed)}% · specially abled: ${P.disabled}`} href={`${root}/seller-list?promoter=scst`} />
+          <StatCard label="With IEC number" value={`${P.withIec} / ${P.approved}`} accent="yellow"
+            hint={`${P.certified} hold quality / product certifications${P.expNoIec ? ` · ${P.expNoIec} exporters without IEC` : ""}`} href={`${root}/seller-list?iec=no`} />
+        </div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          <Card><CardHeader title="Category of unit" />
+            <div className="p-5"><BarList data={v.profile.dims.category.map((o) => ({ label: o.label, value: o.n, href: `${root}/seller-list?cat=${o.value}` }))} color="bg-tx-green" empty="No profiles yet." /></div></Card>
+          <Card><CardHeader title="Unit type" />
+            <div className="p-5"><BarList data={v.profile.dims.unitType.map((o) => ({ label: o.label, value: o.n, href: `${root}/seller-list?utype=${o.value}` }))} color="bg-tx-blue" empty="No profiles yet." /></div></Card>
+          <Card><CardHeader title="Social category of promoters" />
+            <div className="p-5"><BarList data={v.profile.dims.social.map((o) => ({ label: o.label, value: o.n }))} color="bg-violet-500" empty="No profiles yet." /></div></Card>
+          <Card><CardHeader title="Gender of promoters" />
+            <div className="p-5"><BarList data={v.profile.dims.gender.filter((o) => o.n).map((o) => ({ label: o.label, value: o.n }))} color="bg-pink-500" empty="No profiles yet." /></div></Card>
+          <Card className="lg:col-span-2"><CardHeader title="Constitution of unit" />
+            <div className="p-5"><BarList data={v.profile.dims.constitution.filter((o) => o.n).map((o) => ({ label: o.label, value: o.n }))} color="bg-tx-yellow" empty="No profiles yet." /></div></Card>
+          <Card className="lg:col-span-3"><CardHeader title="Where approved sellers already export" subtitle={`${P.exporters} approved sellers have given their export history — for reference only, not used in matchmaking. Approved buyers from each country in brackets.`} />
+            <div className="p-5"><BarList data={v.profile.exportMarkets.slice(0, 12).map((m) => ({ label: `${m.country}${m.buyers ? ` (${m.buyers} buyer${m.buyers > 1 ? "s" : ""})` : ""}`, value: m.sellers }))} color="bg-sky-500" empty="No export history yet." /></div></Card>
+        </div>
+        <Card className="mt-6 overflow-hidden">
+          <CardHeader title="District-wise profile of approved sellers" subtitle="Counts of completed profiles; IEC and certifications cover all approved sellers." />
+          <div className="table-scroll relative overflow-x-auto">
+            <table className="w-full min-w-[1000px] text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-2.5 text-left">District</th>
+                  {["Approved", "Profile done", "Pending", "Women", "SC/ST", "Sp. abled", "Micro", "Small", "Medium", "Large", "Mfg.", "Service", "Trade", "IEC", "Certified"].map((h) => (
+                    <th key={h} className="px-2 py-2.5 text-right">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {v.profile.byDistrict.map((r) => (
+                  <tr key={r.district} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 font-medium text-ink">{r.district}</td>
+                    {[r.approved, r.completed].map((n, i) => <td key={i} className="px-2 py-2 text-right tabular-nums">{n}</td>)}
+                    <td className={cn("px-2 py-2 text-right tabular-nums", r.pending ? "font-semibold text-tx-red" : "text-slate-300")}>
+                      {r.pending ? <Link href={`${root}/seller-list?profile=pending&district=${encodeURIComponent(r.district)}`} className="hover:underline">{r.pending}</Link> : 0}
+                    </td>
+                    {[r.women, r.scst, r.disabled, r.micro, r.small, r.medium, r.large, r.mfg, r.service, r.trade, r.withIec, r.certified].map((n, i) => (
+                      <td key={i} className={cn("px-2 py-2 text-right tabular-nums", !n && "text-slate-300")}>{n}</td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -322,6 +379,32 @@ export async function InsightsPage({ user, root }: { user: User; root: string })
             <div className="p-6"><BarList data={d.certifications.filter((c) => c.approved).sort((a, b) => b.approved - a.approved).slice(0, 12).map((c) => ({ label: c.name, value: c.approved }))} color="bg-tx-green" empty="No approved requirements yet." /></div>
           </Card>
         </div>
+        <Card className="mt-6 overflow-hidden">
+          <CardHeader title="Certification readiness — approved demand against approved sellers"
+            subtitle="For each certification approved buyer sectors require: approved sellers holding it, and how many of them work in those sectors. Gaps first." />
+          <div className="table-scroll relative overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr><th className="px-4 py-2.5 text-left">Certification</th><th className="px-3 py-2.5 text-left">Required in sectors</th>
+                  <th className="px-3 py-2.5 text-right">Approved buyer sectors</th><th className="px-3 py-2.5 text-right">Sellers holding it</th>
+                  <th className="px-3 py-2.5 text-right">…in those sectors</th><th className="px-4 py-2.5 text-left">Position</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {v.profile.certReadiness.map((c) => (
+                  <tr key={c.name} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 font-medium text-ink">{c.name}</td>
+                    <td className="max-w-72 px-3 py-2 text-xs text-slate-600">{c.sectors.join(", ")}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{c.buyerSectors}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{c.holders}</td>
+                    <td className={cn("px-3 py-2 text-right font-semibold tabular-nums", !c.inSector && "text-tx-red")}>{c.inSector}</td>
+                    <td className="px-4 py-2">{!c.inSector ? <Badge tone="red">No certified seller</Badge> : c.inSector < c.buyerSectors ? <Badge tone="amber">Thin</Badge> : <Badge tone="green">Covered</Badge>}</td>
+                  </tr>
+                ))}
+                {!v.profile.certReadiness.length && <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-500">No certifications required in approved buyer sectors yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       </Section>
 
       <Section id="rework" icon={<RotateCcw className="size-4" />} title="Rework and rejection"

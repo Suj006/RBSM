@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Handshake } from "lucide-react";
 import type { User } from "@/generated/prisma/client";
 import { getMatchState, publishedMatches } from "@/lib/matchmaking";
-import { fmtDateTime } from "@/lib/format";
+import { fmtDateTime, parseCerts } from "@/lib/format";
 import { Badge, Card, EmptyState, PageHeader, StatCard } from "@/components/ui";
 import { DownloadButtons } from "@/components/staff/download-buttons";
 import { SourceBadges } from "./badges";
@@ -84,7 +84,8 @@ export async function PublishedMapping({ user, staffBase, back }: { user: User; 
                       <tr key={r.id} className="align-top">
                         <td className="w-8 px-4 py-2 text-slate-400 tabular-nums">{r.slot}</td>
                         <td className="px-2 py-2"><Link href={`${staffBase}/sellers/${r.seller.id}`} className="font-medium text-ink hover:text-brand-700">{r.seller.name}</Link>
-                          <div className="text-xs text-slate-500">{r.seller.district}{r.seller.exportExperience ? " · export experience" : ""}</div></td>
+                          <div className="text-xs text-slate-500">{r.seller.district}{r.seller.exportExperience ? " · export experience" : ""}{r.seller.iecNo ? " · IEC" : ""}</div>
+                          {parseCerts(r.seller.certifications).length > 0 && <div className="text-[11px] text-brand-700">{parseCerts(r.seller.certifications).join(", ")}</div>}</td>
                         <td className="px-3 py-2 text-xs text-slate-600">{r.seller.products.map((p) => `${p.sector.name}: ${p.products}`).join(" · ")}</td>
                         {internal && <td className="px-4 py-2 text-right"><SourceBadges source={r.source} prefRank={null} /></td>}
                       </tr>

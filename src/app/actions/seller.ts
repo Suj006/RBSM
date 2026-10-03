@@ -7,7 +7,7 @@ import { hashPassword, requireUser } from "@/lib/auth";
 import { approvedSellerNo, EVENT, sellerUsername } from "@/lib/config";
 import { sendMail, sellerMail } from "@/lib/mail";
 import { nextSeq } from "@/lib/sequence";
-import { sellerSchema, type SellerData } from "@/lib/seller-schema";
+import { sellerProfileSchema, sellerSchema, type SellerData } from "@/lib/seller-schema";
 import { SELLER_APPLICANT_EDITABLE, SELLER_DISTRICT_EDITABLE } from "@/lib/status";
 import { englishText, firstErrors } from "@/lib/text";
 import type { Prisma } from "@/generated/prisma/client";
@@ -19,12 +19,14 @@ const revalidateAll = () => {
   for (const p of ["/district", "/dic", "/fieo", "/admin", "/seller"]) revalidatePath(p, "layout");
 };
 
-const FIELDS = ["name", "district", "taluk", "localBodyType", "localBodyName", "udyamNo", "exportExperience",
+const FIELDS = ["name", "district", "taluk", "localBodyType", "localBodyName", "udyamNo", "exportExperience", "exportedProducts", "iecNo",
   "contactName", "contactMobile", "contactWhatsapp", "contactEmail"] as const;
 
 function readForm(form: FormData) {
   const raw: Record<string, unknown> = Object.fromEntries(FIELDS.map((k) => [k, String(form.get(k) ?? "")]));
   try { raw.products = JSON.parse(String(form.get("products") ?? "[]")); } catch { raw.products = []; }
+  try { raw.certifications = JSON.parse(String(form.get("certifications") ?? "[]")); } catch { raw.certifications = []; }
+  try { raw.exportCountries = JSON.parse(String(form.get("exportCountries") ?? "[]")); } catch { raw.exportCountries = []; }
   if (form.get("sameWhatsapp") === "on") raw.contactWhatsapp = raw.contactMobile;
   return raw;
 }
@@ -253,4 +255,27 @@ export async function sellerDecisionAction(_: FormState, form: FormData): Promis
     to_seller: "returned to the applicant for correction — login details e-mailed",
   };
   return { ok: true, message: `${done.length} seller${done.length === 1 ? "" : "s"} ${verb[decision]}${done.length === 1 ? ` (${done[0].name})` : ""}.` };
+}
+
+// ---------------------------------------------------------------- approved seller: profile
+
+const PROFILE_KEYS = ["promoterGender", "promoterDob", "socialCategory", "speciallyAbled", "block", "constitution", "unitCategory", "unitType", "iecNo", "exportedProducts"] as const;
+
+/** An approved seller completes (or updates) the promoter and unit profile. */
+export async function saveSellerProfileAction(_: FormState, form: FormData): Promise<FormState> {
+  const user = await requireUser("SELLER");
+  const s = await prisma.seller.findUnique({ where: { userId: user.id } });
+  if (!s || s.status !== "APPROVED") return { error: "The profile can be completed once your registration is approved." };
+  const raw: Record<string, unknown> = Object.fromEntries(PROFILE_KEYS.map((k) => [k, String(form.get(k) ?? "")]));
+  try { raw.certifications = JSON.parse(String(form.get("certifications") ?? "[]")); } catch { raw.certifications = []; }
+  try { raw.exportCountries = JSON.parse(String(form.get("exportCountries") ?? "[]")); } catch { raw.exportCountries = []; }
+  const parsed = sellerProfileSchema(s.district, s.exportExperience).safeParse(raw);
+  if (!parsed.success) return { fieldErrors: firstErrors(parsed.error, true), error: "Please correct the highlighted fields." };
+  const first = !s.profileCompletedAt;
+  await prisma.$transaction([
+    prisma.seller.update({ where: { id: s.id }, data: { ...parsed.data, profileCompletedAt: s.profileCompletedAt ?? new Date() } }),
+    prisma.sellerLog.create({ data: { sellerId: s.id, actorId: user.id, actorRole: "SELLER", action: "PROFILE_UPDATED", comment: first ? "Profile completed" : "Profile updated" } }),
+  ]);
+  revalidateAll();
+  redirect(`/seller/profile?done=${first ? "completed" : "updated"}`);
 }

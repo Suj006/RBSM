@@ -2,9 +2,10 @@ import Link from "next/link";
 import { BadgeCheck, Search } from "lucide-react";
 import type { User } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sellerWhere, type SellerFilters } from "@/lib/seller-query";
-import { DISTRICT_NAMES } from "@/lib/config";
-import { fmtDate } from "@/lib/format";
+import { SELLER_FILTER_KEYS, sellerWhere, type SellerFilters } from "@/lib/seller-query";
+import { ProfileFilters } from "./profile-filters";
+import { DISTRICT_NAMES, optLabel, UNIT_CATEGORIES, UNIT_TYPES } from "@/lib/config";
+import { fmtDate, parseCerts } from "@/lib/format";
 import { fmtMobile } from "@/lib/text";
 import { Badge, Button, Card, EmptyState, Input, PageHeader, Select } from "@/components/ui";
 import { DownloadButtons } from "@/components/staff/download-buttons";
@@ -28,8 +29,7 @@ export async function ApprovedSellerListPage({ user, base, sellerBase, filters }
     prisma.seller.count({ where: { status: "APPROVED" } }),
     prisma.sector.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
   ]);
-  const qs = new URLSearchParams(Object.entries({ q: f.q, district: f.district, sector: f.sector, exp: f.exp })
-    .filter(([, v]) => v) as [string, string][]).toString();
+  const qs = new URLSearchParams(SELLER_FILTER_KEYS.filter((k) => k !== "status" && f[k]).map((k) => [k, f[k]!])).toString();
   const { page: _p, ...rest } = f;
   void _p;
 
@@ -39,7 +39,8 @@ export async function ApprovedSellerListPage({ user, base, sellerBase, filters }
         subtitle={`${allApproved} sellers approved by the Directorate${total !== allApproved ? ` · ${total} match the filters` : ""}. Download for complete details of every seller.`}
         actions={<DownloadButtons href={`/api/reports/approved-sellers${qs ? `?${qs}` : ""}`} label="Complete details" compact />} />
       <Card className="overflow-hidden">
-        <form action={base} className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1.2fr_1fr_auto]">
+        <form action={base} className="space-y-3 border-b border-slate-100 p-4">
+         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1.2fr_1fr_auto]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input name="q" defaultValue={f.q} placeholder="Search name, seller no., Udyam, mobile…" className="pl-9" aria-label="Search" />
@@ -58,6 +59,10 @@ export async function ApprovedSellerListPage({ user, base, sellerBase, filters }
             <option value="no">Export experience: No</option>
           </Select>
           <Button type="submit" variant="secondary">Apply</Button>
+         </div>
+         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <ProfileFilters f={f} personal={user.role !== "FIEO"} />
+         </div>
         </form>
         {rows.length ? (
           <div className="table-scroll relative overflow-x-auto">
@@ -77,9 +82,15 @@ export async function ApprovedSellerListPage({ user, base, sellerBase, filters }
                       <Link href={`${sellerBase}/${s.id}`} className="font-semibold text-ink hover:text-brand-700">{s.name}</Link>
                       <div className="whitespace-nowrap font-mono text-[11px] font-bold text-brand-700">{s.approvedNo}</div>
                       <div className="whitespace-nowrap font-mono text-[11px] text-slate-500">{s.udyamNo}</div>
-                      <div className="mt-1">{s.exportExperience ? <Badge tone="green">Export experience</Badge> : <Badge tone="slate">No export experience</Badge>}</div>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {s.exportExperience ? <Badge tone="green">Export experience</Badge> : <Badge tone="slate">No export experience</Badge>}
+                        {s.profileCompletedAt ? <Badge tone="blue">{[optLabel(UNIT_CATEGORIES, s.unitCategory), optLabel(UNIT_TYPES, s.unitType)].filter(Boolean).join(" · ")}</Badge> : <Badge tone="amber">Profile pending</Badge>}
+                      </div>
+                      {s.iecNo && <div className="mt-1 whitespace-nowrap text-[11px] text-slate-500">IEC <span className="font-mono">{s.iecNo}</span></div>}
+                      {parseCerts(s.certifications).length > 0 && <div className="mt-0.5 text-[11px] text-slate-500">{parseCerts(s.certifications).join(", ")}</div>}
+                      {parseCerts(s.exportCountries).length > 0 && <div className="mt-0.5 text-[11px] text-sky-700">Exported to: {parseCerts(s.exportCountries).join(", ")}</div>}
                     </td>
-                    <td className="px-4 py-3 text-xs"><div className="font-medium text-ink">{s.district}</div><div className="text-slate-500">{s.taluk} · {s.localBodyName}</div></td>
+                    <td className="px-4 py-3 text-xs"><div className="font-medium text-ink">{s.district}</div><div className="text-slate-500">{s.taluk}{s.block ? ` · ${s.block} block` : ""} · {s.localBodyName}</div></td>
                     <td className="px-4 py-3 text-xs">
                       <div className="font-medium text-ink">{s.contactName}</div>
                       <div className="whitespace-nowrap text-slate-500">{fmtMobile(s.contactMobile)}{s.contactWhatsapp !== s.contactMobile && <> · WA {fmtMobile(s.contactWhatsapp)}</>}</div>

@@ -4,6 +4,7 @@ import { getTargets } from "@/lib/targets";
 import { DISTRICT_NAMES } from "@/lib/config";
 import { coverage, getMatchState } from "@/lib/matchmaking";
 import type { Insights } from "@/lib/insights";
+import { sellerProfileStats } from "@/lib/seller-profile-stats";
 
 const DAY = 86400000;
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
@@ -18,7 +19,7 @@ export type FunnelStep = { label: string; value: number; href?: string };
 export async function buildDecisionView(ins: Insights, root: string) {
   const now = Date.now();
   const since14 = new Date(now - 14 * DAY);
-  const [targets, buyers, items, sellers, reqReturns, dicReturns, state] = await Promise.all([
+  const [targets, buyers, items, sellers, reqReturns, dicReturns, state, profile] = await Promise.all([
     getTargets(),
     prisma.buyer.findMany({ select: { status: true, basicSubmittedAt: true, basicApprovedAt: true, approvedAt: true, createdAt: true,
       requirement: { select: { items: { select: { status: true } } } } } }),
@@ -28,6 +29,7 @@ export async function buildDecisionView(ins: Insights, root: string) {
     prisma.reviewLog.findMany({ where: { action: "REQ_RETURNED", itemId: { not: null } }, select: { itemId: true }, distinct: ["itemId"] }),
     prisma.reviewLog.findMany({ where: { action: "DIC_RETURNED", itemId: { not: null } }, select: { itemId: true }, distinct: ["itemId"] }),
     getMatchState(),
+    sellerProfileStats(),
   ]);
 
   // Funnels
@@ -107,6 +109,13 @@ export async function buildDecisionView(ins: Insights, root: string) {
     action: "Review mobilisation with these District Industries Centres.", href: "#districts" });
   if (s.short) f.push({ tone: "amber", title: `${s.short} approved buyer${s.short > 1 ? "s" : ""} short of sellers in their sectors`, detail: `Fewer than ${ins.target} approved sellers exist in their approved sectors.`, action: "Mobilise sellers in these sectors before matchmaking.", href: "#readiness" });
   if (s.productGaps) f.push({ tone: "amber", title: `${s.productGaps} requested product${s.productGaps > 1 ? "s have" : " has"} no approved supplier`, detail: "Buyers asked for them; no approved seller offers them yet.", action: "Share the list with district centres.", href: `${root}/products?view=gaps` });
+  if (profile.summary.pending) f.push({ tone: "amber", title: `${profile.summary.pending} approved seller${profile.summary.pending > 1 ? "s have" : " has"} not completed the seller profile`,
+    detail: `${profile.summary.completed} of ${profile.summary.approved} profiles completed. The profile (promoter and unit details) is needed before a seller can send buyer preferences.`,
+    action: "Ask district centres to remind these sellers.", href: `${root}/seller-list?profile=pending` });
+  const certGaps = profile.certReadiness.filter((c) => c.inSector === 0);
+  if (certGaps.length) f.push({ tone: "amber", title: `${certGaps.length} certification${certGaps.length > 1 ? "s" : ""} buyers require ${certGaps.length > 1 ? "are" : "is"} held by no approved seller in the sector`,
+    detail: certGaps.slice(0, 5).map((c) => `${c.name} (${c.buyerSectors} buyer sector${c.buyerSectors > 1 ? "s" : ""})`).join(", ") + (certGaps.length > 5 ? "…" : ""),
+    action: "Plan certification support for MSMEs in these sectors.", href: "#certs" });
   const highRework = rework.filter((r) => r.of && r.count / r.of >= 0.2);
   for (const r of highRework) f.push({ tone: "blue", title: `${pct(r.count, r.of)}% rework: ${r.label.toLowerCase()}`, detail: `${r.count} of ${r.of}.`, action: "Check whether guidance or forms need to be clearer.", href: r.href });
   if (state.version) {
@@ -117,6 +126,6 @@ export async function buildDecisionView(ins: Insights, root: string) {
   }
   if (!f.length) f.push({ tone: "green", title: "No issues stand out", detail: "Targets are on track and nothing is overdue." });
 
-  return { buyerFunnel, sellerFunnel, pace, rework, districts, cov, state, findings: f };
+  return { buyerFunnel, sellerFunnel, pace, rework, districts, cov, state, profile, findings: f };
 }
 export type DecisionView = Awaited<ReturnType<typeof buildDecisionView>>;

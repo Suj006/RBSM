@@ -2,6 +2,8 @@ import "server-only";
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/prisma";
 import { EVENT, LOCAL_BODY_TYPES } from "@/lib/config";
+import { CORPORATIONS, MUNICIPALITIES, TALUKS } from "@/lib/kerala";
+import { COUNTRIES } from "@/lib/countries";
 import { sellerSchema, type SellerData } from "@/lib/seller-schema";
 import { firstErrors } from "@/lib/text";
 import { C } from "@/lib/reports/theme";
@@ -17,7 +19,11 @@ export const COLUMNS = [
   { key: "localBodyName", header: "Local Body Name", width: 22, required: true },
   { key: "udyamNo", header: "Udyam Number", width: 24, required: true },
   { key: "exportExperience", header: "Export Experience", width: 16, required: true },
-  { key: "contactName", header: "Contact Person Name", width: 24, required: true },
+  { key: "exportCountries", header: "Countries Exported To", width: 30, required: false },
+  { key: "exportedProducts", header: "Products Exported", width: 30, required: false },
+  { key: "iecNo", header: "IEC Number", width: 16, required: false },
+  { key: "certifications", header: "Certifications", width: 34, required: false },
+  { key: "contactName", header: "Name of Promoter", width: 24, required: true },
   { key: "contactMobile", header: "Mobile Number", width: 16, required: true },
   { key: "contactWhatsapp", header: "WhatsApp Number", width: 16, required: true },
   { key: "contactEmail", header: "E-mail", width: 28, required: true },
@@ -27,11 +33,19 @@ export const COLUMNS = [
   ]).flat(),
 ] as const;
 
+// Headings of earlier templates that are still accepted.
+const ALIASES: Record<string, string> = { "contact person name": "contactName" };
+
 const argb = (h: string) => `FF${h}`;
 
 /** Upload template: instructions sheet + data sheet with drop-down lists. */
 export async function buildTemplate(district: string) {
-  const sectors = await prisma.sector.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
+  const [sectors, certs] = await Promise.all([
+    prisma.sector.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
+    prisma.certification.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { name: true } }),
+  ]);
+  const taluks = TALUKS[district] ?? [];
+  const urban = [...(MUNICIPALITIES[district] ?? []).map((m) => `${m} (Municipality)`), ...(CORPORATIONS[district] ?? []).map((c) => `${c} (Corporation)`)];
   const wb = new ExcelJS.Workbook();
   wb.creator = `${EVENT.name} ${EVENT.short} Portal`;
 
@@ -45,13 +59,16 @@ export async function buildTemplate(district: string) {
     ["How to fill", { bold: true, size: 12, color: { argb: argb(C.brandDark) } }],
     ["1. Enter one seller per row in the 'Sellers' sheet, starting from row 2. Do not change or move the heading row.", {}],
     ["2. Use English characters only. Names are formatted automatically (e.g. 'abc exports' becomes 'Abc Exports').", {}],
-    ["3. Local Body Type: choose Panchayat, Municipality or Corporation from the drop-down.", {}],
-    ["4. Udyam Number: Kerala Udyam numbers only. Type just the numbers, e.g. 07-0012345 — UDYAM-KL- is added automatically (the full UDYAM-KL-07-0012345 is also accepted).", {}],
-    ["5. Export Experience: choose Yes or No.", {}],
-    ["6. Mobile / WhatsApp: 10-digit Indian mobile numbers (e.g. 9876543210). Repeat the mobile number if WhatsApp is the same.", {}],
-    [`7. Sector 1 and Products 1 are required; up to ${SECTOR_SLOTS} sectors can be given. Pick sectors from the drop-down; separate products with commas.`, {}],
-    [`8. Up to ${MAX_ROWS} rows per file. Upload the file on the portal, check the preview, then click 'Import'. Rows with errors are skipped and listed.`, {}],
-    ["9. After import, review the sellers and recommend them to the Directorate from the Sellers page.", {}],
+    [`3. Taluk: choose from the drop-down (taluks of ${district}).`, {}],
+    ["4. Local Body Type: choose Panchayat, Municipality or Corporation. Local Body Name: for a municipality or corporation use the exact name below; for a panchayat type the grama panchayat name.", {}],
+    [`     Urban local bodies in ${district}: ${urban.join(", ") || "none"}.`, { color: { argb: argb(C.muted) } }],
+    ["5. Udyam Number: Kerala Udyam numbers only. Type just the numbers, e.g. 07-0012345 — UDYAM-KL- is added automatically (the full UDYAM-KL-07-0012345 is also accepted).", {}],
+    ["6. Export Experience: choose Yes or No. When Yes, also fill Countries Exported To (country names separated by semicolons, e.g. United Arab Emirates; Germany), Products Exported, and IEC Number (10 characters, e.g. ABCDE1234F). Export history is for reference only.", {}],
+    ["7. Certifications (optional): quality / product certifications held, separated by semicolons, e.g. ISO 9001 (Quality Management); FSSAI Licence. Names are listed in the 'Certification list' sheet; country names in the 'Country list' sheet.", {}],
+    ["8. Mobile / WhatsApp: 10-digit Indian mobile numbers (e.g. 9876543210). Repeat the mobile number if WhatsApp is the same.", {}],
+    [`9. Sector 1 and Products 1 are required; up to ${SECTOR_SLOTS} sectors can be given. Pick sectors from the drop-down; separate products with commas.`, {}],
+    [`10. Up to ${MAX_ROWS} rows per file. Upload the file on the portal, check the preview, then click 'Import'. Rows with errors are skipped and listed.`, {}],
+    ["11. After import, review the sellers and recommend them to the Directorate from the Sellers page.", {}],
   ];
   lines.forEach(([t, f], i) => {
     const c = ins.getCell(i + 1, 2);
@@ -65,6 +82,7 @@ export async function buildTemplate(district: string) {
   sectors.forEach((s, i) => (lists.getCell(i + 1, 1).value = s.name));
   LOCAL_BODY_TYPES.forEach((t, i) => (lists.getCell(i + 1, 2).value = t.label));
   ["Yes", "No"].forEach((t, i) => (lists.getCell(i + 1, 3).value = t));
+  taluks.forEach((t, i) => (lists.getCell(i + 1, 4).value = t));
 
   const ws = wb.addWorksheet("Sellers", { views: [{ state: "frozen", ySplit: 1 }] });
   ws.columns = COLUMNS.map((c) => ({ key: c.key, width: c.width }));
@@ -85,11 +103,20 @@ export async function buildTemplate(district: string) {
   };
   list("localBodyType", `Lists!$B$1:$B$${LOCAL_BODY_TYPES.length}`);
   list("exportExperience", "Lists!$C$1:$C$2");
+  if (taluks.length) list("taluk", `Lists!$D$1:$D$${taluks.length}`);
   for (let i = 1; i <= SECTOR_SLOTS; i++) list(`sector${i}`, `Lists!$A$1:$A$${sectors.length}`);
   for (const k of ["contactMobile", "contactWhatsapp", "udyamNo"]) {
     const L = col(k);
     for (let r = 2; r <= 200; r++) ws.getCell(`${L}${r}`).numFmt = "@"; // keep as text (no 9.88E+09)
   }
+  const cl = wb.addWorksheet("Certification list");
+  cl.columns = [{ header: "Certification (copy the name exactly)", key: "n", width: 50 }];
+  cl.getRow(1).font = { bold: true };
+  certs.forEach((c) => cl.addRow({ n: c.name }));
+  const co = wb.addWorksheet("Country list");
+  co.columns = [{ header: "Country (copy the name exactly)", key: "n", width: 40 }];
+  co.getRow(1).font = { bold: true };
+  COUNTRIES.forEach((c) => co.addRow({ n: c }));
   wb.views = [{ activeTab: 2, x: 0, y: 0, width: 10000, height: 20000, firstSheet: 0, visibility: "visible" }];
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
@@ -125,6 +152,7 @@ export async function parseUpload(buf: Buffer, district: string): Promise<{ erro
     const h = cellText(cell).replace(/\s*\*$/, "").trim().toLowerCase();
     const c = COLUMNS.find((x) => x.header.toLowerCase() === h);
     if (c) idx[c.key] = n;
+    else if (ALIASES[h]) idx[ALIASES[h]] ??= n;
   });
   const missing = COLUMNS.filter((c) => c.required && !idx[c.key]).map((c) => c.header);
   if (missing.length) return { error: `The heading row is missing: ${missing.join(", ")}. Please use the template from this page.`, rows: [] };
@@ -132,6 +160,15 @@ export async function parseUpload(buf: Buffer, district: string): Promise<{ erro
   const sectors = await prisma.sector.findMany({ where: { isActive: true } });
   const byName = new Map(sectors.map((s) => [s.name.toLowerCase().replace(/\s+/g, " "), s.id]));
   const lbt = new Map(LOCAL_BODY_TYPES.map((t) => [t.label.toLowerCase(), t.value]));
+  // Country names as in the world list (case-insensitive; "UAE", "USA", "UK" accepted).
+  const ALIAS: Record<string, string> = { uae: "United Arab Emirates", usa: "United States", us: "United States", uk: "United Kingdom" };
+  const countryName = (v: string) => ALIAS[v.toLowerCase()] ?? COUNTRIES.find((c) => c.toLowerCase() === v.toLowerCase()) ?? v;
+  const certNames = (await prisma.certification.findMany({ select: { name: true } })).map((c) => c.name);
+  // "ISO 9001" or "iso 9001 (quality management)" → the master name; anything else is kept as typed.
+  const certName = (v: string) => {
+    const k = v.toLowerCase();
+    return certNames.find((n) => n.toLowerCase() === k || n.toLowerCase().startsWith(`${k} (`)) ?? v;
+  };
 
   const rows: RowResult[] = [];
   const last = ws.actualRowCount ? ws.rowCount : 1;
@@ -155,6 +192,10 @@ export async function parseUpload(buf: Buffer, district: string): Promise<{ erro
       localBodyType: lbt.get(get("localBodyType").toLowerCase()) ?? get("localBodyType"),
       localBodyName: get("localBodyName"), udyamNo: get("udyamNo"),
       exportExperience: get("exportExperience").toUpperCase() === "Y" ? "YES" : get("exportExperience").toUpperCase(),
+      iecNo: get("iecNo"),
+      exportCountries: get("exportCountries").split(/[;\n]/).map((x) => x.trim()).filter(Boolean).map(countryName),
+      exportedProducts: get("exportedProducts"),
+      certifications: get("certifications").split(/[;\n]/).map((x) => x.trim()).filter(Boolean).map(certName),
       contactName: get("contactName"), contactMobile: get("contactMobile"),
       contactWhatsapp: get("contactWhatsapp") || get("contactMobile"), contactEmail: get("contactEmail"), products,
     };
@@ -162,7 +203,7 @@ export async function parseUpload(buf: Buffer, district: string): Promise<{ erro
     if (!parsed.success) {
       for (const [k, msg] of Object.entries(firstErrors(parsed.error, true))) {
         if (k === "products" && errors.some((e) => e.startsWith("Sector"))) continue; // already explained
-        const label = FIELD_LABEL[k] ?? (k.startsWith("products") ? "Products" : k);
+        const label = FIELD_LABEL[k] ?? (k.startsWith("products") ? "Products" : FIELD_LABEL[k.split(".")[0]] ?? k);
         errors.push(msg.includes(":") || msg.startsWith("Enter") || msg.startsWith("Select") || msg.startsWith("Only") || msg.startsWith("Add") ? msg : `${label}: ${msg}`);
       }
     }

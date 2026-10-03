@@ -34,8 +34,8 @@ const BUYER_STEPS = [
 ];
 const SELLER_STEPS = [
   { icon: Store, title: "Register your enterprise", body: "Self-register online and get a login to track your application — or register through your District Industries Centre." },
-  { icon: Landmark, title: "Verified by your district centre", body: "Udyam number and contact details are checked locally. If anything needs correcting, you fix it yourself online." },
-  { icon: BadgeCheck, title: "Approved by the Directorate", body: "You receive your RBSM seller number; your login becomes your permanent seller login." },
+  { icon: Landmark, title: "Verified by your district centre", body: "Udyam number, IEC, certifications and contact details are checked locally. If anything needs correcting, you fix it yourself online." },
+  { icon: BadgeCheck, title: "Approved by the Directorate", body: "You receive your RBSM seller number; your login becomes your permanent seller login, where you complete your seller profile." },
   { icon: Handshake, title: "Choose buyers, then meet them", body: "See approved buyers' requirements, name up to five preferred buyers, and get your published meeting list." },
 ];
 const MODULES = [
@@ -55,7 +55,7 @@ const OFFICIAL = [
 const FAQ = [
   { q: "Who can register as a buyer?", a: "International importers, distributors, retailers and sourcing companies looking to buy from Indian MSMEs. Registration is free; FIEO verifies every buyer before the Directorate approves them." },
   { q: "Who can register as a seller?", a: "MSMEs located in Kerala with a valid Udyam registration (UDYAM-KL-…). You can register online yourself or through your District Industries Centre." },
-  { q: "How are buyers and sellers matched?", a: "On the sectors and products each buyer needs and each seller is ready to export. The aim is for every buyer to meet at least ten relevant sellers." },
+  { q: "How are buyers and sellers matched?", a: "On the sectors and products each buyer needs and each seller is ready to export, the certifications buyers ask for, and sellers' own preferences. The aim is for every buyer to meet at least ten relevant sellers." },
   { q: "I registered but have not received my login.", a: "Buyers receive their login immediately after sign-up — please check your spam folder. Sellers who register online also receive a login immediately, to track the application and make corrections; it becomes the permanent seller login on approval." },
   { q: "My district centre asked for a correction. What do I do?", a: "Sign in with the login e-mailed to you, correct the details shown on your application page and click \u201cSave & submit to district centre\u201d. The district centre's comment is shown at the top of the page." },
   { q: "Can I change my requirement after approval?", a: "Yes. Approved buyers can modify a sector or add new sectors at any time; the change goes through the same verification." },
@@ -241,7 +241,7 @@ export default async function Home() {
               steps={BUYER_STEPS} cta={{ href: "/signup", label: "Register as a buyer" }} />
             <Journey id="sellers" tone="green" icon={Store} label="For Kerala MSMEs" title="Meet buyers without leaving Kerala"
               steps={SELLER_STEPS} cta={{ href: "/seller-register", label: "Register as a seller" }}
-              note="Keep your Udyam registration (UDYAM-KL-…) ready. Your District Industries Centre can also register you." />
+              note="Keep your Udyam registration (UDYAM-KL-…), IEC number (if you export) and certificates ready. Your District Industries Centre can also register you." />
           </div>
         </div>
       </section>

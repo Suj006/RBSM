@@ -161,6 +161,7 @@ export async function submitPreferencesAction(_: FormState, form: FormData): Pro
   if (!state.buyersVisible) return { error: "The buyer directory is not open yet." };
   if (state.prefsFrozen) return { error: "The preference window has been closed by the Directorate." };
   if (seller.prefSubmittedAt) return { error: "You have already submitted your preferences." };
+  if (!seller.profileCompletedAt) return { error: "Please complete your seller profile (My profile) before sending preferences." };
   if (form.get("ack") !== "on") return { error: "Please tick the box to confirm that you understand the preferences are final once submitted." };
   const ids = form.getAll("buyerIds").map(String).filter(Boolean);
   if (!ids.length) return { error: "Choose at least one buyer." };

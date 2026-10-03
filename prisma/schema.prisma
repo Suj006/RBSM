@@ -291,6 +291,7 @@ enum SellerAction {
   RETURNED
   APPROVED
   REJECTED
+  PROFILE_UPDATED // approved seller completed / updated the profile
 }
 
 model Seller {
@@ -305,6 +306,22 @@ model Seller {
   localBodyName    String
   udyamNo          String        @unique // UDYAM-KL-00-0000000
   exportExperience Boolean
+  // Export history (reference only — not used in matchmaking): countries already exported to and the products.
+  exportCountries  String        @default("[]") // JSON array of country names
+  exportedProducts String?
+  iecNo            String? // Importer-Exporter Code (10 characters); required when the seller has export experience
+  certifications   String        @default("[]") // JSON array: quality / product certifications held
+
+  // Profile completed by the seller after approval (option values in src/lib/config.ts).
+  promoterGender     String?
+  promoterDob        DateTime?
+  socialCategory     String?
+  speciallyAbled     Boolean?
+  block              String?
+  constitution       String?
+  unitCategory       String?
+  unitType           String?
+  profileCompletedAt DateTime?
 
   contactName     String
   contactMobile   String // 10-digit Indian mobile number

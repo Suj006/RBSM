@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getMatchState, publishedMatches } from "@/lib/matchmaking";
 import { fmtDateTime, parseCerts } from "@/lib/format";
 import { Badge, Card, CardHeader } from "@/components/ui";
+import { optLabel, UNIT_CATEGORIES, UNIT_TYPES } from "@/lib/config";
 
 /** A seller's published buyer meetings (nothing is shown before the Directorate publishes). */
 export async function SellerMeetings({ sellerId }: { sellerId: string }) {
@@ -68,9 +69,18 @@ export async function BuyerMatches({ buyerId, full }: { buyerId: string; full?: 
             <li key={r.id} className="px-5 py-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div className="font-semibold text-ink"><span className="mr-2 text-slate-400 tabular-nums">{r.slot}.</span>{r.seller.name}</div>
-                <span className="text-xs text-slate-500">{r.seller.district}, Kerala{r.seller.exportExperience ? " · export experience" : ""}</span>
+                <span className="text-xs text-slate-500">
+                  {[`${r.seller.district}, Kerala`, optLabel(UNIT_CATEGORIES, r.seller.unitCategory) && `${optLabel(UNIT_CATEGORIES, r.seller.unitCategory)} enterprise`,
+                    optLabel(UNIT_TYPES, r.seller.unitType), r.seller.exportExperience && "export experience", r.seller.iecNo && "IEC holder"].filter(Boolean).join(" · ")}
+                </span>
               </div>
               <div className="mt-1 text-sm text-slate-600">{r.seller.products.map((p) => `${p.sector.name}: ${p.products}`).join(" · ")}</div>
+              {parseCerts(r.seller.exportCountries).length > 0 && (
+                <div className="mt-1 text-xs text-slate-500">Has exported to {parseCerts(r.seller.exportCountries).join(", ")}</div>
+              )}
+              {parseCerts(r.seller.certifications).length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">{parseCerts(r.seller.certifications).map((c) => <Badge key={c} tone="green">{c}</Badge>)}</div>
+              )}
               {full && <div className="text-xs text-slate-500">Promoter: {r.seller.contactName}</div>}
             </li>
           ))}

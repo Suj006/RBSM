@@ -52,6 +52,7 @@ export type PoolBuyer = {
 };
 export type PoolSeller = {
   id: string; name: string; approvedNo: string | null; district: string; exportExperience: boolean;
+  iecNo: string | null; certifications: string[];
   sectors: { id: string; name: string; products: string; keys: string[] }[];
 };
 
@@ -70,7 +71,7 @@ export async function loadPool() {
     prisma.seller.findMany({
       where: { status: "APPROVED" },
       orderBy: { approvedSeq: "asc" },
-      select: { id: true, name: true, approvedNo: true, district: true, exportExperience: true,
+      select: { id: true, name: true, approvedNo: true, district: true, exportExperience: true, iecNo: true, certifications: true,
         products: { orderBy: { sortOrder: "asc" }, select: { products: true, sector: { select: { id: true, name: true } } } } },
     }),
     prisma.sellerPreference.findMany({ select: { sellerId: true, buyerId: true, rank: true } }),
@@ -85,6 +86,7 @@ export async function loadPool() {
   }));
   const ps: PoolSeller[] = sellers.map((s) => ({
     id: s.id, name: s.name, approvedNo: s.approvedNo, district: s.district, exportExperience: s.exportExperience,
+    iecNo: s.iecNo, certifications: parseCerts(s.certifications),
     sectors: s.products.map((p) => ({ id: p.sector.id, name: p.sector.name, products: p.products, keys: productKeys(p.products) })),
   }));
   const prefRank = new Map(prefs.map((p) => [`${p.buyerId}|${p.sellerId}`, p.rank]));
@@ -94,24 +96,29 @@ export type Pool = Awaited<ReturnType<typeof loadPool>>;
 
 /* ------------------------------------------------------------------ scoring */
 
-export type Fit = { score: number; sectors: string[]; products: string[]; prefRank: number | null };
+export type Fit = { score: number; sectors: string[]; products: string[]; certs: string[]; prefRank: number | null };
 
 /**
  * How well a seller fits a buyer (0 = not a candidate):
- * seller preference 60 (rank 1) … 40 (rank 5); common sector 20; each matching product 10 (max 30); export experience 5.
+ * seller preference 60 (rank 1) … 40 (rank 5); common sector 20; each matching product 10 (max 30);
+ * each certification the buyer requires in a common sector that the seller holds 5 (max 10); export experience 5.
  */
 export function fit(b: PoolBuyer, s: PoolSeller, prefRank: number | null): Fit {
   const sectors: string[] = [];
   const products: string[] = [];
+  const certs: string[] = [];
+  const held = new Set(s.certifications.map((c) => c.toLowerCase()));
   for (const bs of b.sectors) {
     const ss = s.sectors.find((x) => x.id === bs.id);
     if (!ss) continue;
     sectors.push(bs.name);
     for (const k of bs.keys) if (ss.keys.includes(k) && !products.includes(k)) products.push(k);
+    for (const c of bs.certifications) if (held.has(c.toLowerCase()) && !certs.includes(c)) certs.push(c);
   }
-  if (!sectors.length && !prefRank) return { score: 0, sectors, products, prefRank };
-  const score = (prefRank ? 60 - (prefRank - 1) * 5 : 0) + (sectors.length ? 20 : 0) + Math.min(30, products.length * 10) + (s.exportExperience ? 5 : 0);
-  return { score, sectors, products, prefRank };
+  if (!sectors.length && !prefRank) return { score: 0, sectors, products, certs, prefRank };
+  const score = (prefRank ? 60 - (prefRank - 1) * 5 : 0) + (sectors.length ? 20 : 0) + Math.min(30, products.length * 10)
+    + Math.min(10, certs.length * 5) + (s.exportExperience ? 5 : 0);
+  return { score, sectors, products, certs, prefRank };
 }
 
 /** Buyers one seller may meet: the Directorate's setting, or enough to give every buyer the target (rounded up). */
@@ -224,6 +231,9 @@ export async function matchChecks(board?: Board): Promise<Issue[]> {
         detail: `${m.seller.name} offers ${m.seller.sectors.map((s) => s.name).join(", ") || "no sector"}; the buyer's approved sectors are ${r.buyer.sectors.map((s) => s.name).join(", ")}.` });
       else if (!m.fit.products.length) issues.push({ severity: "low", kind: "No matching product", buyerId: r.buyer.id, buyer: r.buyer.name, seller: m.seller.name,
         detail: `Same sector (${m.fit.sectors.join(", ")}) but none of the products named by the buyer.` });
+      const required = [...new Set(r.buyer.sectors.filter((s) => m.fit.sectors.includes(s.name)).flatMap((s) => s.certifications))];
+      if (m.fit.sectors.length && required.length && !m.fit.certs.length) issues.push({ severity: "low", kind: "Required certification not held", buyerId: r.buyer.id, buyer: r.buyer.name, seller: m.seller.name,
+        detail: `The buyer asks for ${required.slice(0, 4).join(", ")}${required.length > 4 ? "…" : ""}; the seller has listed none of these.` });
     }
     if (r.matches.length < bd.pool.target) issues.push({ severity: "medium", kind: "Below target", buyerId: r.buyer.id, buyer: r.buyer.name,
       detail: `${r.matches.length} of ${bd.pool.target} sellers mapped.` });
@@ -287,6 +297,7 @@ export async function publishedMatches(where: { buyerId?: string; sellerId?: str
       },
       seller: {
         select: { id: true, name: true, approvedNo: true, district: true, exportExperience: true, contactName: true,
+          iecNo: true, certifications: true, unitCategory: true, unitType: true, exportCountries: true,
           products: { orderBy: { sortOrder: "asc" }, select: { products: true, sector: { select: { name: true } } } } },
       },
     },

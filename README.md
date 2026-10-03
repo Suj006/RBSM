@@ -44,9 +44,24 @@ with the district or returned to the applicant) the form to correct and resubmit
 it opens the full seller dashboard. A district can also return a district-entered seller to the applicant;
 a login is then created and e-mailed.
 
-Seller details: name, district (14 Kerala districts), taluk, local body type (Panchayat / Municipality /
-Corporation) and name, Udyam number (Kerala only, UDYAM-KL-00-0000000, unique — users type only the digits), export experience,
-sectors with products ready to export, and promoter contact (name, mobile, WhatsApp, e-mail).
+Seller details at registration: name, district (14 Kerala districts), taluk (drop-down by district), local body type
+(Panchayat / Municipality / Corporation) and name (municipalities and corporations from a drop-down; grama panchayat typed in),
+Udyam number (Kerala only, UDYAM-KL-00-0000000, unique — users type only the digits), export experience — when Yes,
+**countries exported to** (several, from the world list) and **products exported** (for reference only; not used in
+matchmaking) — **IEC number**
+(10 characters; required when the seller has export experience), **quality / product certifications** (from the certification
+master, plus others), sectors with products ready to export, and promoter details (name of the promoter, mobile, WhatsApp, e-mail).
+The Kerala masters (taluks, block panchayats, municipalities, corporations) are in `src/lib/kerala.ts`.
+
+**Seller profile (after approval).** An approved seller completes **My profile**: gender and date of birth of the promoter,
+social category (General / OBC / SC / ST), specially abled, block, constitution of the unit (Proprietary … Others), category
+(Micro / Small / Medium / Large) and unit type (Manufacturing / Service / Trade); IEC and certifications can be updated there.
+The dashboard asks for it until done, and buyer preferences can be sent only after it. Staff see "Profile pending" on
+lists and dashboards, can filter by profile, category, unit type, promoter (women, SC / ST, specially abled), IEC and
+certifications, and download the **Seller Profile Analysis** report (including the countries sellers already export to). Personal promoter details (gender, date of birth, social
+category, specially abled) are shown to the Directorate, Admin and district centres only — not to FIEO or buyers.
+Matchmaking adds 5 fit points for each certification the buyer requires that the seller holds (max 10), and flags pairs where the
+seller holds none of the required certifications; buyers see their matched sellers' certifications, category and IEC status.
 FIEO sees sellers only after Directorate approval. Seller products use the same sector master as buyer
 requirements, ready for buyer–seller matchmaking. Targets (approved sellers overall and per district,
 approved buyers, sellers per buyer — default 600 / 60 / 10) are set by the Directorate on the **Targets** page.
@@ -88,6 +103,9 @@ A decision page built from live data, with an Excel / PDF report of every sectio
 - **Progress to targets and pace** — approvals per week over the last 14 days and weeks to target
 - **District performance** — districts ranked by approved sellers against target, files waiting over a
   week, average days to recommend, rejections
+- **Seller profile** — women, SC / ST and specially abled promoters, unit category, type and constitution, IEC and
+  certifications, district-wise, with profiles still pending; **certification readiness** — each certification approved
+  buyers require against approved sellers holding it in those sectors
 - Matchmaking readiness per approved buyer, sector supply gaps, district × sector supply, markets × sectors
   demand, certifications, **rework and rejection** rates, turnaround and ageing, and the matchmaking position
 

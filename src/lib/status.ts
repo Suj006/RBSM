@@ -100,6 +100,7 @@ export const SELLER_ACTION_LABEL: Record<SellerAction, string> = {
   RETURNED: "Returned to district",
   APPROVED: "Approved — login allotted",
   REJECTED: "Rejected",
+  PROFILE_UPDATED: "Seller profile updated by the seller",
 };
 
 /** Seller records each role may see. FIEO sees sellers only once approved. */

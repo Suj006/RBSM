@@ -6,7 +6,8 @@ import bcrypt from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
 import type { ItemStatus, BuyerStatus } from "../src/generated/prisma/enums";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { approvedBuyerNo, buyerRegNo, buyerUsername } from "../src/lib/config";
+import { approvedBuyerNo, buyerRegNo, buyerUsername, CONSTITUTIONS, GENDERS, SOCIAL_CATEGORIES, UNIT_CATEGORIES, UNIT_TYPES } from "../src/lib/config";
+import { BLOCKS, CORPORATIONS, MUNICIPALITIES } from "../src/lib/kerala";
 
 const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? "file:./dev.db" }) });
 
@@ -171,6 +172,23 @@ async function main() {
     Malappuram: ["Tirur", "Perinthalmanna"], Kozhikode: ["Vadakara", "Koyilandy"], Wayanad: ["Mananthavady", "Vythiri"],
     Kannur: ["Thalassery", "Taliparamba"], Kasaragod: ["Hosdurg", "Manjeshwaram"],
   };
+  // Urban local bodies come from the master; a district without a corporation uses a municipality.
+  const localBody = (district: string, taluk: string, k: number) => {
+    const type = (["PANCHAYAT", "MUNICIPALITY", "CORPORATION"] as const)[k % 3];
+    const corp = CORPORATIONS[district] ?? [], muni = MUNICIPALITIES[district] ?? [];
+    if (type === "CORPORATION" && corp.length) return { localBodyType: type, localBodyName: corp[0] };
+    if (type !== "PANCHAYAT" && muni.length) return { localBodyType: "MUNICIPALITY" as const, localBodyName: muni[k % muni.length] };
+    return { localBodyType: "PANCHAYAT" as const, localBodyName: `${taluk} North` };
+  };
+  const EXPORT_MARKETS: string[][] = [
+    ["United Arab Emirates", "Saudi Arabia"], ["Germany", "Netherlands", "France"], ["United States"], ["United Kingdom", "Ireland"],
+    ["Qatar", "Oman", "Kuwait"], ["Japan", "Singapore"], ["Australia"], ["Canada", "United States"], ["Sri Lanka", "Maldives"],
+  ];
+  const EXPORTED = ["Black pepper, Cardamom", "Coir mats, Coir yarn", "Cashew kernels", "Handloom sarees", "Herbal oils", "Frozen shrimp", "Rubber mats", "Tea"];
+  const SELLER_CERTS: string[][] = [
+    ["FSSAI Licence", "HACCP"], ["ISO 9001 (Quality Management)"], [], ["ISO 22000 (Food Safety)", "BRCGS"], ["Halal", "FSSAI Licence"],
+    ["GOTS (Organic Textile)"], [], ["USDA Organic", "NPOP / India Organic"], ["ISO 9001 (Quality Management)", "HACCP"], ["Fairtrade"],
+  ];
   const FIRMS = ["Spices", "Coir Works", "Cashew Exports", "Agro Foods", "Handlooms", "Ayurveda", "Rubber Products", "Bamboo Crafts", "Tea Estates", "Seafoods", "Furniture", "Herbals"];
   const PEOPLE = ["Anil Kumar", "Suresh Nair", "Lakshmi Menon", "Joseph Thomas", "Fathima Beevi", "Rajesh Pillai", "Mini Joseph", "Abdul Rahman", "Deepa Varghese", "Vinod Krishnan"];
   const STATES: ("WITH_DISTRICT" | "RECOMMENDED" | "RETURNED" | "APPROVED" | "REJECTED")[] = ["APPROVED", "APPROVED", "RECOMMENDED", "WITH_DISTRICT", "APPROVED", "RETURNED", "WITH_DISTRICT", "APPROVED", "RECOMMENDED", "REJECTED"];
@@ -202,7 +220,11 @@ async function main() {
       const seller = await prisma.seller.create({
         data: {
           seq: sSeq, regNo: `RBSM-S-${String(sSeq).padStart(3, "0")}`, name: firm, district, taluk: taluks[k % 2],
-          localBodyType: (["PANCHAYAT", "MUNICIPALITY", "CORPORATION"] as const)[k % 3], localBodyName: `${taluks[k % 2]}`,
+          ...localBody(district, taluks[k % 2], k),
+          iecNo: k % 3 !== 0 ? `${"ABCDEFGHJK"[sSeq % 10]}${"LMNPQRSTUV"[(sSeq * 3) % 10]}${"WXYZABCDEF"[(sSeq * 7) % 10]}PK${String(1000 + sSeq * 13).slice(-4)}${"QRSTUVWXYZ"[sSeq % 10]}` : (k % 6 === 3 ? `${"ABCDEFGHJK"[sSeq % 10]}MNPS${String(2000 + sSeq).slice(-4)}L` : null),
+          certifications: JSON.stringify(SELLER_CERTS[sSeq % SELLER_CERTS.length]),
+          exportCountries: JSON.stringify(k % 3 !== 0 ? EXPORT_MARKETS[sSeq % EXPORT_MARKETS.length] : []),
+          exportedProducts: k % 3 !== 0 ? EXPORTED[sSeq % EXPORTED.length] : null,
           udyamNo: `UDYAM-KL-${String(di + 1).padStart(2, "0")}-${String(1000000 + sSeq * 37).slice(0, 7)}`,
           exportExperience: k % 3 !== 0, contactName: person, contactMobile: mobile, contactWhatsapp: mobile,
           contactEmail: `${person.split(" ")[0].toLowerCase()}${sSeq}@msme.example`, source, createdById: source === "SELF" ? null : du?.id,
@@ -237,10 +259,29 @@ async function main() {
     where: { status: "APPROVED" }, orderBy: { approvedSeq: "asc" },
     select: { id: true, requirement: { select: { items: { where: { status: "APPROVED" }, select: { sectorId: true } } } } },
   });
-  const approvedSellers = await prisma.seller.findMany({ where: { status: "APPROVED" }, orderBy: { approvedSeq: "asc" }, select: { id: true, products: { select: { sectorId: true } } } });
+  const approvedSellers = await prisma.seller.findMany({ where: { status: "APPROVED" }, orderBy: { approvedSeq: "asc" },
+    select: { id: true, district: true, approvedAt: true, userId: true, products: { select: { sectorId: true } } } });
+  // Seller profiles: completed by most approved sellers (every fourth is still pending).
+  let profiles = 0;
+  for (const [k, sl] of approvedSellers.entries()) {
+    if (k % 4 === 3) continue;
+    const blocks = BLOCKS[sl.district] ?? [];
+    const at = new Date((sl.approvedAt ?? new Date()).getTime() + (1 + (k % 3)) * day);
+    await prisma.seller.update({ where: { id: sl.id }, data: {
+      promoterGender: [GENDERS[0], GENDERS[1], GENDERS[0], GENDERS[1], GENDERS[0], GENDERS[4]][k % 6].value,
+      promoterDob: new Date(Date.UTC(1965 + (k * 7) % 30, (k * 5) % 12, 1 + (k * 11) % 27)),
+      socialCategory: SOCIAL_CATEGORIES[[0, 1, 1, 0, 2, 1, 0, 3][k % 8]].value, speciallyAbled: k % 11 === 5,
+      block: blocks[k % blocks.length], constitution: CONSTITUTIONS[[0, 0, 2, 1, 4, 0, 5, 6, 2][k % 9]].value,
+      unitCategory: UNIT_CATEGORIES[[0, 0, 1, 0, 1, 2, 0, 1][k % 8]].value, unitType: UNIT_TYPES[[0, 0, 2, 0, 1, 0][k % 6]].value,
+      profileCompletedAt: at > new Date() ? new Date() : at,
+    } });
+    await prisma.sellerLog.create({ data: { sellerId: sl.id, actorId: sl.userId, actorRole: "SELLER", action: "PROFILE_UPDATED", comment: "Profile completed", createdAt: at > new Date() ? new Date() : at } });
+    profiles++;
+  }
   let prefSellers = 0;
   for (const [k, sl] of approvedSellers.entries()) {
-    if (k % 2) continue;
+    // Only sellers with a completed profile can give preferences.
+    if (k % 2 || k % 4 === 3) continue;
     const mine = new Set(sl.products.map((p) => p.sectorId));
     const relevant = approvedBuyers.filter((b) => b.requirement?.items.some((i) => mine.has(i.sectorId)));
     const picks = [...relevant, ...approvedBuyers.filter((b) => !relevant.includes(b))].slice(0, 1 + (k % 5)).map((b) => b.id);
@@ -250,7 +291,7 @@ async function main() {
     prefSellers++;
   }
 
-  console.log(`Loaded ${BUYERS.length} demo buyers (${approvedSeq} approved) and ${sSeq} demo sellers (${sApproved} approved; ${prefSellers} with buyer preferences). Demo password: pass@123`);
+  console.log(`Loaded ${BUYERS.length} demo buyers (${approvedSeq} approved) and ${sSeq} demo sellers (${sApproved} approved; ${profiles} profiles completed; ${prefSellers} with buyer preferences). Demo password: pass@123`);
 }
 
 main().finally(() => prisma.$disconnect());

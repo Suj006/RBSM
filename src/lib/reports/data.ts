@@ -6,16 +6,17 @@ import { buyerWhere, itemScope, scopeFor, type BuyerFilters } from "@/lib/buyer-
 import { ACTION_LABEL, ALL_ITEM_STATUSES, ALL_STATUSES, ITEM_META, ROLE_LABEL, STATUS_META } from "@/lib/status";
 import { parseCerts } from "@/lib/format";
 import { EVENT } from "@/lib/config";
-import type { Kpi, Report, Row, Table } from "./types";
-import { sellerScope, sellerWhere, type SellerFilters } from "@/lib/seller-query";
+import type { Column, Kpi, Report, Row, Table } from "./types";
+import { describeProfileFilters, sellerScope, sellerWhere, type SellerFilters } from "@/lib/seller-query";
 import { ALL_SELLER_STATUSES, SELLER_ACTION_LABEL, SELLER_META } from "@/lib/status";
 import type { SellerStatus } from "@/generated/prisma/enums";
-import { DISTRICT_NAMES, localBodyLabel } from "@/lib/config";
+import { CONSTITUTIONS, DISTRICT_NAMES, GENDERS, localBodyLabel, optLabel, SOCIAL_CATEGORIES, UNIT_CATEGORIES, UNIT_TYPES } from "@/lib/config";
 import { fmtMobile } from "@/lib/text";
 import { getTargets } from "@/lib/targets";
 import { productDemand, sectorDemandSummary } from "@/lib/demand";
 import { AGE_BUCKETS, buildInsights } from "@/lib/insights";
 import { buildDecisionView } from "@/lib/decision";
+import { sellerProfileStats } from "@/lib/seller-profile-stats";
 import { coverage, fit, getMatchState, loadPool, preferenceOutcomes, SOURCE_LABEL } from "@/lib/matchmaking";
 
 export const REPORTS = {
@@ -33,15 +34,19 @@ export const REPORTS = {
   },
   "approved-sellers": {
     title: "RBSM Approved Seller List",
-    description: "Complete details of sellers approved by the Directorate: Udyam number, location, promoter contact, export experience, and every sector with the products ready to export.",
+    description: "Complete details of sellers approved by the Directorate: Udyam and IEC numbers, location, promoter contact, export experience, certifications, seller profile, and every sector with the products ready to export.",
   },
   "seller-register": {
     title: "Seller Registration Register",
-    description: "Kerala MSME sellers with Udyam number, location, contact details, sectors and products ready to export, and approval status.",
+    description: "Kerala MSME sellers with Udyam and IEC numbers, location, promoter details, certifications, sectors and products ready to export, and approval status.",
   },
   "seller-district-summary": {
     title: "District-wise Seller Summary",
     description: "Seller registrations and approvals by district, against the targets set by the Directorate.",
+  },
+  "seller-profile-analysis": {
+    title: "Seller Profile Analysis",
+    description: "Approved sellers by promoter (women, SC / ST, specially abled), unit category, type and constitution, IEC, certifications and export markets — district-wise, with profiles still pending.",
   },
   "sector-demand": {
     title: "Sector Demand Report",
@@ -53,7 +58,7 @@ export const REPORTS = {
   },
   "insights": {
     title: "Directorate Insights",
-    description: "Key findings with recommended actions, registration funnels, pace to targets, district performance, rework, matchmaking readiness, supply gaps, district × sector supply, markets × sectors demand, certifications required, turnaround and ageing.",
+    description: "Key findings with recommended actions, registration funnels, pace to targets, district performance, rework, seller profile, certification readiness, matchmaking readiness, supply gaps, district × sector supply, markets × sectors demand, certifications required, turnaround and ageing.",
   },
   "match-list": {
     title: "Buyer–Seller Mapping",
@@ -76,8 +81,9 @@ export const REPORTS = {
 export type ReportId = keyof typeof REPORTS;
 /** Reports a role may open (district offices: seller reports only). */
 export const reportsFor = (role: User["role"]): ReportId[] =>
-  role === "DISTRICT" ? ["approved-sellers", "seller-register", "seller-district-summary", "match-list"]
-  : role === "FIEO" ? (Object.keys(REPORTS) as ReportId[]).filter((id) => !["insights", "seller-preferences", "match-coverage"].includes(id))
+  role === "DISTRICT" ? ["approved-sellers", "seller-register", "seller-district-summary", "seller-profile-analysis", "match-list"]
+  // Promoter details (gender, social category…) are internal to the Directorate and districts.
+  : role === "FIEO" ? (Object.keys(REPORTS) as ReportId[]).filter((id) => !["insights", "seller-preferences", "match-coverage", "seller-profile-analysis"].includes(id))
   : role === "DIC" || role === "ADMIN" ? (Object.keys(REPORTS) as ReportId[])
   : [];
 export const isReportId = (s: string): s is ReportId => s in REPORTS;
@@ -296,7 +302,39 @@ async function approvedBuyers(user: User, f: BuyerFilters): Promise<Report> {
 
 // ---------------------------------------------------------------- approved sellers (complete details)
 
+/** Promoter details (gender, date of birth, social category, specially abled) are internal: not for FIEO. */
+const PERSONAL_ROLES = new Set(["DIC", "ADMIN", "DISTRICT"]);
+
+/** Excel-only profile columns appended to seller lists. */
+function profileColumns(personal: boolean): Column[] {
+  return [
+    { key: "block", header: "Block", width: 14, excelOnly: true },
+    ...(personal ? [
+      { key: "gender", header: "Promoter Gender", width: 12, excelOnly: true },
+      { key: "dob", header: "Promoter Date of Birth", width: 13, kind: "date" as const, excelOnly: true },
+      { key: "social", header: "Social Category", width: 11, excelOnly: true },
+      { key: "abled", header: "Specially Abled", width: 10, excelOnly: true },
+    ] : []),
+    { key: "constitution", header: "Constitution of Unit", width: 22, excelOnly: true },
+    { key: "category", header: "Category of Unit", width: 11, excelOnly: true },
+    { key: "unitType", header: "Unit Type", width: 13, excelOnly: true },
+    { key: "profile", header: "Profile Completed On", width: 14, kind: "date", excelOnly: true },
+  ];
+}
+type ProfileSrc = { block: string | null; promoterGender: string | null; promoterDob: Date | null; socialCategory: string | null;
+  speciallyAbled: boolean | null; constitution: string | null; unitCategory: string | null; unitType: string | null; profileCompletedAt: Date | null };
+function profileRow(x: ProfileSrc, personal: boolean): Row {
+  return {
+    block: x.block ?? "",
+    ...(personal ? { gender: optLabel(GENDERS, x.promoterGender), dob: x.promoterDob, social: optLabel(SOCIAL_CATEGORIES, x.socialCategory),
+      abled: x.speciallyAbled === null ? "" : x.speciallyAbled ? "Yes" : "No" } : {}),
+    constitution: optLabel(CONSTITUTIONS, x.constitution), category: optLabel(UNIT_CATEGORIES, x.unitCategory), unitType: optLabel(UNIT_TYPES, x.unitType),
+    profile: x.profileCompletedAt,
+  };
+}
+
 async function approvedSellers(user: User, f: SellerFilters): Promise<Report> {
+  const personal = PERSONAL_ROLES.has(user.role);
   const sellers = await prisma.seller.findMany({
     where: { AND: [sellerWhere(user, { ...f, status: undefined }), { status: "APPROVED" }] },
     orderBy: { approvedSeq: "asc" },
@@ -309,7 +347,7 @@ async function approvedSellers(user: User, f: SellerFilters): Promise<Report> {
       { label: "Approved sellers", value: sellers.length, tone: "green" },
       { label: "With export experience", value: sellers.filter((x) => x.exportExperience).length, tone: "blue" },
       { label: "Sectors covered", value: new Set(sellers.flatMap((x) => x.products.map((p) => p.sectorId))).size, tone: "violet" },
-      { label: "Districts", value: new Set(sellers.map((x) => x.district)).size, tone: "yellow" },
+      { label: "Profiles completed", value: `${sellers.filter((x) => x.profileCompletedAt).length} / ${sellers.length}`, tone: "yellow" },
     ],
     tables: [
       {
@@ -325,18 +363,56 @@ async function approvedSellers(user: User, f: SellerFilters): Promise<Report> {
           { key: "localBody", header: "Local Body", width: 20 },
           { key: "udyamNo", header: "Udyam Number", width: 21, kind: "mono" },
           { key: "exp", header: "Export Exp.", width: 9, align: "center" },
-          { key: "contact", header: "Promoter / Contact", width: 18 },
+          { key: "contact", header: "Name of Promoter", width: 18 },
           { key: "mobile", header: "Mobile", width: 15 },
           { key: "whatsapp", header: "WhatsApp", width: 15, excelOnly: true },
           { key: "email", header: "E-mail", width: 26 },
+          { key: "iecNo", header: "IEC Number", width: 13, kind: "mono", excelOnly: true },
+          { key: "certs", header: "Certifications", width: 30, excelOnly: true },
+          { key: "expCountries", header: "Countries Exported To", width: 30, excelOnly: true },
+          { key: "expProducts", header: "Products Exported", width: 30, excelOnly: true },
           { key: "sectors", header: "Sectors & Products Ready to Export", width: 44 },
           { key: "approvedAt", header: "Approved On", width: 14, kind: "date" },
+          ...profileColumns(personal),
         ],
         rows: sellers.map((x, i) => ({
           sl: i + 1, approvedNo: x.approvedNo, regNo: x.regNo, name: x.name, district: x.district, taluk: x.taluk,
           localBody: `${x.localBodyName} ${localBodyLabel(x.localBodyType)}`, udyamNo: x.udyamNo, exp: x.exportExperience ? "Yes" : "No",
           contact: x.contactName, mobile: fmtMobile(x.contactMobile), whatsapp: fmtMobile(x.contactWhatsapp), email: x.contactEmail,
+          iecNo: x.iecNo ?? "", certs: parseCerts(x.certifications).join(", "),
+          expCountries: parseCerts(x.exportCountries).join(", "), expProducts: x.exportedProducts ?? "",
           sectors: x.products.map((p) => `${p.sector.name}: ${p.products}`).join("\n"), approvedAt: x.approvedAt,
+          ...profileRow(x, personal),
+        })),
+      },
+      {
+        name: "Profile & Credentials",
+        heading: "3. Seller profile and export credentials",
+        columns: [
+          { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+          { key: "approvedNo", header: "Seller No.", width: 19, kind: "mono" },
+          { key: "name", header: "Name of Seller", width: 24 },
+          { key: "district", header: "District", width: 14 },
+          { key: "block", header: "Block", width: 14 },
+          ...(personal ? [
+            { key: "gender", header: "Promoter Gender", width: 11 },
+            { key: "social", header: "Social Category", width: 10 },
+            { key: "abled", header: "Specially Abled", width: 9, align: "center" as const },
+          ] : []),
+          { key: "constitution", header: "Constitution", width: 18 },
+          { key: "category", header: "Category", width: 9 },
+          { key: "unitType", header: "Unit Type", width: 13 },
+          { key: "iecNo", header: "IEC Number", width: 13, kind: "mono" },
+          { key: "certs", header: "Certifications", width: 30 },
+          { key: "expCountries", header: "Exported To", width: 26 },
+          { key: "profile", header: "Profile", width: 11 },
+        ],
+        rows: sellers.map((x, i) => ({
+          sl: i + 1, approvedNo: x.approvedNo, name: x.name, district: x.district, block: x.block ?? "",
+          gender: optLabel(GENDERS, x.promoterGender), social: optLabel(SOCIAL_CATEGORIES, x.socialCategory),
+          abled: x.speciallyAbled === null ? "" : x.speciallyAbled ? "Yes" : "No",
+          constitution: optLabel(CONSTITUTIONS, x.constitution), category: optLabel(UNIT_CATEGORIES, x.unitCategory), unitType: optLabel(UNIT_TYPES, x.unitType),
+          iecNo: x.iecNo ?? "", certs: parseCerts(x.certifications).join(", ") || "None", expCountries: parseCerts(x.exportCountries).join(", "), profile: x.profileCompletedAt ? "Completed" : "Pending",
         })),
       },
       {
@@ -481,6 +557,7 @@ export async function buildReport(id: ReportId, user: User, f: BuyerFilters & Se
     case "mis-summary": return misSummary(user);
     case "product-demand": return productDemandReport(user, f as BuyerFilters & { view?: string });
     case "insights": return insightsReport(user);
+    case "seller-profile-analysis": return sellerProfileAnalysis(user);
     case "match-list": return matchListReport(user, (f as { v?: string }).v === "draft" ? "draft" : "published");
     case "seller-preferences": return sellerPreferencesReport(user);
     case "match-coverage": return matchCoverageReport(user, (f as { v?: string }).v === "draft" ? "draft" : "published");
@@ -593,6 +670,7 @@ async function describeSellerFilters(user: User, f: SellerFilters): Promise<stri
   if (f.district) out.push(`District: ${f.district}`);
   if (f.exp === "yes") out.push("Export experience: Yes");
   if (f.exp === "no") out.push("Export experience: No");
+  out.push(...describeProfileFilters(f));
   return out;
 }
 
@@ -623,11 +701,16 @@ async function sellerRegister(user: User, f: SellerFilters): Promise<Report> {
         { key: "localBody", header: "Local Body", width: 20 },
         { key: "udyamNo", header: "Udyam Number", width: 21, kind: "mono" },
         { key: "exp", header: "Export Exp.", width: 9, align: "center" },
-        { key: "contact", header: "Contact Person", width: 18 },
+        { key: "contact", header: "Promoter", width: 18 },
         { key: "mobile", header: "Mobile / WhatsApp", width: 17 },
         { key: "email", header: "E-mail", width: 26 },
+        { key: "iecNo", header: "IEC Number", width: 13, kind: "mono", excelOnly: true },
+        { key: "certs", header: "Certifications", width: 30, excelOnly: true },
+        { key: "expCountries", header: "Countries Exported To", width: 30, excelOnly: true },
+        { key: "expProducts", header: "Products Exported", width: 30, excelOnly: true },
         { key: "products", header: "Sectors & Products", width: 37 },
         { key: "status", header: "Status", width: 20, kind: "sellerStatus" },
+        ...profileColumns(PERSONAL_ROLES.has(user.role)),
       ],
       rows: sellers.map((x, i) => ({
         sl: i + 1, regNo: x.regNo, approvedNo: x.approvedNo, name: x.name, district: x.district, taluk: x.taluk,
@@ -636,14 +719,16 @@ async function sellerRegister(user: User, f: SellerFilters): Promise<Report> {
         mobile: fmtMobile(x.contactMobile) + (x.contactWhatsapp !== x.contactMobile ? `\nWA: ${fmtMobile(x.contactWhatsapp)}` : ""),
         email: x.contactEmail,
         products: x.products.map((p) => `${p.sector.name}: ${p.products}`).join("\n"),
-        status: x.status,
+        status: x.status, iecNo: x.iecNo ?? "", certs: parseCerts(x.certifications).join(", "),
+        expCountries: parseCerts(x.exportCountries).join(", "), expProducts: x.exportedProducts ?? "",
+        ...profileRow(x, PERSONAL_ROLES.has(user.role)),
       })),
     }],
   };
 }
 
 async function sellerDistrictSummary(user: User): Promise<Report> {
-  const sellers = await prisma.seller.findMany({ where: sellerScope(user), select: { district: true, status: true, exportExperience: true } });
+  const sellers = await prisma.seller.findMany({ where: sellerScope(user), select: { district: true, status: true, exportExperience: true, profileCompletedAt: true } });
   const districts = user.role === "DISTRICT" ? [user.district ?? ""] : DISTRICT_NAMES;
   const targets = await getTargets();
   const rows = districts.map((d) => {
@@ -653,6 +738,7 @@ async function sellerDistrictSummary(user: User): Promise<Report> {
     return {
       district: d, total: ds.length, pending: c("WITH_DISTRICT", "WITH_SELLER", "RETURNED"), recommended: c("RECOMMENDED"),
       approved, rejected: c("REJECTED"), exp: ds.filter((x) => x.exportExperience).length, target: targets.district[d] ?? 0,
+      profilePending: ds.filter((x) => x.status === "APPROVED" && !x.profileCompletedAt).length,
       achieved: targets.district[d] ? approved / targets.district[d] : null,
     };
   });
@@ -681,6 +767,7 @@ async function sellerDistrictSummary(user: User): Promise<Report> {
         { key: "approved", header: "Approved", width: 11, kind: "number", align: "right" },
         ...(fieo ? [] : [{ key: "rejected", header: "Rejected", width: 10, kind: "number" as const, align: "right" as const }]),
         { key: "exp", header: "Export Exp.", width: 11, kind: "number", align: "right" },
+        ...(fieo ? [] : [{ key: "profilePending", header: "Profile Pending", width: 11, kind: "number" as const, align: "right" as const }]),
         // Targets are an internal Directorate / district matter — not shown to FIEO.
         ...(fieo ? [] : [
           { key: "target", header: "Target", width: 9, kind: "number" as const, align: "right" as const },
@@ -690,7 +777,7 @@ async function sellerDistrictSummary(user: User): Promise<Report> {
       rows,
       totals: {
         district: "Total", total: sum("total"), pending: sum("pending"), recommended: sum("recommended"), approved: totalApproved,
-        rejected: sum("rejected"), exp: sum("exp"),
+        rejected: sum("rejected"), exp: sum("exp"), profilePending: sum("profilePending"),
         target: user.role === "DISTRICT" ? targets.district[user.district ?? ""] ?? 0 : targets.sellers,
         achieved: (user.role === "DISTRICT" ? targets.district[user.district ?? ""] : targets.sellers) ? totalApproved / (user.role === "DISTRICT" ? targets.district[user.district ?? ""] : targets.sellers) : null,
       },
@@ -727,19 +814,33 @@ export async function buildSellerProfile(user: User, sellerId: string): Promise<
     ],
     tables: [
       {
-        name: "Seller Details", heading: "1. Enterprise and contact details", columns: kvCols,
+        name: "Seller Details", heading: "Enterprise and promoter details", columns: kvCols,
         rows: kv([
           ["Registration No.", x.regNo], ["Seller No.", x.approvedNo ?? "Not yet approved"], ["Login ID", x.user?.username ?? "Allotted on approval"],
           ["Name of the seller", x.name], ["Udyam number", x.udyamNo], ["District", x.district], ["Taluk", x.taluk],
           ["Local body", `${x.localBodyName} ${localBodyLabel(x.localBodyType)}`], ["Export experience", x.exportExperience ? "Yes" : "No"],
-          ["Contact person", x.contactName], ["Mobile number", fmtMobile(x.contactMobile)], ["WhatsApp number", fmtMobile(x.contactWhatsapp)],
+          ...(x.exportExperience ? [["Countries exported to", parseCerts(x.exportCountries).join(", ") || "Not given"], ["Products exported", x.exportedProducts ?? "Not given"]] as [string, Row[string]][] : []),
+          ["IEC number", x.iecNo ?? "Not given"], ["Quality / product certifications", parseCerts(x.certifications).join(", ") || "None"],
+          ["Name of the promoter", x.contactName], ["Mobile number", fmtMobile(x.contactMobile)], ["WhatsApp number", fmtMobile(x.contactWhatsapp)],
           ["E-mail ID", x.contactEmail],
           ["Source", x.source === "SELF" ? "Self-registered" : x.source === "BULK" ? "Bulk upload by district centre" : "Entered by district centre"],
           ["Registered on", x.createdAt], ["Recommended on", x.recommendedAt], ["Approved on", x.approvedAt],
         ]),
       },
+      ...(x.status === "APPROVED" ? [{
+        name: "Seller Profile", heading: "Seller profile (completed by the seller after approval)", columns: kvCols,
+        rows: x.profileCompletedAt ? kv([
+          ...(PERSONAL_ROLES.has(user.role) ? [
+            ["Gender of the promoter", optLabel(GENDERS, x.promoterGender)], ["Date of birth", x.promoterDob],
+            ["Social category", optLabel(SOCIAL_CATEGORIES, x.socialCategory)], ["Specially abled", x.speciallyAbled ? "Yes" : "No"],
+          ] as [string, Row[string]][] : []),
+          ["Block", x.block], ["Constitution of the unit", optLabel(CONSTITUTIONS, x.constitution)],
+          ["Category of the unit", optLabel(UNIT_CATEGORIES, x.unitCategory)], ["Unit type", optLabel(UNIT_TYPES, x.unitType)],
+          ["Profile completed on", x.profileCompletedAt],
+        ]) : kv([["Profile", "Not completed by the seller yet"]]),
+      }] : []),
       {
-        name: "Products", heading: "2. Sectors and products ready to export",
+        name: "Products", heading: "Sectors and products ready to export",
         columns: [
           { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
           { key: "sector", header: "Sector", width: 30 },
@@ -748,7 +849,7 @@ export async function buildSellerProfile(user: User, sellerId: string): Promise<
         rows: x.products.map((p, i) => ({ sl: i + 1, sector: p.sector.name, products: p.products })),
       },
       {
-        name: "Activity Log", heading: "3. Activity log",
+        name: "Activity Log", heading: "Activity log",
         columns: [
           { key: "at", header: "Date & Time", width: 18, kind: "datetime" },
           { key: "by", header: "By", width: 22 },
@@ -864,6 +965,68 @@ async function productDemandReport(user: User, f: BuyerFilters & { view?: string
   };
 }
 
+// ---------------------------------------------------------------- seller profile analysis
+
+async function sellerProfileAnalysis(user: User): Promise<Report> {
+  const districts = user.role === "DISTRICT" ? [user.district ?? ""] : DISTRICT_NAMES;
+  const p = await sellerProfileStats(sellerScope(user), districts);
+  const S = p.summary;
+  const pct = (a: number) => (S.completed ? Math.round((a / S.completed) * 100) : 0);
+  const num = (key: string, header: string, width = 8) => ({ key, header, width, kind: "number" as const, align: "right" as const });
+  const pending = await prisma.seller.findMany({
+    where: { AND: [sellerScope(user), { status: "APPROVED", profileCompletedAt: null }] }, orderBy: [{ district: "asc" }, { approvedSeq: "asc" }],
+    select: { approvedNo: true, name: true, district: true, contactName: true, contactMobile: true, contactEmail: true, approvedAt: true },
+  });
+  return {
+    ...base("seller-profile-analysis", user, user.role === "DISTRICT" ? [`District: ${user.district}`] : []),
+    kpis: [
+      { label: "Profiles completed", value: `${S.completed} / ${S.approved}`, tone: "green" },
+      { label: "Women promoters", value: `${S.women} (${pct(S.women)}%)`, tone: "violet" },
+      { label: "SC / ST promoters", value: `${S.scst} (${pct(S.scst)}%)`, tone: "blue" },
+      { label: "With IEC number", value: `${S.withIec} / ${S.approved}`, tone: "yellow" },
+    ],
+    tables: [
+      {
+        name: "District-wise", heading: "1. Approved sellers by district",
+        columns: [{ key: "district", header: "District", width: 18 }, num("approved", "Approved", 9), num("completed", "Profile Done", 9), num("pending", "Pending"),
+          num("women", "Women", 7), num("scst", "SC / ST", 7), num("disabled", "Sp. Abled", 7), num("micro", "Micro", 7), num("small", "Small", 7),
+          num("medium", "Medium", 7), num("large", "Large", 7), num("mfg", "Mfg.", 7), num("service", "Service", 7), num("trade", "Trade", 7),
+          num("withIec", "IEC", 7), num("certified", "Certified")],
+        rows: p.byDistrict,
+        totals: { district: "Total", ...Object.fromEntries((["approved", "completed", "pending", "women", "scst", "disabled", "micro", "small", "medium", "large", "mfg", "service", "trade", "withIec", "certified"] as const)
+          .map((k) => [k, p.byDistrict.reduce((a, r) => a + r[k], 0)])) },
+      },
+      {
+        name: "Breakdown", heading: "2. Breakdown of completed profiles",
+        columns: [{ key: "dim", header: "Attribute", width: 26 }, { key: "label", header: "Value", width: 36 }, num("n", "Sellers", 10), num("pct", "% of Completed", 13)],
+        rows: ([["Category of unit", p.dims.category], ["Unit type", p.dims.unitType], ["Constitution of unit", p.dims.constitution],
+          ["Gender of promoter", p.dims.gender], ["Social category", p.dims.social]] as const)
+          .flatMap(([dim, xs]) => xs.map((o, i) => ({ dim: i ? "" : dim, label: o.label, n: o.n, pct: pct(o.n) }))),
+      },
+      {
+        name: "Certification Readiness", heading: "3. Certifications required by approved buyers against approved sellers",
+        columns: [{ key: "name", header: "Certification", width: 30 }, { key: "sectors", header: "Required in Sectors", width: 40 },
+          num("buyerSectors", "Approved Buyer Sectors", 12), num("holders", "Sellers Holding It", 11), num("inSector", "…in Those Sectors", 11)],
+        rows: p.certReadiness.map((c) => ({ name: c.name, sectors: c.sectors.join(", "), buyerSectors: c.buyerSectors, holders: c.holders, inSector: c.inSector })),
+      },
+      {
+        name: "Export Markets", heading: "4. Countries approved sellers have already exported to (reference only)",
+        columns: [{ key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" }, { key: "country", header: "Country", width: 30 },
+          num("sellers", "Approved Sellers", 12), num("buyers", "Approved Buyers from Country", 14)],
+        rows: p.exportMarkets.map((m, i) => ({ sl: i + 1, ...m })),
+      },
+      {
+        name: "Profile Pending", heading: "5. Approved sellers yet to complete the profile",
+        columns: [{ key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" }, { key: "approvedNo", header: "Seller No.", width: 19, kind: "mono" },
+          { key: "name", header: "Name of Seller", width: 28 }, { key: "district", header: "District", width: 16 }, { key: "contact", header: "Name of Promoter", width: 20 },
+          { key: "mobile", header: "Mobile", width: 15 }, { key: "email", header: "E-mail", width: 26 }, { key: "approvedAt", header: "Approved On", width: 13, kind: "date" }],
+        rows: pending.map((x, i) => ({ sl: i + 1, approvedNo: x.approvedNo, name: x.name, district: x.district, contact: x.contactName,
+          mobile: fmtMobile(x.contactMobile), email: x.contactEmail, approvedAt: x.approvedAt })),
+      },
+    ],
+  };
+}
+
 // ---------------------------------------------------------------- Directorate insights
 
 async function insightsReport(user: User): Promise<Report> {
@@ -911,6 +1074,35 @@ async function insightsReport(user: User): Promise<Report> {
         name: "Rework", heading: "Rework and rejection",
         columns: [{ key: "label", header: "Measure", width: 50 }, num("count", "Count"), num("of", "Out of"), num("pct", "%")],
         rows: v.rework.map((r) => ({ label: r.label, count: r.count, of: r.of, pct: r.of ? Math.round((r.count / r.of) * 100) : 0 })),
+      },
+      {
+        name: "Seller Profile", heading: "Seller profile — approved sellers by district",
+        columns: [{ key: "district", header: "District", width: 18 }, num("approved", "Approved", 9), num("completed", "Profile Done", 9), num("pending", "Pending", 8),
+          num("women", "Women", 7), num("scst", "SC / ST", 7), num("disabled", "Sp. Abled", 7), num("micro", "Micro", 7), num("small", "Small", 7),
+          num("medium", "Medium", 7), num("large", "Large", 7), num("mfg", "Mfg.", 7), num("service", "Service", 7), num("trade", "Trade", 7),
+          num("withIec", "IEC", 7), num("certified", "Certified", 8)],
+        rows: v.profile.byDistrict,
+        totals: { district: "Total", ...Object.fromEntries((["approved", "completed", "pending", "women", "scst", "disabled", "micro", "small", "medium", "large", "mfg", "service", "trade", "withIec", "certified"] as const)
+          .map((k) => [k, v.profile.byDistrict.reduce((a, r) => a + r[k], 0)])) },
+      },
+      {
+        name: "Profile Breakdown", heading: "Seller profile — breakdown of completed profiles",
+        columns: [{ key: "dim", header: "Attribute", width: 26 }, { key: "label", header: "Value", width: 36 }, num("n", "Sellers"), num("pct", "% of Completed", 13)],
+        rows: ([["Category of unit", v.profile.dims.category], ["Unit type", v.profile.dims.unitType], ["Constitution of unit", v.profile.dims.constitution],
+          ["Gender of promoter", v.profile.dims.gender], ["Social category", v.profile.dims.social]] as const)
+          .flatMap(([dim, xs]) => xs.map((o, i) => ({ dim: i ? "" : dim, label: o.label, n: o.n, pct: v.profile.summary.completed ? Math.round((o.n / v.profile.summary.completed) * 100) : 0 }))),
+      },
+      {
+        name: "Seller Export Markets", heading: "Countries approved sellers have already exported to (reference only)",
+        columns: [{ key: "country", header: "Country", width: 30 }, num("sellers", "Approved Sellers", 12), num("buyers", "Approved Buyers from Country", 14)],
+        rows: v.profile.exportMarkets,
+      },
+      {
+        name: "Certification Readiness", heading: "Certification readiness — approved buyer demand against approved sellers",
+        columns: [{ key: "name", header: "Certification", width: 30 }, { key: "sectors", header: "Required in Sectors", width: 40 },
+          num("buyerSectors", "Approved Buyer Sectors", 12), num("holders", "Sellers Holding It", 11), num("inSector", "…in Those Sectors", 11), { key: "pos", header: "Position", width: 18 }],
+        rows: v.profile.certReadiness.map((c) => ({ name: c.name, sectors: c.sectors.join(", "), buyerSectors: c.buyerSectors, holders: c.holders, inSector: c.inSector,
+          pos: !c.inSector ? "No certified seller" : c.inSector < c.buyerSectors ? "Thin" : "Covered" })),
       },
       {
         name: "Matchmaking Readiness", heading: `1. Matchmaking readiness (target ${d.target} sellers per buyer)`,
@@ -995,6 +1187,7 @@ async function matchListReport(user: User, which: "published" | "draft"): Promis
       sl: ++sl, buyerNo: b.approvedNo, buyer: b.name, country: b.country, n: i + 1, sellerNo: s.approvedNo, seller: s.name, district: s.district,
       sectors: f.sectors.join(", "), products: s.sectors.map((x) => `${x.name}: ${x.products}`).join("\n"),
       source: SOURCE_LABEL[p.source] + (f.prefRank ? ` (preference #${f.prefRank})` : ""), score: f.score,
+      iec: s.iecNo ?? "", certs: s.certifications.join(", "), certMatch: f.certs.join(", "),
     }));
   }
   const buyers = new Set(rows.map((r) => r.buyer)).size;
@@ -1020,6 +1213,9 @@ async function matchListReport(user: User, which: "published" | "draft"): Promis
         { key: "seller", header: "Seller", width: 24 }, { key: "district", header: "District", width: 15 },
         { key: "sectors", header: "Common Sectors", width: 22 },
         { key: "products", header: "Seller's Sectors & Products", width: 36 },
+        { key: "iec", header: "Seller IEC", width: 13, kind: "mono", excelOnly: true },
+        { key: "certs", header: "Seller Certifications", width: 30, excelOnly: true },
+        { key: "certMatch", header: "Required Certifications Held", width: 26, excelOnly: true },
         ...(internal ? [{ key: "source", header: "How Matched", width: 22 }, { key: "score", header: "Fit", width: 6, kind: "number" as const, align: "right" as const }] : []),
       ],
       rows,

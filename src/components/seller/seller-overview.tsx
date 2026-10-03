@@ -30,7 +30,7 @@ function Progress({ label, value, target, color, suffix }: { label: string; valu
 /** Seller statistics for any staff role, within what that role may see. */
 export async function SellerOverview({ user, base, standalone }: { user: User; base: string; standalone?: boolean }) {
   const scope = sellerScope(user);
-  const [byStatus, byDistrict, products, exp, bySource, approvedBuyers] = await Promise.all([
+  const [byStatus, byDistrict, products, exp, bySource, approvedBuyers, profilePending, withIec, certified] = await Promise.all([
     prisma.seller.groupBy({ by: ["status"], where: scope, _count: true }),
     prisma.seller.groupBy({ by: ["district", "status"], where: scope, _count: true }),
     // Sellers by sector: approved sellers only.
@@ -38,6 +38,9 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
     prisma.seller.groupBy({ by: ["exportExperience", "status"], where: scope, _count: true }),
     prisma.seller.groupBy({ by: ["source"], where: scope, _count: true }),
     prisma.buyer.count({ where: { status: "APPROVED" } }),
+    prisma.seller.count({ where: { AND: [scope, { status: "APPROVED", profileCompletedAt: null }] } }),
+    prisma.seller.count({ where: { AND: [scope, { iecNo: { not: null } }] } }),
+    prisma.seller.count({ where: { AND: [scope, { certifications: { not: "[]" } }] } }),
   ]);
   const n = (...s: SellerStatus[]) => byStatus.filter((x) => s.includes(x.status)).reduce((a, x) => a + x._count, 0);
   const total = byStatus.reduce((a, x) => a + x._count, 0);
@@ -126,6 +129,8 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
                   <ul className="space-y-1 text-sm">
                     <li className="flex justify-between"><span className="text-slate-600">Yes</span><span className="font-semibold tabular-nums">{expCount(true)}</span></li>
                     <li className="flex justify-between"><span className="text-slate-600">No</span><span className="font-semibold tabular-nums">{expCount(false)}</span></li>
+                    <li className="flex justify-between"><Link href={`${base}/sellers?iec=yes`} className="text-slate-600 hover:text-brand-700">IEC number given</Link><span className="font-semibold tabular-nums">{withIec}</span></li>
+                    <li className="flex justify-between"><Link href={`${base}/sellers?cert=yes`} className="text-slate-600 hover:text-brand-700">Hold certifications</Link><span className="font-semibold tabular-nums">{certified}</span></li>
                   </ul>
                 </div>
               </div>
@@ -156,6 +161,7 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
           { label: "With applicants for correction", value: n("WITH_SELLER"), href: `${base}/sellers?status=WITH_SELLER`, dot: "bg-tx-blue" },
           { label: user.role === "DISTRICT" ? "Returned by Directorate" : "Returned by Directorate to districts", value: n("RETURNED"), href: `${base}/sellers?status=RETURNED`, dot: "bg-tx-red" },
           { label: "Awaiting Directorate approval", value: n("RECOMMENDED"), href: `${base}/sellers?status=RECOMMENDED`, dot: "bg-violet-500" },
+          { label: "Approved — profile pending with seller", value: profilePending, href: `${base}/sellers?profile=pending`, dot: "bg-amber-500" },
         ]} />
         {sellersBySector}
         {(user.role === "DIC" || user.role === "ADMIN") && (

@@ -11,6 +11,7 @@ import { Button, ButtonLink, Card, Input, PageHeader, Select } from "@/component
 import { Pagination } from "@/components/staff/pagination";
 import { DownloadButtons } from "@/components/staff/download-buttons";
 import { SellerTable } from "./seller-table";
+import { ProfileFilters } from "./profile-filters";
 
 const PAGE_SIZE = 25;
 
@@ -51,7 +52,8 @@ export async function SellerListPage({ user, base, filters, title, subtitle }: {
           </div>
         } />
       <Card className="overflow-hidden">
-        <form action={base} className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[1.3fr_1.4fr_1fr_1fr_1.1fr_auto]">
+        <form action={base} className="space-y-3 border-b border-slate-100 p-4">
+         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[1.3fr_1.4fr_1fr_1fr_1.1fr_auto]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input name="q" defaultValue={filters.q} placeholder="Search name, Udyam, reg. no., mobile…" className="pl-9" aria-label="Search" />
@@ -85,6 +87,10 @@ export async function SellerListPage({ user, base, filters, title, subtitle }: {
             <option value="no">Export experience: No</option>
           </Select>
           <Button type="submit" variant="secondary">Apply</Button>
+         </div>
+         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <ProfileFilters f={filters} personal={user.role !== "FIEO"} />
+         </div>
         </form>
         <SellerTable
           base={base}
@@ -93,6 +99,7 @@ export async function SellerListPage({ user, base, filters, title, subtitle }: {
             id: s.id, regNo: s.regNo, approvedNo: s.approvedNo, name: s.name, district: s.district, taluk: s.taluk,
             udyamNo: s.udyamNo, exportExperience: s.exportExperience, contactName: s.contactName, mobile: fmtMobile(s.contactMobile),
             status: s.status, source: s.source, sectors: s.products.map((p) => p.sector.name), updated: fmtDate(s.updatedAt),
+            profilePending: s.status === "APPROVED" && !s.profileCompletedAt,
           }))}
         />
         <Pagination base={base} params={rest} page={page} total={total} pageSize={PAGE_SIZE} />

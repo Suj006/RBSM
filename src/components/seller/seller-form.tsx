@@ -6,16 +6,21 @@ import { CheckCircle2, Plus, Save, Send, Trash2 } from "lucide-react";
 import { applicantSaveSellerAction, saveSellerAction, selfRegisterSellerAction } from "@/app/actions/seller";
 import { Alert, Button, ButtonLink, Card, CardHeader, Field, Input, Select, Textarea } from "@/components/ui";
 import { DISTRICT_NAMES, LOCAL_BODY_TYPES } from "@/lib/config";
+import { TALUKS, urbanBodies } from "@/lib/kerala";
+import { CertPicker } from "./cert-picker";
+import { CountryMulti } from "./country-multi";
 import { useKeepForm } from "@/lib/use-keep-form";
 import { UdyamInput } from "./udyam-input";
 import { cn } from "@/lib/cn";
 import { EMPTY_SELLER, type SellerFormValues } from "@/lib/seller-form-defaults";
 
-export function SellerForm({ mode, initial, sectors, district, backHref }: {
+export function SellerForm({ mode, initial, sectors, certifications, district, backHref }: {
   /** district: a district office; self: public self-registration; applicant: the applicant correcting their own registration. */
   mode: "district" | "self" | "applicant";
   initial: SellerFormValues;
   sectors: { id: string; name: string }[];
+  /** Certification master names. */
+  certifications: string[];
   district?: string;
   backHref?: string;
 }) {
@@ -25,6 +30,13 @@ export function SellerForm({ mode, initial, sectors, district, backHref }: {
   const [same, setSame] = useState(!initial.contactWhatsapp || initial.contactWhatsapp === initial.contactMobile);
   const fe = state?.fieldErrors ?? {};
   const used = new Set(rows.map((r) => r.sectorId));
+  const [dist, setDist] = useState(mode === "district" ? district ?? "" : initial.district);
+  const [lbt, setLbt] = useState(initial.localBodyType);
+  const [exp, setExp] = useState(initial.exportExperience);
+  const taluks = TALUKS[dist] ?? [];
+  const urban = urbanBodies(dist, lbt);
+  // Keep a stored value that is not in the master visible, so an older record can be corrected.
+  const withCurrent = (list: readonly string[], v: string) => (v && !list.includes(v) ? [v, ...list] : list);
 
   if (state?.ok && mode === "self" && state.data) {
     return (
@@ -80,23 +92,36 @@ export function SellerForm({ mode, initial, sectors, district, backHref }: {
                 <input type="hidden" name="district" value={district} />
               </>
             ) : (
-              <Select id="district" name="district" defaultValue={initial.district}>
+              <Select id="district" name="district" value={dist} onChange={(e) => setDist(e.target.value)}>
                 <option value="">Select district…</option>
                 {DISTRICT_NAMES.map((d) => <option key={d}>{d}</option>)}
               </Select>
             )}
           </Field>
           <Field label="Taluk" htmlFor="taluk" required error={fe.taluk}>
-            <Input id="taluk" name="taluk" defaultValue={initial.taluk} maxLength={80} />
+            <Select key={`t-${dist}`} id="taluk" name="taluk" defaultValue={dist === initial.district ? initial.taluk : ""} disabled={!dist}>
+              <option value="">{dist ? "Select taluk…" : "Select the district first"}</option>
+              {withCurrent(taluks, dist === initial.district ? initial.taluk : "").map((t) => <option key={t}>{t}</option>)}
+            </Select>
           </Field>
           <Field label="Local body type" htmlFor="localBodyType" required error={fe.localBodyType}>
-            <Select id="localBodyType" name="localBodyType" defaultValue={initial.localBodyType}>
+            <Select id="localBodyType" name="localBodyType" value={lbt} onChange={(e) => setLbt(e.target.value)}>
               <option value="">Select…</option>
               {LOCAL_BODY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </Select>
           </Field>
-          <Field label="Local body name" htmlFor="localBodyName" required error={fe.localBodyName}>
-            <Input id="localBodyName" name="localBodyName" defaultValue={initial.localBodyName} maxLength={80} />
+          <Field label="Local body name" htmlFor="localBodyName" required error={fe.localBodyName}
+            hint={lbt === "PANCHAYAT" ? "Name of the grama panchayat" : undefined}>
+            {lbt === "MUNICIPALITY" || lbt === "CORPORATION" ? (
+              <Select key={`lb-${dist}-${lbt}`} id="localBodyName" name="localBodyName" disabled={!dist}
+                defaultValue={dist === initial.district && lbt === initial.localBodyType ? initial.localBodyName : ""}>
+                <option value="">{!dist ? "Select the district first" : urban.length ? "Select…" : `No ${lbt === "CORPORATION" ? "corporation" : "municipality"} in ${dist}`}</option>
+                {withCurrent(urban, dist === initial.district && lbt === initial.localBodyType ? initial.localBodyName : "").map((t) => <option key={t}>{t}</option>)}
+              </Select>
+            ) : (
+              <Input key={`lbp-${lbt}`} id="localBodyName" name="localBodyName" maxLength={80}
+                defaultValue={lbt === initial.localBodyType ? initial.localBodyName : ""} placeholder={lbt ? "e.g. Thanneermukkom" : "Select the local body type first"} />
+            )}
           </Field>
           <Field label="Udyam registration number" htmlFor="udyamNo" required error={fe.udyamNo} hint="Enter only the numbers — e.g. 07 and 0012345. UDYAM-KL- is filled in for you.">
             <UdyamInput name="udyamNo" defaultValue={initial.udyamNo} invalid={!!fe.udyamNo} />
@@ -105,19 +130,40 @@ export function SellerForm({ mode, initial, sectors, district, backHref }: {
             <div className="flex gap-3 pt-1" role="radiogroup">
               {(["YES", "NO"] as const).map((v) => (
                 <label key={v} className="flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium ring-1 ring-slate-300 has-[:checked]:bg-brand-50 has-[:checked]:ring-2 has-[:checked]:ring-brand-600">
-                  <input type="radio" name="exportExperience" value={v} defaultChecked={initial.exportExperience === v} className="accent-brand-700" />
+                  <input type="radio" name="exportExperience" value={v} checked={exp === v} onChange={() => setExp(v)} className="accent-brand-700" />
                   {v === "YES" ? "Yes" : "No"}
                 </label>
               ))}
             </div>
           </Field>
+          {exp === "YES" && (
+            <div className="grid gap-5 rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200 sm:col-span-2 sm:grid-cols-2">
+              <div className="sm:col-span-2 text-xs text-slate-500">Export history — for reference only; it does not affect buyer–seller matchmaking.</div>
+              <Field label="Countries exported to" htmlFor="exportCountries" required error={fe.exportCountries ?? Object.entries(fe).find(([k]) => k.startsWith("exportCountries."))?.[1]}
+                hint="Pick each country from the list; you can add several.">
+                <CountryMulti id="exportCountries" name="exportCountries" initial={initial.exportCountries} invalid={!!fe.exportCountries} />
+              </Field>
+              <Field label="Products exported" htmlFor="exportedProducts" required error={fe.exportedProducts} hint="Separate products with commas">
+                <Textarea id="exportedProducts" name="exportedProducts" rows={3} maxLength={1000} defaultValue={initial.exportedProducts} placeholder="e.g. Black pepper, Coir mats" />
+              </Field>
+            </div>
+          )}
+          <Field label="IEC number (Importer-Exporter Code)" htmlFor="iecNo" required={exp === "YES"} error={fe.iecNo}
+            hint={exp === "YES" ? "10 characters, e.g. ABCDE1234F — required for sellers with export experience" : "10 characters, e.g. ABCDE1234F — if the unit has one"}>
+            <Input id="iecNo" name="iecNo" defaultValue={initial.iecNo} maxLength={14} className="uppercase" autoComplete="off" />
+          </Field>
+          <div className="sm:col-span-2">
+            <div className="mb-2 text-sm font-semibold text-slate-700">Quality / product certifications held</div>
+            <CertPicker name="certifications" master={certifications} initial={initial.certifications}
+              error={Object.entries(fe).find(([k]) => k.startsWith("certifications"))?.[1]} />
+          </div>
         </div>
       </Card>
 
       <Card>
-        <CardHeader title="Promoter / contact person" />
+        <CardHeader title="Promoter details" subtitle="The promoter is the contact person for the event." />
         <div className="grid gap-5 p-6 sm:grid-cols-2">
-          <Field label="Name" htmlFor="contactName" required error={fe.contactName} hint="English letters and spaces only">
+          <Field label="Name of the promoter" htmlFor="contactName" required error={fe.contactName} hint="English letters and spaces only">
             <Input id="contactName" name="contactName" defaultValue={initial.contactName} maxLength={120} autoComplete="name" />
           </Field>
           <Field label="E-mail ID" htmlFor="contactEmail" required error={fe.contactEmail}

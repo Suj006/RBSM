@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { EyeOff, Lock, Snowflake } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -38,7 +39,8 @@ export default async function Page() {
     .sort((a, b) => Number(b.relevant) - Number(a.relevant) || a.name.localeCompare(b.name));
   const usedSectors = sectors.filter((s) => buyers.some((b) => b.sectors.some((x) => x.id === s.id)));
   const submitted = !!seller.prefSubmittedAt;
-  const canPick = !submitted && !state.prefsFrozen;
+  const needProfile = !submitted && !state.prefsFrozen && !seller.profileCompletedAt;
+  const canPick = !submitted && !state.prefsFrozen && !needProfile;
 
   return (
     <>
@@ -63,6 +65,12 @@ export default async function Page() {
       {!submitted && state.prefsFrozen && (
         <Alert tone="slate" className="mb-6" title="The preference window is closed">
           <span className="inline-flex items-center gap-1"><Snowflake className="size-4" /> The Directorate has frozen preferences. You can still see the buyers; your meetings will be shown once the mapping is published.</span>
+        </Alert>
+      )}
+      {needProfile && (
+        <Alert tone="amber" className="mb-6" title="Complete your profile to choose preferences">
+          You can see the buyers now. To choose your preferences, first complete your seller profile —{" "}
+          <Link href="/seller/profile" className="font-semibold underline">go to My profile</Link>.
         </Alert>
       )}
       {buyers.length

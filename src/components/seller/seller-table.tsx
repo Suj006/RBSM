@@ -14,6 +14,8 @@ export type SellerRow = {
   id: string; regNo: string; approvedNo: string | null; name: string; district: string; taluk: string;
   udyamNo: string; exportExperience: boolean; contactName: string; mobile: string; status: SellerStatus;
   source: string; sectors: string[]; updated: string;
+  /** Approved seller who has not completed the profile yet. */
+  profilePending?: boolean;
 };
 
 /**
@@ -100,6 +102,7 @@ export function SellerTable({ rows, base, bulk }: {
                   <td className="px-4 py-3 align-top">{r.exportExperience ? <Badge tone="green">Yes</Badge> : <Badge tone="slate">No</Badge>}</td>
                   <td className="px-4 py-3 align-top">
                     <Badge tone={m.tone}>{m.short}</Badge>
+                    {r.profilePending && <div className="mt-1"><Badge tone="amber">Profile pending</Badge></div>}
                     <div className="mt-1 text-[11px] text-slate-400">{r.source === "SELF" ? "Self-registered" : r.source === "BULK" ? "Bulk upload" : "Entered by district centre"} · {r.updated}</div>
                   </td>
                   <td className="px-4 py-3 text-right align-top">

@@ -69,6 +69,7 @@ export async function BuyerMapping({ user, base, buyerId, staffBase }: { user: U
                       <td className="max-w-72 px-3 py-2.5 text-xs">
                         {m.fit.sectors.length ? <span className="text-ink">{m.fit.sectors.join(", ")}</span> : <span className="font-semibold text-tx-red">No common sector</span>}
                         {m.fit.products.length > 0 && <div className="text-slate-500">Products: {m.fit.products.join(", ")}</div>}
+                        {m.fit.certs.length > 0 && <div className="text-brand-700">Certified: {m.fit.certs.join(", ")}</div>}
                       </td>
                       <td className="px-3 py-2.5"><SourceBadges source={m.source} prefRank={m.fit.prefRank} /></td>
                       <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{m.fit.score}</td>
@@ -85,7 +86,7 @@ export async function BuyerMapping({ user, base, buyerId, staffBase }: { user: U
           </Card>
 
           <Card className="overflow-hidden">
-            <CardHeader title="Other sellers that fit" subtitle="Best candidates not in the list — seller preferences first. Fit: preference 60–40 · common sector 20 · products 10 each (max 30) · export experience 5" />
+            <CardHeader title="Other sellers that fit" subtitle="Best candidates not in the list — seller preferences first. Fit: preference 60–40 · common sector 20 · products 10 each (max 30) · required certifications held 5 each (max 10) · export experience 5" />
             <div className="table-scroll relative overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -104,7 +105,8 @@ export async function BuyerMapping({ user, base, buyerId, staffBase }: { user: U
                         </div>
                       </td>
                       <td className="max-w-72 px-3 py-2.5 text-xs">{f.sectors.join(", ") || <span className="text-tx-red">No common sector</span>}
-                        {f.products.length > 0 && <div className="text-slate-500">Products: {f.products.join(", ")}</div>}</td>
+                        {f.products.length > 0 && <div className="text-slate-500">Products: {f.products.join(", ")}</div>}
+                        {f.certs.length > 0 && <div className="text-brand-700">Certified: {f.certs.join(", ")}</div>}</td>
                       <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{f.score}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{load.get(s.id) ?? 0}{(load.get(s.id) ?? 0) >= board.cap && <span className="block text-[11px] text-amber-700">at limit</span>}</td>
                       <td className="px-3 py-2.5 text-right">{editable && <ActionButton action={mapPairAction} fields={{ op: "add", buyerId, sellerId: s.id }} compact label={<><Plus className="size-3.5" /> Add</>} />}</td>

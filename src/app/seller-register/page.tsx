@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { certificationNames } from "@/lib/masters";
 import { ArrowLeft } from "lucide-react";
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -14,6 +15,7 @@ export const metadata: Metadata = { title: "Seller registration" };
 export default async function Page() {
   await connection(); // render per request so the sector list is always current
   const sectors = await prisma.sector.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } });
+  const certs = await certificationNames();
   return (
     <div className="min-h-dvh bg-canvas">
       <div className="tx-ribbon h-1" />
@@ -35,8 +37,12 @@ export default async function Page() {
             Directorate of Industries &amp; Commerce. A login is e-mailed to you right away so you can track your application and make
             any corrections the district centre asks for; it becomes your permanent seller login once you are approved.
           </p>
+          <p className="mt-2 max-w-3xl text-sm text-slate-500">
+            Keep ready: Udyam registration, IEC number (required if you have export experience) and any quality / product certificates.
+            After approval you will also be asked to complete a short seller profile (promoter and unit details).
+          </p>
         </div>
-        <SellerForm mode="self" initial={EMPTY_SELLER} sectors={sectors} />
+        <SellerForm mode="self" initial={EMPTY_SELLER} sectors={sectors} certifications={certs} />
       </main>
     </div>
   );

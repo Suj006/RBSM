@@ -65,6 +65,30 @@ export const LOCAL_BODY_TYPES = [
 ] as const;
 export const localBodyLabel = (v: string) => LOCAL_BODY_TYPES.find((t) => t.value === v)?.label ?? v;
 
+// Seller profile (collected from approved sellers after approval).
+type Opt = { readonly value: string; readonly label: string };
+export const GENDERS: readonly Opt[] = [
+  { value: "MALE", label: "Male" }, { value: "FEMALE", label: "Female" }, { value: "TRANSGENDER", label: "Transgender" },
+  { value: "OTHER", label: "Other" }, { value: "NOT_SAY", label: "Prefer not to say" },
+];
+export const SOCIAL_CATEGORIES: readonly Opt[] = [
+  { value: "GENERAL", label: "General" }, { value: "OBC", label: "OBC" }, { value: "SC", label: "SC" }, { value: "ST", label: "ST" },
+];
+export const CONSTITUTIONS: readonly Opt[] = [
+  { value: "PROPRIETARY", label: "Proprietary" }, { value: "PARTNERSHIP", label: "Partnership" },
+  { value: "PRIVATE_LTD", label: "Private Limited Company" }, { value: "PUBLIC_LTD", label: "Public Limited Company" },
+  { value: "LLP", label: "Limited Liability Partnership (LLP)" }, { value: "COOPERATIVE", label: "Co-operative Society" },
+  { value: "SHG", label: "Self Help Group" }, { value: "PSU", label: "Public Sector Undertaking" }, { value: "OTHERS", label: "Others" },
+];
+export const UNIT_CATEGORIES: readonly Opt[] = [
+  { value: "MICRO", label: "Micro" }, { value: "SMALL", label: "Small" }, { value: "MEDIUM", label: "Medium" }, { value: "LARGE", label: "Large" },
+];
+export const UNIT_TYPES: readonly Opt[] = [
+  { value: "MANUFACTURING", label: "Manufacturing" }, { value: "SERVICE", label: "Service" }, { value: "TRADE", label: "Trade" },
+];
+/** Label of an option value ("" when not given). */
+export const optLabel = (opts: readonly Opt[], v: string | null | undefined) => (v ? opts.find((o) => o.value === v)?.label ?? v : "");
+
 export const ORGANISATION_TYPES = [
   "Importer",
   "Distributor / Wholesaler",
