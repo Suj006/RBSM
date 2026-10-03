@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CalendarClock, Handshake } from "lucide-react";
+import Link from "next/link";
+import { Handshake, Star } from "lucide-react";
+import { SellerMeetings } from "@/components/match/my-matches";
+import { getMatchState } from "@/lib/matchmaking";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Alert, Badge, Card, CardHeader, DL, PageHeader } from "@/components/ui";
@@ -25,6 +28,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
   if (!s) notFound();
   // Until the Directorate approves, the login is a temporary applicant login: status and corrections only.
   if (s.status !== "APPROVED") return <ApplicantView seller={s} done={done} />;
+  const match = await getMatchState();
   return (
     <>
       <PageHeader eyebrow={`${EVENT.name} · ${EVENT.short}`} title={`Welcome, ${s.name}`}
@@ -36,6 +40,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
         </Alert>
       )}
 
+      {match.buyersVisible && !s.prefSubmittedAt && !match.prefsFrozen && (
+        <Link href="/seller/buyers" className="mb-6 flex items-center justify-between gap-4 rounded-2xl bg-violet-50 px-5 py-4 text-violet-900 ring-1 ring-violet-200 hover:bg-violet-100">
+          <span className="flex items-center gap-3"><Star className="size-5 shrink-0" />
+            <span><b>Approved international buyers are now listed.</b> See what they need and choose up to 5 as your tentative preferences.</span></span>
+          <span className="shrink-0 text-sm font-semibold">Choose preferences →</span>
+        </Link>
+      )}
       <Card className="mb-6 overflow-hidden">
         <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center">
           <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700"><Handshake className="size-6" /></div>
@@ -78,12 +89,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
             </div>
           </Card>
         </div>
-        <Card>
-          <CardHeader title="Buyer meetings" icon={<CalendarClock className="size-4" />} />
-          <div className="p-6 text-sm text-slate-500">
-            Matchmaking with international buyers is in progress. Matched buyers and B2B meeting slots will be listed here.
-          </div>
-        </Card>
+        <SellerMeetings sellerId={s.id} />
       </div>
     </>
   );

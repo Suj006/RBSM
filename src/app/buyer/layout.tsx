@@ -11,6 +11,7 @@ export default async function BuyerLayout({ children }: { children: React.ReactN
         { href: "/buyer", label: "Dashboard", icon: "dashboard", exact: true },
         { href: "/buyer/profile", label: "Basic details", icon: "profile" },
         { href: "/buyer/requirement", label: "Detailed requirement", icon: "requirement" },
+        { href: "/buyer/matches", label: "Matched sellers", icon: "sellers" },
       ]}
     >
       {children}

@@ -79,11 +79,12 @@ model User {
 
   sessions     Session[]
   buyer        Buyer?
-  seller       Seller?     @relation("SellerLogin")
+  seller       Seller?      @relation("SellerLogin")
   reviewLogs   ReviewLog[]
-  sellersAdded Seller[]    @relation("SellerCreatedBy")
+  sellersAdded Seller[]     @relation("SellerCreatedBy")
   sellerLogs   SellerLog[]
-  targetsSet   Target[]    @relation("TargetUpdatedBy")
+  targetsSet   Target[]     @relation("TargetUpdatedBy")
+  matchEvents  MatchEvent[]
 }
 
 model Session {
@@ -104,6 +105,10 @@ model Counter {
 }
 
 model Buyer {
+  preferredBy      SellerPreference[]
+  matches          Match[]
+  publishedMatches PublishedMatch[]
+
   id     String @id @default(cuid())
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -324,6 +329,12 @@ model Seller {
   products SellerProduct[]
   logs     SellerLog[]
 
+  // Matchmaking: up to 5 preferred buyers, submitted once (cannot be changed afterwards).
+  prefSubmittedAt  DateTime?
+  preferences      SellerPreference[]
+  matches          Match[]
+  publishedMatches PublishedMatch[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -368,4 +379,87 @@ model Target {
   updatedById String?
   updatedBy   User?    @relation("TargetUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------- matchmaking
+
+/**
+ * Matchmaking switches and settings (buyer directory visibility, preference freeze, lock, version…).
+ */
+model MatchSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+/**
+ * A seller's preferred buyer, rank 1–5 (tentative; considered with other conditions).
+ */
+model SellerPreference {
+  id        String   @id @default(cuid())
+  sellerId  String
+  seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  rank      Int
+  createdAt DateTime @default(now())
+
+  @@unique([sellerId, rank])
+  @@unique([sellerId, buyerId])
+  @@index([buyerId])
+}
+
+enum MatchSource {
+  PREFERENCE // suggested because the seller preferred this buyer
+  SYSTEM // suggested by the portal on sector / product fit
+  MANUAL // added by the Directorate
+}
+
+/**
+ * Working (draft) buyer–seller mapping, edited by the Directorate. Removed pairs are kept so suggestions do not bring them back.
+ */
+model Match {
+  id        String      @id @default(cuid())
+  buyerId   String
+  buyer     Buyer       @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId  String
+  seller    Seller      @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  source    MatchSource
+  score     Float       @default(0)
+  removed   Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([buyerId, sellerId])
+  @@index([sellerId])
+}
+
+/**
+ * The mapping as last published — what buyers, sellers, FIEO and districts see.
+ */
+model PublishedMatch {
+  id       String      @id @default(cuid())
+  version  Int
+  buyerId  String
+  buyer    Buyer       @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId String
+  seller   Seller      @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  source   MatchSource
+  score    Float       @default(0)
+  slot     Int
+
+  @@unique([buyerId, sellerId])
+  @@index([sellerId])
+}
+
+/**
+ * Audit trail of matchmaking actions.
+ */
+model MatchEvent {
+  id        String   @id @default(cuid())
+  action    String
+  detail    String?
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { MatchStatusBand } from "@/components/match/status-band";
 import { Plus, Upload } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { ButtonLink, PageHeader } from "@/components/ui";
@@ -15,6 +16,7 @@ export default async function Page() {
         subtitle="Register sellers from your district, verify them and recommend them to the Directorate."
         actions={<><ButtonLink href="/district/sellers/new"><Plus className="size-4" /> Add seller</ButtonLink><ButtonLink href="/district/upload" variant="secondary"><Upload className="size-4" /> Bulk upload</ButtonLink></>} />
       <SellerOverview user={user} base="/district" standalone />
+      <MatchStatusBand user={user} base="/district" />
     </>
   );
 }

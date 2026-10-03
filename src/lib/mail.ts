@@ -188,3 +188,16 @@ Your seller registration ${regNo} could not be accepted, for the following reaso
 For clarification, please contact your District Industries Centre.${signature}`,
   }),
 };
+
+export const matchMail = {
+  published: (name: string, who: "buyer" | "seller", count: number, updated: boolean) => ({
+    subject: `${EVENT.name} ${EVENT.short} — your B2B matchmaking ${updated ? "has been updated" : "is ready"}`,
+    text: `Dear ${name},
+
+The Directorate of Industries & Commerce has ${updated ? "updated" : "published"} the buyer–seller matchmaking for ${EVENT.name} ${EVENT.programme}.
+
+You have been matched with ${count} ${who === "buyer" ? "Kerala MSME seller" : "international buyer"}${count === 1 ? "" : "s"} for one-to-one B2B meetings.
+
+Sign in at ${APP_URL}/login to see the details. Meeting schedules will be shared through the portal.${signature}`,
+  }),
+};

@@ -8,6 +8,7 @@ export default async function SellerLayout({ children }: { children: React.React
   return (
     <AppShell role="SELLER" user={{ displayName: user.displayName, username: user.username }} nav={[
       { href: "/seller", label: seller?.status === "APPROVED" ? "Dashboard" : "My application", icon: "dashboard", exact: true },
+      ...(seller?.status === "APPROVED" ? [{ href: "/seller/buyers", label: "Buyers & preferences", icon: "buyers" as const }] : []),
     ]}>{children}</AppShell>
   );
 }

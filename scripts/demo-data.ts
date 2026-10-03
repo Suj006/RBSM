@@ -231,7 +231,26 @@ async function main() {
   await prisma.counter.upsert({ where: { name: "seller" }, create: { name: "seller", value: sSeq }, update: { value: sSeq } });
   await prisma.counter.upsert({ where: { name: "seller-approved-2026" }, create: { name: "seller-approved-2026", value: sApproved }, update: { value: sApproved } });
 
-  console.log(`Loaded ${BUYERS.length} demo buyers (${approvedSeq} approved) and ${sSeq} demo sellers (${sApproved} approved). Demo password: pass@123`);
+  // Matchmaking: buyer directory open; about half the approved sellers have given tentative preferences.
+  await prisma.matchSetting.upsert({ where: { key: "buyersVisible" }, create: { key: "buyersVisible", value: "true" }, update: { value: "true" } });
+  const approvedBuyers = await prisma.buyer.findMany({
+    where: { status: "APPROVED" }, orderBy: { approvedSeq: "asc" },
+    select: { id: true, requirement: { select: { items: { where: { status: "APPROVED" }, select: { sectorId: true } } } } },
+  });
+  const approvedSellers = await prisma.seller.findMany({ where: { status: "APPROVED" }, orderBy: { approvedSeq: "asc" }, select: { id: true, products: { select: { sectorId: true } } } });
+  let prefSellers = 0;
+  for (const [k, sl] of approvedSellers.entries()) {
+    if (k % 2) continue;
+    const mine = new Set(sl.products.map((p) => p.sectorId));
+    const relevant = approvedBuyers.filter((b) => b.requirement?.items.some((i) => mine.has(i.sectorId)));
+    const picks = [...relevant, ...approvedBuyers.filter((b) => !relevant.includes(b))].slice(0, 1 + (k % 5)).map((b) => b.id);
+    if (!picks.length) continue;
+    await prisma.sellerPreference.createMany({ data: picks.map((buyerId, r) => ({ sellerId: sl.id, buyerId, rank: r + 1 })) });
+    await prisma.seller.update({ where: { id: sl.id }, data: { prefSubmittedAt: new Date(Date.now() - (k % 7) * day) } });
+    prefSellers++;
+  }
+
+  console.log(`Loaded ${BUYERS.length} demo buyers (${approvedSeq} approved) and ${sSeq} demo sellers (${sApproved} approved; ${prefSellers} with buyer preferences). Demo password: pass@123`);
 }
 
 main().finally(() => prisma.$disconnect());

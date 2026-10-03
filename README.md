@@ -51,6 +51,29 @@ FIEO sees sellers only after Directorate approval. Seller products use the same 
 requirements, ready for buyer–seller matchmaking. Targets (approved sellers overall and per district,
 approved buyers, sellers per buyer — default 600 / 60 / 10) are set by the Directorate on the **Targets** page.
 
+## Matchmaking (core module)
+
+```
+1. Directorate opens the buyer directory  ─► approved sellers see approved buyers (sectors, products,
+                                              specifications, certifications, volumes)
+2. Sellers give up to 5 tentative preferences, in order — final once submitted
+3. Directorate freezes preferences          (only Admin can reopen; the Directorate can freeze again)
+4. Directorate builds the mapping           ─► suggestions: up to 10 sellers per buyer, sharing the buyer's
+                                              sectors — seller preferences first, then best fit
+                                              (products, export experience); add / remove by hand
+5. Checks flag incorrect mappings           (Directorate only, for reference — never blocks publishing)
+6. Publish                                  ─► buyers, sellers, FIEO and district centres see it; changes
+                                              stay in the working list until republished
+7. Lock the final version                   (only Admin can unlock)
+```
+
+Every pair is labelled **Seller preference (#rank)**, **System match** or **Manual**. The Directorate sees each
+seller's preferences and how many made it into the working list and the published mapping, plus **Results &
+gaps**: buyers below 10 sellers, approved sellers without a buyer, sector coverage, requested products not
+covered by the matched sellers, and district position. Reports: mapping (published or working list), seller
+preferences and outcome, results and gaps. Buyers see their matched sellers; sellers their buyer meetings;
+district centres the meetings of their sellers. Participants whose list changes are e-mailed on publishing.
+
 ## Logins (phase-1 defaults — change before going live)
 
 | Role | User name | Password | Can do |

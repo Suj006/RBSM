@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { BuyerMatches } from "@/components/match/my-matches";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, Clock, AlertTriangle, Plus, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
@@ -96,6 +97,8 @@ export default async function BuyerDashboard() {
               </ul>
             </Card>
           )}
+
+          {b.status === "APPROVED" && <BuyerMatches buyerId={b.id} />}
 
           <Card>
             <CardHeader title="Registration summary" />

@@ -1,4 +1,4 @@
-import { BarChart3, BadgeCheck, Boxes, ClipboardList, Lightbulb, MapPinned, PackageSearch, Store, Users } from "lucide-react";
+import { BarChart3, BadgeCheck, Boxes, ChartPie, ClipboardList, Handshake, Lightbulb, MapPinned, PackageSearch, Star, Store, Users } from "lucide-react";
 import type { User } from "@/generated/prisma/client";
 import type { SellerStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
@@ -13,14 +13,15 @@ import { DownloadButtons } from "./download-buttons";
 const ICON: Record<ReportId, typeof Users> = {
   "buyer-register": Users, "sector-requirements": ClipboardList, "approved-buyers": BadgeCheck, "approved-sellers": BadgeCheck,
   "seller-register": Store, "seller-district-summary": MapPinned, "mis-summary": BarChart3, "sector-demand": Boxes,
-  "product-demand": PackageSearch, "insights": Lightbulb,
+  "product-demand": PackageSearch, "insights": Lightbulb, "match-list": Handshake, "seller-preferences": Star, "match-coverage": ChartPie,
 };
 const ACCENT: Record<ReportId, string> = {
   "buyer-register": "bg-tx-blue", "sector-requirements": "bg-tx-yellow", "approved-buyers": "bg-tx-green", "approved-sellers": "bg-tx-green",
   "seller-register": "bg-tx-green", "seller-district-summary": "bg-tx-blue", "mis-summary": "bg-tx-red", "sector-demand": "bg-violet-500",
-  "product-demand": "bg-violet-500", "insights": "bg-ink",
+  "product-demand": "bg-violet-500", "insights": "bg-ink", "match-list": "bg-tx-green", "seller-preferences": "bg-violet-500", "match-coverage": "bg-tx-red",
 };
 const SELLER_REPORTS: ReportId[] = ["approved-sellers", "seller-register", "seller-district-summary"];
+const MATCH_REPORTS: ReportId[] = ["match-list", "seller-preferences", "match-coverage"];
 
 type Params = F & { s_status?: string; s_district?: string; s_sector?: string; s_exp?: string };
 
@@ -45,7 +46,8 @@ function ReportCard({ id, href, note }: { id: ReportId; href: string; note?: str
 export async function ReportsPage({ user, base, filters }: { user: User; base: string; filters: Params }) {
   const role = user.role;
   const allowed = reportsFor(role);
-  const buyerIds = allowed.filter((id) => !SELLER_REPORTS.includes(id));
+  const buyerIds = allowed.filter((id) => !SELLER_REPORTS.includes(id) && !MATCH_REPORTS.includes(id));
+  const matchIds = allowed.filter((id) => MATCH_REPORTS.includes(id));
   const sellerIds = allowed.filter((id) => SELLER_REPORTS.includes(id));
   const [countries, sectors] = await Promise.all([
     buyerIds.length ? prisma.buyer.findMany({ where: scopeFor(role), distinct: ["country"], select: { country: true }, orderBy: { country: "asc" } }) : [],
@@ -139,6 +141,17 @@ export async function ReportsPage({ user, base, filters }: { user: User; base: s
               <ReportCard key={id} id={id} href={`/api/reports/${id}${id === "seller-district-summary" || !sqs ? "" : `?${sqs}`}`}
                 note={id === "seller-district-summary" ? "Covers all sellers you can see (filters not applied)."
                   : id === "approved-sellers" ? "Approved sellers only — the status filter is not applied." : undefined} />
+            ))}
+          </div>
+        </section>
+      )}
+      {matchIds.length > 0 && (
+        <section className="mt-10">
+          <h2 className="mb-3 text-lg font-bold text-ink">Matchmaking reports</h2>
+          <div className="grid gap-5 md:grid-cols-2">
+            {matchIds.map((id) => (
+              <ReportCard key={id} id={id} href={`/api/reports/${id}`}
+                note={id === "match-list" ? (role === "DIC" || role === "ADMIN" ? "Published mapping. The working list is downloadable from Matchmaking." : "Published mapping only.") : "Published mapping; the working list is on the Matchmaking pages."} />
             ))}
           </div>
         </section>

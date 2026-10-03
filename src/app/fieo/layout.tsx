@@ -15,6 +15,7 @@ export default async function FieoLayout({ children }: { children: React.ReactNo
       { href: "/fieo/seller-list", label: "RBSM seller list", icon: "sellers", group: "Sellers" },
       { href: "/fieo/demand", label: "Sector demand", icon: "demand", group: "Programme" },
       { href: "/fieo/products", label: "Product demand", icon: "products", group: "Programme" },
+      { href: "/fieo/matches", label: "Buyer–seller mapping", icon: "match", group: "Programme" },
       { href: "/fieo/reports", label: "Reports", icon: "reports", group: "Programme" },
     ]}>{children}</AppShell>
   );

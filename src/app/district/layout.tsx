@@ -11,6 +11,7 @@ export default async function DistrictLayout({ children }: { children: React.Rea
       { href: "/district/sellers", label: "Sellers", icon: "sellers", badge: pending },
       { href: "/district/sellers/new", label: "Add seller", icon: "add", exact: true },
       { href: "/district/upload", label: "Bulk upload", icon: "upload" },
+      { href: "/district/matches", label: "Buyer meetings", icon: "match" },
       { href: "/district/reports", label: "Reports", icon: "reports" },
     ]}>{children}</AppShell>
   );
