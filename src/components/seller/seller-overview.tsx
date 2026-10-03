@@ -7,8 +7,8 @@ import { sellerScope } from "@/lib/seller-query";
 import { DISTRICT_NAMES } from "@/lib/config";
 import { getTargets } from "@/lib/targets";
 import { SELLER_META } from "@/lib/status";
-import { fmtDate } from "@/lib/format";
-import { Badge, Card, CardHeader, StatCard } from "@/components/ui";
+import { Card, CardHeader, StatCard } from "@/components/ui";
+import { PendingNow } from "@/components/pending-now";
 import { SectionBand } from "@/components/section-band";
 import { BarList, PipelineBar } from "@/components/charts";
 import { cn } from "@/lib/cn";
@@ -30,19 +30,14 @@ function Progress({ label, value, target, color, suffix }: { label: string; valu
 /** Seller statistics for any staff role, within what that role may see. */
 export async function SellerOverview({ user, base, standalone }: { user: User; base: string; standalone?: boolean }) {
   const scope = sellerScope(user);
-  const [byStatus, byDistrict, products, exp, bySource, approvedBuyers, recent] = await Promise.all([
+  const [byStatus, byDistrict, products, exp, bySource, approvedBuyers] = await Promise.all([
     prisma.seller.groupBy({ by: ["status"], where: scope, _count: true }),
     prisma.seller.groupBy({ by: ["district", "status"], where: scope, _count: true }),
-    prisma.sellerProduct.findMany({ where: { seller: scope }, select: { sectorId: true, sector: { select: { name: true } } } }),
+    // Sellers by sector: approved sellers only.
+    prisma.sellerProduct.findMany({ where: { seller: { AND: [scope, { status: "APPROVED" }] } }, select: { sectorId: true, sector: { select: { name: true } } } }),
     prisma.seller.groupBy({ by: ["exportExperience", "status"], where: scope, _count: true }),
     prisma.seller.groupBy({ by: ["source"], where: scope, _count: true }),
     prisma.buyer.count({ where: { status: "APPROVED" } }),
-    user.role === "DISTRICT" || user.role === "DIC"
-      ? prisma.seller.findMany({
-          where: { AND: [scope, { status: { in: user.role === "DISTRICT" ? ["WITH_DISTRICT", "RETURNED"] : ["RECOMMENDED"] } }] },
-          orderBy: { updatedAt: "asc" }, take: 6,
-        })
-      : Promise.resolve([]),
   ]);
   const n = (...s: SellerStatus[]) => byStatus.filter((x) => s.includes(x.status)).reduce((a, x) => a + x._count, 0);
   const total = byStatus.reduce((a, x) => a + x._count, 0);
@@ -89,10 +84,10 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
   const ownTarget = user.role === "DISTRICT" ? targets.district[user.district ?? ""] ?? 0 : 0;
 
   const sellersBySector = (
-    <Card className={user.role === "ADMIN" ? "" : "lg:col-span-2"}>
-      <CardHeader title="Sellers by sector" subtitle="Sellers ready to export, per sector" />
+    <Card className="lg:col-span-2">
+      <CardHeader title="Sellers by sector" subtitle="Approved sellers ready to export, per sector" />
       <div className="p-6">
-        <BarList data={topSectors.map((s) => ({ label: s.name, value: s.n, href: `${base}/sellers?sector=${s.id}` }))} color="bg-tx-red" empty="No sellers yet." />
+        <BarList data={topSectors.map((s) => ({ label: s.name, value: s.n, href: user.role === "FIEO" ? `${base}/seller-list?sector=${s.id}` : `${base}/sellers?status=APPROVED&sector=${s.id}` }))} color="bg-tx-red" empty="No approved sellers yet." />
       </div>
     </Card>
   );
@@ -156,29 +151,15 @@ export async function SellerOverview({ user, base, standalone }: { user: User; b
       </div>
 
       {user.role !== "FIEO" && <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {user.role === "DISTRICT" || user.role === "DIC" ? (
-          <Card>
-            <CardHeader title={user.role === "DISTRICT" ? "Waiting for recommendation" : "Waiting for approval"} subtitle="Oldest first"
-              action={<Link href={`${base}/sellers?status=action`} className="text-sm font-semibold text-brand-700 hover:underline">View all</Link>} />
-            <ul className="divide-y divide-slate-100">
-              {recent.map((s) => (
-                <li key={s.id}>
-                  <Link href={`${base}/sellers/${s.id}`} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-ink">{s.name}</div>
-                      <div className="text-xs text-slate-500">{s.regNo} · {s.district} · {fmtDate(s.updatedAt)}</div>
-                    </div>
-                    {s.status === "RETURNED" && <Badge tone="red">Returned</Badge>}
-                  </Link>
-                </li>
-              ))}
-              {!recent.length && <li className="px-5 py-8 text-center text-sm text-slate-500">Nothing waiting — all caught up.</li>}
-            </ul>
-          </Card>
-        ) : null}
+        <PendingNow title="Sellers pending now" rows={[
+          { label: user.role === "DISTRICT" ? "With my office" : "With district centres", value: n("WITH_DISTRICT"), href: `${base}/sellers?status=WITH_DISTRICT`, dot: "bg-tx-yellow" },
+          { label: "With applicants for correction", value: n("WITH_SELLER"), href: `${base}/sellers?status=WITH_SELLER`, dot: "bg-tx-blue" },
+          { label: user.role === "DISTRICT" ? "Returned by Directorate" : "Returned by Directorate to districts", value: n("RETURNED"), href: `${base}/sellers?status=RETURNED`, dot: "bg-tx-red" },
+          { label: "Awaiting Directorate approval", value: n("RECOMMENDED"), href: `${base}/sellers?status=RECOMMENDED`, dot: "bg-violet-500" },
+        ]} />
         {sellersBySector}
         {(user.role === "DIC" || user.role === "ADMIN") && (
-          <Card className={user.role === "DIC" ? "lg:col-span-3" : "lg:col-span-2"}>
+          <Card className="lg:col-span-3">
             <CardHeader title="District-wise position" subtitle="Approved sellers against each district's target" />
             <div className="table-scroll relative overflow-x-auto">
               <table className="w-full min-w-[520px] text-sm">

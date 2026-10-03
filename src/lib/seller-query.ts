@@ -1,6 +1,6 @@
 import type { Prisma, User } from "@/generated/prisma/client";
 import type { SellerStatus } from "@/generated/prisma/enums";
-import { ALL_SELLER_STATUSES, SELLER_VISIBLE } from "@/lib/status";
+import { ALL_SELLER_STATUSES, SELLER_PENDING, SELLER_VISIBLE } from "@/lib/status";
 
 export type SellerFilters = { q?: string; status?: string; sector?: string; district?: string; exp?: string; source?: string; page?: string };
 
@@ -27,6 +27,8 @@ export function sellerWhere(user: Pick<User, "role" | "district">, f: SellerFilt
   }
   if (f.status === "action") {
     and.push({ status: { in: user.role === "DISTRICT" ? ["WITH_DISTRICT", "RETURNED"] : ["RECOMMENDED"] } });
+  } else if (f.status === "pending") {
+    and.push({ status: { in: SELLER_PENDING } });
   } else if (f.status && ALL_SELLER_STATUSES.includes(f.status as SellerStatus)) {
     and.push({ status: f.status as SellerStatus });
   }

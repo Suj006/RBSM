@@ -67,6 +67,8 @@ export const JOURNEY = ["Sign up", "Basic details", "FIEO approval", "Sector req
 
 // Sector rows each reviewer acts on.
 export const FIEO_ITEM_QUEUE: ItemStatus[] = ["SUBMITTED", "DIC_RETURNED"];
+/** Submitted sector requirements still in verification (drafts excluded). */
+export const ITEM_PENDING: ItemStatus[] = ["SUBMITTED", "FIEO_RETURNED", "FIEO_RECOMMENDED", "DIC_RETURNED"];
 export const DIC_ITEM_QUEUE: ItemStatus[] = ["FIEO_RECOMMENDED"];
 // Sector rows the Directorate can see at all.
 
@@ -106,5 +108,7 @@ export const SELLER_VISIBLE: Partial<Record<Role, SellerStatus[]>> = {
 };
 /** The district can edit (and recommend) these. */
 export const SELLER_DISTRICT_EDITABLE: SellerStatus[] = ["WITH_DISTRICT", "RETURNED"];
+/** Sellers still in verification (not yet approved or rejected). */
+export const SELLER_PENDING: SellerStatus[] = ["WITH_DISTRICT", "WITH_SELLER", "RETURNED", "RECOMMENDED"];
 /** An applicant with a temporary login can correct their own details in these (and resubmit to the district). */
 export const SELLER_APPLICANT_EDITABLE: SellerStatus[] = ["WITH_DISTRICT", "WITH_SELLER"];

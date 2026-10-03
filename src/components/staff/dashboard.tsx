@@ -1,13 +1,11 @@
-import Link from "next/link";
 import type { BuyerStatus, ItemStatus, Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
-import { actionWhere, itemScope, scopeFor } from "@/lib/buyer-query";
-import { DIC_ITEM_QUEUE, FIEO_ITEM_QUEUE, ITEM_META, ROLE_LABEL } from "@/lib/status";
+import { itemScope, scopeFor } from "@/lib/buyer-query";
+import { FIEO_ITEM_QUEUE, ITEM_META, ROLE_LABEL } from "@/lib/status";
 import { Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
+import { PendingNow } from "@/components/pending-now";
 import { SectionBand, SectionJumps } from "@/components/section-band";
 import { BarList, ColumnChart, PipelineBar } from "@/components/charts";
-import { StatusBadge } from "@/components/status-badge";
-import { ItemChips } from "@/components/item-chips";
 import { fmtDate } from "@/lib/format";
 import { EVENT } from "@/lib/config";
 
@@ -17,21 +15,14 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
   const scope = scopeFor(role);
   const iScope = itemScope(role);
   const since = new Date(); since.setHours(0, 0, 0, 0); since.setDate(since.getDate() - (DAYS - 1));
-  const itemQueue: ItemStatus[] = role === "DIC" ? DIC_ITEM_QUEUE : FIEO_ITEM_QUEUE;
 
-  const [byStatus, byItem, byCountry, sectorItems, recent, queue] = await Promise.all([
+  const [byStatus, byItem, byCountry, sectorItems, recent] = await Promise.all([
     prisma.buyer.groupBy({ by: ["status"], where: scope, _count: true }),
     prisma.requirementItem.groupBy({ by: ["status"], where: iScope, _count: true }),
     prisma.buyer.groupBy({ by: ["country"], where: scope, _count: true, orderBy: { _count: { country: "desc" } }, take: 8 }),
     // Sectors of interest: approved requirements only.
     prisma.requirementItem.findMany({ where: { AND: [iScope, { status: "APPROVED" }] }, select: { sectorId: true, sector: { select: { name: true } } } }),
     prisma.buyer.findMany({ where: { AND: [scope, { createdAt: { gte: since } }] }, select: { createdAt: true } }),
-    prisma.buyer.findMany({
-      where: { AND: [scope, actionWhere(role)] },
-      orderBy: { updatedAt: "asc" },
-      take: 6,
-      include: { requirement: { select: { items: { where: { status: { in: itemQueue } }, select: { status: true, sector: { select: { name: true } } } } } } },
-    }),
   ]);
   const count = (...s: BuyerStatus[]) => byStatus.filter((x) => s.includes(x.status)).reduce((n, x) => n + x._count, 0);
   const items = (...s: ItemStatus[]) => byItem.filter((x) => s.includes(x.status)).reduce((n, x) => n + x._count, 0);
@@ -115,22 +106,16 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <Card>
-          <CardHeader title="Work queue" subtitle="Oldest first" action={<Link href={`${base}/buyers?status=action`} className="text-sm font-semibold text-brand-700 hover:underline">View all</Link>} />
-          <ul className="divide-y divide-slate-100">
-            {queue.map((b) => (
-              <li key={b.id}>
-                <Link href={`${base}/buyers/${b.id}`} className="block px-5 py-3 hover:bg-slate-50">
-                  <div className="truncate text-sm font-semibold text-ink" title={b.name}>{b.name}</div>
-                  <div className="text-xs text-slate-500">{b.regNo} · {b.country} · {fmtDate(b.updatedAt)}</div>
-                  {b.status === "BASIC_SUBMITTED" && <div className="mt-1.5"><StatusBadge status={b.status} /></div>}
-                  {!!b.requirement?.items.length && <div className="mt-1.5"><ItemChips items={b.requirement.items} /></div>}
-                </Link>
-              </li>
-            ))}
-            {!queue.length && <li className="px-5 py-8 text-center text-sm text-slate-500">Nothing waiting — all caught up.</li>}
-          </ul>
-        </Card>
+        <PendingNow title="Buyers pending now" rows={[
+          { group: "Basic details", label: "Signed up, not yet submitted", value: count("SIGNED_UP"), href: `${base}/buyers?status=SIGNED_UP`, dot: "bg-slate-400" },
+          { group: "Basic details", label: "Returned to buyer for correction", value: count("BASIC_RETURNED"), href: `${base}/buyers?status=BASIC_RETURNED`, dot: "bg-tx-red" },
+          { group: "Basic details", label: "Awaiting FIEO verification", value: count("BASIC_SUBMITTED"), href: `${base}/buyers?status=BASIC_SUBMITTED`, dot: "bg-tx-yellow" },
+          { group: "Sector requirements", label: "Draft, not yet submitted", value: items("DRAFT"), href: `${base}/requirements?item=DRAFT`, dot: "bg-slate-400" },
+          { group: "Sector requirements", label: "Returned to buyer", value: items("FIEO_RETURNED"), href: `${base}/requirements?item=FIEO_RETURNED`, dot: "bg-tx-red" },
+          { group: "Sector requirements", label: "Awaiting FIEO", value: items("SUBMITTED"), href: `${base}/requirements?item=SUBMITTED`, dot: "bg-tx-yellow" },
+          { group: "Sector requirements", label: "Returned by Directorate to FIEO", value: items("DIC_RETURNED"), href: `${base}/requirements?item=DIC_RETURNED`, dot: "bg-orange-500" },
+          { group: "Sector requirements", label: "Awaiting Directorate approval", value: items("FIEO_RECOMMENDED"), href: `${base}/requirements?item=FIEO_RECOMMENDED`, dot: "bg-violet-500" },
+        ]} />
         <Card>
           <CardHeader title="Top countries" />
           <div className="p-6">

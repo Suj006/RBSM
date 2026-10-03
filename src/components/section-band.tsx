@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Globe2, Store } from "lucide-react";
+import { Globe2, LayoutGrid, Store } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const KIND = {
   buyers: { icon: Globe2, eyebrow: "International buyers", bar: "bg-tx-blue", soft: "bg-tx-blue/10 text-tx-blue", ring: "ring-tx-blue/25" },
   sellers: { icon: Store, eyebrow: "Kerala MSME sellers", bar: "bg-tx-green", soft: "bg-tx-green/10 text-brand-700", ring: "ring-tx-green/25" },
+  programme: { icon: LayoutGrid, eyebrow: "Whole programme", bar: "bg-ink", soft: "bg-slate-100 text-ink", ring: "ring-slate-200" },
 } as const;
 
 /** Header band that opens the buyer or seller half of a dashboard, so the two are told apart at a glance. */
@@ -19,7 +20,7 @@ export function SectionBand({ id, kind, title, summary, links }: {
         <div className="flex items-center gap-4">
           <span className={cn("grid size-11 shrink-0 place-items-center rounded-xl", k.soft)}><k.icon className="size-6" /></span>
           <div>
-            <div className={cn("text-xs font-bold uppercase tracking-wider", kind === "buyers" ? "text-tx-blue" : "text-brand-700")}>{k.eyebrow}</div>
+            <div className={cn("text-xs font-bold uppercase tracking-wider", kind === "buyers" ? "text-tx-blue" : kind === "sellers" ? "text-brand-700" : "text-slate-500")}>{k.eyebrow}</div>
             <h2 className="text-xl font-extrabold tracking-tight text-ink">{title}</h2>
             {summary && <div className="text-sm text-slate-500">{summary}</div>}
           </div>
@@ -46,6 +47,9 @@ export function SectionJumps() {
       </a>
       <a href="#sellers" className="inline-flex items-center gap-2 rounded-lg bg-tx-green/10 px-3.5 py-2 text-sm font-semibold text-brand-700 ring-1 ring-inset ring-tx-green/25 hover:bg-tx-green/15">
         <Store className="size-4" /> Sellers
+      </a>
+      <a href="#sectors" className="inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-sm font-semibold text-ink ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+        <LayoutGrid className="size-4" /> Sectors
       </a>
     </div>
   );

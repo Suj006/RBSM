@@ -4,7 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { ItemStatus, Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { itemScope, scopeFor } from "@/lib/buyer-query";
-import { ALL_ITEM_STATUSES, DIC_ITEM_QUEUE, FIEO_ITEM_QUEUE, ITEM_META } from "@/lib/status";
+import { ALL_ITEM_STATUSES, DIC_ITEM_QUEUE, FIEO_ITEM_QUEUE, ITEM_META, ITEM_PENDING } from "@/lib/status";
 import { fmtDate, parseCerts } from "@/lib/format";
 import { Badge, Button, Card, EmptyState, Input, PageHeader, Select } from "@/components/ui";
 import { Pagination } from "./pagination";
@@ -19,6 +19,7 @@ export async function RequirementListPage({ role, base, buyerBase, filters }: { 
   const and: Prisma.RequirementItemWhereInput[] = [itemScope(role), filters.item === "DRAFT" ? {} : { status: { not: "DRAFT" } }];
   if (filters.item === "action") and.push({ status: { in: role === "DIC" ? DIC_ITEM_QUEUE : FIEO_ITEM_QUEUE } });
   else if (filters.item === "with_fieo") and.push({ status: { in: FIEO_ITEM_QUEUE } });
+  else if (filters.item === "pending") and.push({ status: { in: ITEM_PENDING } });
   else if (filters.item && ALL_ITEM_STATUSES.includes(filters.item as ItemStatus)) and.push({ status: filters.item as ItemStatus });
   if (filters.sector) and.push({ sectorId: filters.sector });
   if (filters.country) and.push({ requirement: { buyer: { country: filters.country } } });
@@ -39,7 +40,7 @@ export async function RequirementListPage({ role, base, buyerBase, filters }: { 
   ]);
   const { page: _p, ...rest } = filters;
   void _p;
-  const qs = new URLSearchParams(Object.entries({ item: filters.item === "action" || filters.item === "with_fieo" ? undefined : filters.item, sector: filters.sector, country: filters.country })
+  const qs = new URLSearchParams(Object.entries({ item: filters.item === "action" || filters.item === "with_fieo" || filters.item === "pending" ? undefined : filters.item, sector: filters.sector, country: filters.country })
     .filter(([, v]) => v) as [string, string][]).toString();
 
   return (
@@ -57,6 +58,7 @@ export async function RequirementListPage({ role, base, buyerBase, filters }: { 
             <option value="">All statuses</option>
             <option value="action">{role === "ADMIN" ? "Pending with FIEO" : "⚑ Waiting for my decision"}</option>
             {role === "DIC" && <option value="with_fieo">Pending with FIEO</option>}
+            <option value="pending">All pending (in verification)</option>
             {statuses.map((s) => <option key={s} value={s}>{ITEM_META[s].label}</option>)}
           </Select>
           <Select name="sector" defaultValue={filters.sector ?? ""} aria-label="Sector">

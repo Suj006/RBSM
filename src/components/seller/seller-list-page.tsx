@@ -59,6 +59,7 @@ export async function SellerListPage({ user, base, filters, title, subtitle }: {
           <Select name="status" defaultValue={filters.status ?? ""} aria-label="Status">
             <option value="">All statuses</option>
             {(user.role === "DISTRICT" || user.role === "DIC") && <option value="action">⚑ Needs my action</option>}
+            {user.role !== "FIEO" && <option value="pending">All pending (in verification)</option>}
             {statuses.map((s) => <option key={s} value={s}>{SELLER_META[s].label}</option>)}
           </Select>
           <Select name="sector" defaultValue={filters.sector ?? ""} aria-label="Sector">
