@@ -88,6 +88,19 @@ gaps**: buyers below 10 sellers, approved sellers without a buyer, sector covera
 covered by the matched sellers, and district position. Reports: mapping (published or working list), seller
 preferences and outcome, results and gaps. Buyers see their matched sellers; sellers their buyer meetings;
 district centres the meetings of their sellers. Participants whose list changes are e-mailed on publishing.
+**Reports at every step** (Excel and PDF, offered inside each step on the Matchmaking overview and on Reports):
+
+| Step | Report | What it holds |
+|---|---|---|
+| 1 | Buyer directory for sellers | Approved buyers' approved sectors: products, specifications, certifications, volumes; approved sellers per sector; preferences received |
+| 2–3 | Seller preferences and outcome | Each seller's ranked choices; every preference with the seller's sectors & products, the buyer's sectors & products, the fit and the result (in working list / published / why not placed); sellers yet to respond; preferences per buyer |
+| 4 | Working list | Every pair with the buyer's approved sectors & products, the seller's sectors & products and **why matched** (seller's preference rank, common sectors, matching products, required certifications held, export experience, with the fit points); buyer-wise and seller-wise summaries; changes against the published version; pairs removed by the Directorate |
+| 5 | Checks | Mappings to review, by severity |
+| 5–6 | Published / final mapping, Results & gaps | As the working list, for the published (or locked) version; buyers below target and sellers without buyers with their sectors & products, sector and product coverage, district position |
+
+FIEO and district centres get the published mapping (districts: their own sellers) with the sector, product and certification
+reasons but without seller preference ranks or fit points. Buyers and sellers see "Matched on: <sectors>" for each meeting.
+
 The Directorate and Admin work the module from one **Matchmaking** menu entry with tabs: Overview, Mapping
 board, Seller preferences, Checks, Results & gaps, Published.
 

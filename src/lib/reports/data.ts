@@ -17,7 +17,7 @@ import { productDemand, sectorDemandSummary } from "@/lib/demand";
 import { AGE_BUCKETS, buildInsights } from "@/lib/insights";
 import { buildDecisionView } from "@/lib/decision";
 import { sellerProfileStats } from "@/lib/seller-profile-stats";
-import { coverage, fit, getMatchState, loadPool, preferenceOutcomes, SOURCE_LABEL } from "@/lib/matchmaking";
+import { buyerNeeds, coverage, fit, getMatchState, loadPool, matchChecks, preferenceOutcomes, sellerOffers, SOURCE_LABEL, whyMatched } from "@/lib/matchmaking";
 
 export const REPORTS = {
   "buyer-register": {
@@ -62,11 +62,19 @@ export const REPORTS = {
   },
   "match-list": {
     title: "Buyer–Seller Mapping",
-    description: "Buyer-wise list of matched sellers — sectors, products, district and how each pair was made (seller preference, system match or manual).",
+    description: "Steps 4–6 — every buyer–seller pair with the buyer's approved sectors and products, the seller's sectors and products, and why they are matched (common sector, matching products, certifications, preference); buyer-wise and seller-wise summaries.",
+  },
+  "match-buyer-directory": {
+    title: "Buyer Directory for Sellers",
+    description: "Step 1 — the approved buyers and approved sector requirements shown to approved sellers: products, specifications, certifications, volumes, approved sellers per sector and preferences received.",
+  },
+  "match-checks": {
+    title: "Matchmaking Checks",
+    description: "Step 5 — working-list mappings that look incorrect (not approved any more, no common sector, no matching product, missing certifications, below / above target, over-assigned sellers). For reference; they do not stop publishing.",
   },
   "seller-preferences": {
     title: "Seller Preferences and Outcome",
-    description: "Each approved seller's tentative buyer preferences (rank 1–5) and whether each made it into the working list and the published mapping.",
+    description: "Steps 2–3 — each approved seller's tentative buyer preferences (rank 1–5) with both sides' sectors and products, the fit, and whether each made it into the working list and the published mapping; sellers yet to respond; preferences received by each buyer.",
   },
   "match-coverage": {
     title: "Matchmaking Results and Gaps",
@@ -83,7 +91,7 @@ export type ReportId = keyof typeof REPORTS;
 export const reportsFor = (role: User["role"]): ReportId[] =>
   role === "DISTRICT" ? ["approved-sellers", "seller-register", "seller-district-summary", "seller-profile-analysis", "match-list"]
   // Promoter details (gender, social category…) are internal to the Directorate and districts.
-  : role === "FIEO" ? (Object.keys(REPORTS) as ReportId[]).filter((id) => !["insights", "seller-preferences", "match-coverage", "seller-profile-analysis"].includes(id))
+  : role === "FIEO" ? (Object.keys(REPORTS) as ReportId[]).filter((id) => !["insights", "seller-preferences", "match-coverage", "match-checks", "match-buyer-directory", "seller-profile-analysis"].includes(id))
   : role === "DIC" || role === "ADMIN" ? (Object.keys(REPORTS) as ReportId[])
   : [];
 export const isReportId = (s: string): s is ReportId => s in REPORTS;
@@ -560,6 +568,8 @@ export async function buildReport(id: ReportId, user: User, f: BuyerFilters & Se
     case "seller-profile-analysis": return sellerProfileAnalysis(user);
     case "match-list": return matchListReport(user, (f as { v?: string }).v === "draft" ? "draft" : "published");
     case "seller-preferences": return sellerPreferencesReport(user);
+    case "match-buyer-directory": return buyerDirectoryReport(user);
+    case "match-checks": return matchChecksReport(user);
     case "match-coverage": return matchCoverageReport(user, (f as { v?: string }).v === "draft" ? "draft" : "published");
   }
 }
@@ -1170,90 +1180,324 @@ async function matchListReport(user: User, which: "published" | "draft"): Promis
   // Only the Directorate and Admin see the working list; everyone else sees what is published.
   const draft = which === "draft" && (user.role === "DIC" || user.role === "ADMIN");
   const internal = user.role === "DIC" || user.role === "ADMIN";
-  const [state, pool, pairs] = await Promise.all([
+  const districtOnly = user.role === "DISTRICT" ? { seller: { district: user.district ?? "" } } : {};
+  const [state, pool, pairs, published, removed] = await Promise.all([
     getMatchState(), loadPool(),
     draft
       ? prisma.match.findMany({ where: { removed: false }, select: { buyerId: true, sellerId: true, source: true } })
-      : prisma.publishedMatch.findMany({ where: user.role === "DISTRICT" ? { seller: { district: user.district ?? "" } } : {}, orderBy: { slot: "asc" }, select: { buyerId: true, sellerId: true, source: true } }),
+      : prisma.publishedMatch.findMany({ where: districtOnly, orderBy: { slot: "asc" }, select: { buyerId: true, sellerId: true, source: true } }),
+    draft ? prisma.publishedMatch.findMany({ select: { buyerId: true, sellerId: true, source: true } }) : Promise.resolve([]),
+    draft ? prisma.match.findMany({ where: { removed: true }, select: { buyerId: true, sellerId: true, updatedAt: true } }) : Promise.resolve([]),
   ]);
   const sellerById = new Map(pool.sellers.map((s) => [s.id, s]));
+  const buyerById = new Map(pool.buyers.map((b) => [b.id, b]));
+  const fitOf = (buyerId: string, sellerId: string) => fit(buyerById.get(buyerId)!, sellerById.get(sellerId)!, pool.prefRank.get(`${buyerId}|${sellerId}`) ?? null);
+  const label = draft ? "Working list (not published)" : state.version ? `Published version ${state.version}${state.locked ? " (final)" : ""}` : "Not published yet";
+
+  // 1. Pair by pair, with both sides' sectors and products and why the pair is there.
   const rows: Row[] = [];
+  const buyerRows: Row[] = [];
   let sl = 0;
   for (const b of pool.buyers) {
     const mine = pairs.filter((p) => p.buyerId === b.id && sellerById.has(p.sellerId))
-      .map((p) => ({ p, s: sellerById.get(p.sellerId)!, f: fit(b, sellerById.get(p.sellerId)!, pool.prefRank.get(`${b.id}|${p.sellerId}`) ?? null) }))
+      .map((p) => ({ p, s: sellerById.get(p.sellerId)!, f: fitOf(b.id, p.sellerId) }))
       .sort((x, y) => y.f.score - x.f.score);
     mine.forEach(({ p, s, f }, i) => rows.push({
-      sl: ++sl, buyerNo: b.approvedNo, buyer: b.name, country: b.country, n: i + 1, sellerNo: s.approvedNo, seller: s.name, district: s.district,
-      sectors: f.sectors.join(", "), products: s.sectors.map((x) => `${x.name}: ${x.products}`).join("\n"),
-      source: SOURCE_LABEL[p.source] + (f.prefRank ? ` (preference #${f.prefRank})` : ""), score: f.score,
-      iec: s.iecNo ?? "", certs: s.certifications.join(", "), certMatch: f.certs.join(", "),
+      sl: ++sl, buyerNo: b.approvedNo, buyer: b.name, country: b.country, n: i + 1, needs: buyerNeeds(b),
+      sellerNo: s.approvedNo, seller: s.name, district: s.district, offers: sellerOffers(s),
+      why: whyMatched(f, s, internal), source: SOURCE_LABEL[p.source] + (f.prefRank ? ` (preference #${f.prefRank})` : ""), score: f.score,
+      iec: s.iecNo ?? "", certs: s.certifications.join(", "),
     }));
+    if (user.role !== "DISTRICT" || mine.length) {
+      const src = (x: string) => mine.filter((m) => m.p.source === x).length;
+      buyerRows.push({
+        buyerNo: b.approvedNo, buyer: b.name, country: b.country, sectors: b.sectors.map((x) => x.name).join(", "), n: mine.length,
+        pref: src("PREFERENCE"), sys: src("SYSTEM"), manual: src("MANUAL"),
+        status: user.role === "DISTRICT" ? "" : mine.length >= pool.target ? "At target" : mine.length ? `Short by ${pool.target - mine.length}` : "No sellers",
+      });
+    }
   }
-  const buyers = new Set(rows.map((r) => r.buyer)).size;
-  return {
-    ...base("match-list", user, [
-      draft ? "Working list (not published)" : state.version ? `Published version ${state.version}${state.locked ? " (final)" : ""}` : "Not published yet",
-      ...(user.role === "DISTRICT" ? [`Sellers of ${user.district}`] : []),
-    ]),
-    kpis: [
-      { label: "Buyers", value: buyers, tone: "blue" },
-      { label: "Buyer–seller pairs", value: rows.length, tone: "green" },
-      { label: "Sellers", value: new Set(rows.map((r) => r.seller)).size, tone: "violet" },
-      { label: "Target per buyer", value: pool.target, tone: "yellow" },
-    ],
-    tables: [{
-      name: "Mapping",
+  // 2. Seller by seller.
+  const sellerRows: Row[] = pool.sellers
+    .filter((s) => user.role !== "DISTRICT" || s.district === user.district)
+    .map((s) => {
+      const mine = pairs.filter((p) => p.sellerId === s.id && buyerById.has(p.buyerId));
+      const prefs = pool.prefs.filter((x) => x.sellerId === s.id);
+      return {
+        sellerNo: s.approvedNo, seller: s.name, district: s.district, sectors: s.sectors.map((x) => x.name).join(", "), n: mine.length,
+        buyers: mine.map((p) => `${buyerById.get(p.buyerId)!.name} (${buyerById.get(p.buyerId)!.country})`).join("\n"),
+        prefs: prefs.length ? `${prefs.filter((x) => mine.some((m) => m.buyerId === x.buyerId)).length} of ${prefs.length}` : "—",
+      };
+    })
+    .sort((a, b) => Number(b.n) - Number(a.n) || String(a.seller).localeCompare(String(b.seller)));
+
+  const tables: Table[] = [
+    {
+      name: "Mapping", heading: "1. Buyer–seller pairs — what each side needs / offers and why they are matched",
       columns: [
         { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
         { key: "buyerNo", header: "Buyer No.", width: 19, kind: "mono", excelOnly: true },
-        { key: "buyer", header: "Buyer", width: 24 }, { key: "country", header: "Country", width: 14 },
+        { key: "buyer", header: "Buyer", width: 20 }, { key: "country", header: "Country", width: 12 },
+        { key: "needs", header: "Buyer's Approved Sectors & Products", width: 34 },
         { key: "n", header: "#", width: 4, kind: "number", align: "center" },
         { key: "sellerNo", header: "Seller No.", width: 19, kind: "mono", excelOnly: true },
-        { key: "seller", header: "Seller", width: 24 }, { key: "district", header: "District", width: 15 },
-        { key: "sectors", header: "Common Sectors", width: 22 },
-        { key: "products", header: "Seller's Sectors & Products", width: 36 },
+        { key: "seller", header: "Seller", width: 20 }, { key: "district", header: "District", width: 12 },
+        { key: "offers", header: "Seller's Sectors & Products", width: 34 },
+        { key: "why", header: "Why Matched", width: 40 },
+        ...(internal ? [{ key: "source", header: "How Matched", width: 16 }, { key: "score", header: "Fit", width: 6, kind: "number" as const, align: "right" as const }] : []),
         { key: "iec", header: "Seller IEC", width: 13, kind: "mono", excelOnly: true },
         { key: "certs", header: "Seller Certifications", width: 30, excelOnly: true },
-        { key: "certMatch", header: "Required Certifications Held", width: 26, excelOnly: true },
-        ...(internal ? [{ key: "source", header: "How Matched", width: 22 }, { key: "score", header: "Fit", width: 6, kind: "number" as const, align: "right" as const }] : []),
       ],
       rows,
-    }],
+    },
+    {
+      name: "Buyer-wise", heading: `2. Buyer-wise summary${user.role === "DISTRICT" ? ` (sellers of ${user.district})` : ` (target ${pool.target} sellers per buyer)`}`,
+      columns: [
+        { key: "buyerNo", header: "Buyer No.", width: 19, kind: "mono" }, { key: "buyer", header: "Buyer", width: 26 }, { key: "country", header: "Country", width: 15 },
+        { key: "sectors", header: "Approved Sectors", width: 36 }, { key: "n", header: "Sellers", width: 8, kind: "number", align: "right" },
+        ...(internal ? [
+          { key: "pref", header: "Preference", width: 10, kind: "number" as const, align: "right" as const },
+          { key: "sys", header: "System", width: 8, kind: "number" as const, align: "right" as const },
+          { key: "manual", header: "Manual", width: 8, kind: "number" as const, align: "right" as const },
+        ] : []),
+        ...(user.role === "DISTRICT" ? [] : [{ key: "status", header: "Position", width: 14 }]),
+      ],
+      rows: buyerRows,
+    },
+    {
+      name: "Seller-wise", heading: "3. Seller-wise summary — the buyers each seller meets",
+      columns: [
+        { key: "sellerNo", header: "Seller No.", width: 19, kind: "mono" }, { key: "seller", header: "Seller", width: 26 }, { key: "district", header: "District", width: 15 },
+        { key: "sectors", header: "Sectors", width: 30 }, { key: "n", header: "Buyers", width: 8, kind: "number", align: "right" },
+        { key: "buyers", header: "Buyers (Country)", width: 40 },
+        ...(internal ? [{ key: "prefs", header: "Own Preferences Included", width: 13, align: "center" as const }] : []),
+      ],
+      rows: sellerRows,
+    },
+  ];
+  if (draft && state.version) {
+    const key = (x: { buyerId: string; sellerId: string }) => `${x.buyerId}|${x.sellerId}`;
+    const pub = new Set(published.map(key)), cur = new Set(pairs.map(key));
+    const name = (x: { buyerId: string; sellerId: string }) => ({ buyer: buyerById.get(x.buyerId)?.name ?? "—", seller: sellerById.get(x.sellerId)?.name ?? "(no longer approved)" });
+    tables.push({
+      name: "Changes vs Published", heading: `4. Changes against published version ${state.version} (seen by participants only after republishing)`,
+      columns: [{ key: "change", header: "Change", width: 12 }, { key: "buyer", header: "Buyer", width: 28 }, { key: "seller", header: "Seller", width: 28 }, { key: "source", header: "How Matched", width: 20 }],
+      rows: [
+        ...pairs.filter((x) => !pub.has(key(x))).map((x) => ({ change: "Added", ...name(x), source: SOURCE_LABEL[x.source] })),
+        ...published.filter((x) => !cur.has(key(x))).map((x) => ({ change: "Removed", ...name(x), source: SOURCE_LABEL[x.source] })),
+      ],
+    });
+  }
+  // Pairs whose buyer or seller is no longer approved (kept until the mapping is changed and republished).
+  const orphans = pairs.filter((p) => !sellerById.has(p.sellerId) || !buyerById.has(p.buyerId));
+  if (orphans.length) {
+    const [ob, os] = await Promise.all([
+      prisma.buyer.findMany({ where: { id: { in: orphans.map((o) => o.buyerId) } }, select: { id: true, name: true, status: true } }),
+      prisma.seller.findMany({ where: { id: { in: orphans.map((o) => o.sellerId) } }, select: { id: true, name: true, status: true } }),
+    ]);
+    tables.push({
+      name: "Needs Attention", heading: `${tables.length + 1}. Pairs whose buyer or seller is no longer approved`,
+      columns: [{ key: "buyer", header: "Buyer", width: 30 }, { key: "seller", header: "Seller", width: 30 }, { key: "note", header: "Note", width: 40 }],
+      rows: orphans.map((o) => {
+        const b = ob.find((x) => x.id === o.buyerId), sl = os.find((x) => x.id === o.sellerId);
+        return { buyer: b?.name ?? "—", seller: sl?.name ?? "—",
+          note: [b && b.status !== "APPROVED" && "Buyer no longer approved", sl && sl.status !== "APPROVED" && "Seller no longer approved"].filter(Boolean).join("; ") || "Not in the approved lists" };
+      }),
+    });
+  }
+  if (draft) tables.push({
+    name: "Excluded Pairs", heading: `${tables.length + 1}. Pairs removed by the Directorate (kept out when suggestions are refreshed)`,
+    columns: [{ key: "buyer", header: "Buyer", width: 28 }, { key: "seller", header: "Seller", width: 28 }, { key: "pref", header: "Seller's Preference", width: 14 }, { key: "at", header: "Removed On", width: 16, kind: "datetime" }],
+    rows: removed.filter((x) => buyerById.has(x.buyerId) && sellerById.has(x.sellerId)).map((x) => ({
+      buyer: buyerById.get(x.buyerId)!.name, seller: sellerById.get(x.sellerId)!.name,
+      pref: pool.prefRank.get(`${x.buyerId}|${x.sellerId}`) ? `#${pool.prefRank.get(`${x.buyerId}|${x.sellerId}`)}` : "", at: x.updatedAt,
+    })),
+  });
+
+  const r = base("match-list", user, [label, ...(user.role === "DISTRICT" ? [`Sellers of ${user.district}`] : [])]);
+  return {
+    ...r,
+    title: draft ? "Buyer–Seller Mapping — Working List" : state.locked ? "Buyer–Seller Mapping — Final" : r.title,
+    fileName: draft ? r.fileName.replace("Mapping", "Mapping-Working-List") : r.fileName,
+    kpis: [
+      { label: "Buyers", value: new Set(rows.map((x) => x.buyer)).size, tone: "blue" },
+      { label: "Buyer–seller pairs", value: rows.length, tone: "green" },
+      { label: "Sellers", value: new Set(rows.map((x) => x.seller)).size, tone: "violet" },
+      { label: "Target per buyer", value: pool.target, tone: "yellow" },
+    ],
+    tables,
   };
 }
 
 async function sellerPreferencesReport(user: User): Promise<Report> {
-  const [{ rows, summary }, state] = await Promise.all([preferenceOutcomes(), getMatchState()]);
+  const [{ rows, summary }, state, pool, removed, draftCount, profiles] = await Promise.all([
+    preferenceOutcomes(), getMatchState(), loadPool(),
+    prisma.match.findMany({ where: { removed: true }, select: { buyerId: true, sellerId: true } }),
+    prisma.match.count({ where: { removed: false } }),
+    prisma.seller.findMany({ where: { status: "APPROVED" }, select: { id: true, profileCompletedAt: true, contactName: true, contactMobile: true, contactEmail: true } }),
+  ]);
+  const sellerById = new Map(pool.sellers.map((s) => [s.id, s]));
+  const buyerById = new Map(pool.buyers.map((b) => [b.id, b]));
+  const profileOf = new Map(profiles.map((p) => [p.id, p]));
+  const removedSet = new Set(removed.map((x) => `${x.buyerId}|${x.sellerId}`));
   const cell = (r: (typeof rows)[number], n: number) => {
     const p = r.prefs.find((x) => x.rank === n);
     return p ? `${p.buyer}${p.inPublished ? " ✓ published" : p.inDraft ? " ✓ list" : ""}` : "";
   };
+  const outcome = (inDraft: boolean, inPublished: boolean, buyerId: string, sellerId: string, common: boolean) =>
+    inPublished ? (inDraft ? "In published mapping" : "In published mapping; removed from working list")
+    : inDraft ? "In working list (not yet published)"
+    : removedSet.has(`${buyerId}|${sellerId}`) ? "Removed by the Directorate"
+    : !common ? "Not placed — no common sector with the buyer"
+    : !draftCount ? "Mapping not built yet"
+    : "Not placed — buyer's list was full or the seller reached the buyer limit";
+
+  // Each preference with both sides' sectors and products and the result.
+  const detail: Row[] = [];
+  for (const r of rows) for (const p of r.prefs) {
+    const s = sellerById.get(r.id), b = buyerById.get(p.buyerId);
+    const f = s && b ? fit(b, s, p.rank) : null;
+    detail.push({
+      sellerNo: r.approvedNo, seller: r.name, district: r.district, offers: s ? sellerOffers(s) : "", rank: p.rank,
+      buyerNo: p.approvedNo, buyer: p.buyer, country: b?.country ?? "", needs: b ? buyerNeeds(b) : "(buyer no longer approved)",
+      fitWhy: f && s ? whyMatched(f, s, true) : "", score: f?.score ?? "",
+      outcome: outcome(p.inDraft, p.inPublished, p.buyerId, r.id, !!f?.sectors.length),
+    });
+  }
+  const pending = rows.filter((r) => !r.prefSubmittedAt);
+  const byBuyer = pool.buyers.map((b) => {
+    const ps = pool.prefs.filter((x) => x.buyerId === b.id);
+    return { buyerNo: b.approvedNo, buyer: b.name, country: b.country, sectors: b.sectors.map((x) => x.name).join(", "),
+      total: ps.length, first: ps.filter((x) => x.rank === 1).length, sellers: ps.map((x) => `${sellerById.get(x.sellerId)?.name ?? "—"} (#${x.rank})`).join("\n") };
+  }).sort((a, b) => b.total - a.total || a.buyer.localeCompare(b.buyer));
+
   return {
-    ...base("seller-preferences", user, [state.prefsFrozen ? "Preferences frozen" : "Preferences open"]),
+    ...base("seller-preferences", user, [state.prefsFrozen ? "Preferences frozen" : "Preferences open", state.buyersVisible ? "Buyer directory open" : "Buyer directory hidden"]),
     kpis: [
       { label: "Sellers who submitted", value: `${summary.submitted} / ${summary.sellers}`, tone: "violet" },
       { label: "Preferences given", value: summary.preferences, tone: "blue" },
       { label: "Included in working list", value: summary.honouredDraft, tone: "green" },
       { label: "Included in published", value: summary.honouredPublished, tone: "yellow" },
     ],
+    tables: [
+      {
+        name: "Seller Preferences", heading: "1. Each seller's preferences (rank 1–5) and how many were included",
+        columns: [
+          { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+          { key: "approvedNo", header: "Seller No.", width: 19, kind: "mono", excelOnly: true },
+          { key: "name", header: "Seller", width: 24 }, { key: "district", header: "District", width: 14 },
+          { key: "submitted", header: "Submitted On", width: 14, kind: "date" },
+          ...[1, 2, 3, 4, 5].map((n) => ({ key: `p${n}`, header: `Preference ${n}`, width: 20 })),
+          { key: "honoured", header: "Included", width: 9, align: "center" as const },
+          { key: "mapped", header: "Buyers Mapped", width: 9, kind: "number" as const, align: "right" as const },
+        ],
+        rows: rows.filter((r) => r.prefSubmittedAt).map((r, i) => ({
+          sl: i + 1, approvedNo: r.approvedNo, name: r.name, district: r.district, submitted: r.prefSubmittedAt,
+          ...Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`p${n}`, cell(r, n)])),
+          honoured: r.prefs.length ? `${state.version ? r.honouredPublished : r.honouredDraft}/${r.prefs.length}` : "",
+          mapped: state.version ? r.matchedPublished : r.matchedDraft,
+        })),
+      },
+      {
+        name: "Preference Details", heading: "2. Every preference — seller's offer, buyer's need, fit and result",
+        columns: [
+          { key: "sellerNo", header: "Seller No.", width: 19, kind: "mono", excelOnly: true },
+          { key: "seller", header: "Seller", width: 20 }, { key: "district", header: "District", width: 12 },
+          { key: "offers", header: "Seller's Sectors & Products", width: 32 },
+          { key: "rank", header: "Rank", width: 5, kind: "number", align: "center" },
+          { key: "buyerNo", header: "Buyer No.", width: 19, kind: "mono", excelOnly: true },
+          { key: "buyer", header: "Buyer", width: 20 }, { key: "country", header: "Country", width: 12 },
+          { key: "needs", header: "Buyer's Approved Sectors & Products", width: 32 },
+          { key: "fitWhy", header: "Fit", width: 36 }, { key: "score", header: "Score", width: 6, kind: "number", align: "right" },
+          { key: "outcome", header: "Result", width: 24 },
+        ],
+        rows: detail,
+      },
+      {
+        name: "No Preferences Yet", heading: `3. Approved sellers who have not given preferences${state.prefsFrozen ? " (window closed)" : ""}`,
+        columns: [
+          { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
+          { key: "approvedNo", header: "Seller No.", width: 19, kind: "mono" }, { key: "name", header: "Seller", width: 26 },
+          { key: "district", header: "District", width: 15 }, { key: "sectors", header: "Sectors & Products", width: 36 },
+          { key: "profile", header: "Profile", width: 12 },
+          { key: "contact", header: "Promoter", width: 18 }, { key: "mobile", header: "Mobile", width: 15 }, { key: "email", header: "E-mail", width: 26, excelOnly: true },
+        ],
+        rows: pending.map((r, i) => {
+          const pr = profileOf.get(r.id), s = sellerById.get(r.id);
+          return { sl: i + 1, approvedNo: r.approvedNo, name: r.name, district: r.district, sectors: s ? sellerOffers(s) : "",
+            profile: pr?.profileCompletedAt ? "Completed" : "Pending (needed first)", contact: pr?.contactName ?? "", mobile: fmtMobile(pr?.contactMobile), email: pr?.contactEmail ?? "" };
+        }),
+      },
+      {
+        name: "Preferences by Buyer", heading: "4. Preferences received by each buyer",
+        columns: [
+          { key: "buyerNo", header: "Buyer No.", width: 19, kind: "mono", excelOnly: true }, { key: "buyer", header: "Buyer", width: 26 },
+          { key: "country", header: "Country", width: 15 }, { key: "sectors", header: "Approved Sectors", width: 32 },
+          { key: "total", header: "Sellers Preferring", width: 11, kind: "number", align: "right" },
+          { key: "first", header: "As First Choice", width: 10, kind: "number", align: "right" },
+          { key: "sellers", header: "Sellers (Rank)", width: 40 },
+        ],
+        rows: byBuyer,
+      },
+    ],
+  };
+}
+
+// The buyer directory as approved sellers see it (step 1).
+async function buyerDirectoryReport(user: User): Promise<Report> {
+  const [state, pool] = await Promise.all([getMatchState(), loadPool()]);
+  const rows: Row[] = [];
+  let sl = 0;
+  for (const b of pool.buyers) for (const x of b.sectors) {
+    const sellers = pool.sellers.filter((s) => s.sectors.some((y) => y.id === x.id)).length;
+    rows.push({ sl: ++sl, buyerNo: b.approvedNo, buyer: b.name, country: b.country, sector: x.name, products: x.products,
+      specs: x.specifications ?? "", certs: x.certifications.join(", "), quantity: x.quantity ?? "", sellers,
+      prefs: pool.prefs.filter((p) => p.buyerId === b.id).length });
+  }
+  return {
+    ...base("match-buyer-directory", user, [state.buyersVisible ? "Open to approved sellers" : "Hidden from sellers"]),
+    kpis: [
+      { label: "Approved buyers", value: pool.buyers.length, tone: "blue" },
+      { label: "Approved sectors", value: rows.length, tone: "green" },
+      { label: "Approved sellers", value: pool.sellers.length, tone: "violet" },
+      { label: "Preferences so far", value: pool.prefs.length, tone: "yellow" },
+    ],
     tables: [{
-      name: "Seller Preferences",
+      name: "Buyer Directory", heading: "Approved buyers and their approved sector requirements",
       columns: [
         { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
-        { key: "approvedNo", header: "Seller No.", width: 19, kind: "mono", excelOnly: true },
-        { key: "name", header: "Seller", width: 24 }, { key: "district", header: "District", width: 14 },
-        { key: "submitted", header: "Submitted On", width: 14, kind: "date" },
-        ...[1, 2, 3, 4, 5].map((n) => ({ key: `p${n}`, header: `Preference ${n}`, width: 20 })),
-        { key: "honoured", header: "Included", width: 9, align: "center" as const },
-        { key: "mapped", header: "Buyers Mapped", width: 9, kind: "number" as const, align: "right" as const },
+        { key: "buyerNo", header: "Buyer No.", width: 19, kind: "mono" }, { key: "buyer", header: "Buyer", width: 22 }, { key: "country", header: "Country", width: 13 },
+        { key: "sector", header: "Sector", width: 20 }, { key: "products", header: "Products", width: 30 },
+        { key: "specs", header: "Specifications", width: 28, excelOnly: true }, { key: "certs", header: "Certifications", width: 24 },
+        { key: "quantity", header: "Volume", width: 16, excelOnly: true },
+        { key: "sellers", header: "Approved Sellers in Sector", width: 11, kind: "number", align: "right" },
+        { key: "prefs", header: "Sellers Preferring Buyer", width: 11, kind: "number", align: "right" },
       ],
-      rows: rows.map((r, i) => ({
-        sl: i + 1, approvedNo: r.approvedNo, name: r.name, district: r.district, submitted: r.prefSubmittedAt,
-        ...Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`p${n}`, cell(r, n)])),
-        honoured: r.prefs.length ? `${state.version ? r.honouredPublished : r.honouredDraft}/${r.prefs.length}` : "",
-        mapped: state.version ? r.matchedPublished : r.matchedDraft,
-      })),
+      rows,
+    }],
+  };
+}
+
+// Mappings that look incorrect (step 5) — for reference; they never block publishing.
+async function matchChecksReport(user: User): Promise<Report> {
+  const [issues, state] = await Promise.all([matchChecks(), getMatchState()]);
+  const sev = { high: "High", medium: "Medium", low: "Low" } as const;
+  return {
+    ...base("match-checks", user, [state.version ? `Working list against published version ${state.version}` : "Working list"]),
+    kpis: [
+      { label: "Items to review", value: issues.length, tone: "blue" },
+      { label: "High", value: issues.filter((i) => i.severity === "high").length, tone: "red" },
+      { label: "Medium", value: issues.filter((i) => i.severity === "medium").length, tone: "yellow" },
+      { label: "Low", value: issues.filter((i) => i.severity === "low").length, tone: "slate" },
+    ],
+    tables: [{
+      name: "Checks", heading: "Mappings to review (reference only — they do not stop publishing)",
+      columns: [
+        { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" }, { key: "severity", header: "Severity", width: 10 },
+        { key: "kind", header: "Check", width: 26 }, { key: "buyer", header: "Buyer", width: 24 }, { key: "seller", header: "Seller", width: 24 },
+        { key: "detail", header: "Detail", width: 56 },
+      ],
+      rows: issues.map((i, n) => ({ sl: n + 1, severity: sev[i.severity], kind: i.kind, buyer: i.buyer ?? "", seller: i.seller ?? "", detail: i.detail })),
     }],
   };
 }
@@ -1271,11 +1515,13 @@ async function matchCoverageReport(user: User, which: "published" | "draft"): Pr
     ],
     tables: [
       { name: "Buyers Below Target", heading: `1. Buyers below ${c.target} sellers`,
-        columns: [{ key: "buyer", header: "Buyer", width: 26 }, { key: "country", header: "Country", width: 14 }, { key: "sectors", header: "Sectors", width: 34 }, num("n", "Sellers"), num("short", "Short By")],
-        rows: c.buyersBelow.map((b) => ({ buyer: b.name, country: b.country, sectors: b.sectors.join(", "), n: b.n, short: b.shortfall })) },
+        columns: [{ key: "buyerNo", header: "Buyer No.", width: 19, kind: "mono", excelOnly: true }, { key: "buyer", header: "Buyer", width: 24 }, { key: "country", header: "Country", width: 14 },
+          { key: "needs", header: "Approved Sectors & Products", width: 44 }, num("n", "Sellers"), num("short", "Short By")],
+        rows: c.buyersBelow.map((b) => ({ buyerNo: b.approvedNo, buyer: b.name, country: b.country, needs: b.needs, n: b.n, short: b.shortfall })) },
       { name: "Sellers Without Buyer", heading: "2. Approved sellers without a buyer",
-        columns: [{ key: "seller", header: "Seller", width: 26 }, { key: "district", header: "District", width: 16 }, { key: "sectors", header: "Sectors", width: 34 }, { key: "pref", header: "Gave Preferences", width: 12 }],
-        rows: c.sellersWithout.map((s) => ({ seller: s.name, district: s.district, sectors: s.sectors.join(", "), pref: s.gavePreferences ? "Yes" : "No" })) },
+        columns: [{ key: "sellerNo", header: "Seller No.", width: 19, kind: "mono", excelOnly: true }, { key: "seller", header: "Seller", width: 24 }, { key: "district", header: "District", width: 15 },
+          { key: "offers", header: "Sectors & Products", width: 44 }, { key: "pref", header: "Gave Preferences", width: 12 }],
+        rows: c.sellersWithout.map((s) => ({ sellerNo: s.approvedNo, seller: s.name, district: s.district, offers: s.offers, pref: s.gavePreferences ? "Yes" : "No" })) },
       { name: "Sector Coverage", heading: "3. Sector coverage",
         columns: [{ key: "sector", header: "Sector", width: 28 }, num("buyers", "Approved Buyers"), num("needed", "Sellers Needed"), num("sellers", "Approved Sellers"), num("mapped", "Sellers Mapped"), num("unmapped", "Not Mapped"), { key: "status", header: "Position", width: 20 }],
         rows: c.sectorRows.map((r) => ({ sector: r.name, buyers: r.buyers, needed: r.needed, sellers: r.sellers, mapped: r.matchedSellers, unmapped: r.unmatchedSellers, status: r.status })) },

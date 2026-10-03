@@ -1,4 +1,4 @@
-import { BarChart3, BadgeCheck, Boxes, ChartPie, ClipboardList, Handshake, Lightbulb, MapPinned, PackageSearch, Star, Store, Users, UsersRound } from "lucide-react";
+import { ShieldAlert, BarChart3, BadgeCheck, Boxes, ChartPie, ClipboardList, Handshake, Lightbulb, MapPinned, PackageSearch, Star, Store, Users, UsersRound } from "lucide-react";
 import type { User } from "@/generated/prisma/client";
 import type { SellerStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
@@ -14,15 +14,16 @@ import { ProfileFilters } from "@/components/seller/profile-filters";
 const ICON: Record<ReportId, typeof Users> = {
   "buyer-register": Users, "sector-requirements": ClipboardList, "approved-buyers": BadgeCheck, "approved-sellers": BadgeCheck,
   "seller-register": Store, "seller-district-summary": MapPinned, "seller-profile-analysis": UsersRound, "mis-summary": BarChart3, "sector-demand": Boxes,
-  "product-demand": PackageSearch, "insights": Lightbulb, "match-list": Handshake, "seller-preferences": Star, "match-coverage": ChartPie,
+  "product-demand": PackageSearch, "insights": Lightbulb, "match-list": Handshake, "seller-preferences": Star, "match-coverage": ChartPie, "match-buyer-directory": Users, "match-checks": ShieldAlert,
 };
 const ACCENT: Record<ReportId, string> = {
   "buyer-register": "bg-tx-blue", "sector-requirements": "bg-tx-yellow", "approved-buyers": "bg-tx-green", "approved-sellers": "bg-tx-green",
   "seller-register": "bg-tx-green", "seller-district-summary": "bg-tx-blue", "seller-profile-analysis": "bg-violet-500", "mis-summary": "bg-tx-red", "sector-demand": "bg-violet-500",
-  "product-demand": "bg-violet-500", "insights": "bg-ink", "match-list": "bg-tx-green", "seller-preferences": "bg-violet-500", "match-coverage": "bg-tx-red",
+  "product-demand": "bg-violet-500", "insights": "bg-ink", "match-list": "bg-tx-green", "seller-preferences": "bg-violet-500", "match-coverage": "bg-tx-red", "match-buyer-directory": "bg-tx-blue", "match-checks": "bg-tx-yellow",
 };
 const SELLER_REPORTS: ReportId[] = ["approved-sellers", "seller-register", "seller-district-summary", "seller-profile-analysis"];
-const MATCH_REPORTS: ReportId[] = ["match-list", "seller-preferences", "match-coverage"];
+// In the order of the matchmaking steps.
+const MATCH_REPORTS: ReportId[] = ["match-buyer-directory", "seller-preferences", "match-list", "match-checks", "match-coverage"];
 
 type Params = F & { s_status?: string; s_district?: string; s_sector?: string; s_exp?: string;
   s_profile?: string; s_cat?: string; s_utype?: string; s_promoter?: string; s_iec?: string; s_cert?: string };
@@ -49,7 +50,7 @@ export async function ReportsPage({ user, base, filters }: { user: User; base: s
   const role = user.role;
   const allowed = reportsFor(role);
   const buyerIds = allowed.filter((id) => !SELLER_REPORTS.includes(id) && !MATCH_REPORTS.includes(id));
-  const matchIds = allowed.filter((id) => MATCH_REPORTS.includes(id));
+  const matchIds = MATCH_REPORTS.filter((id) => allowed.includes(id));
   const sellerIds = allowed.filter((id) => SELLER_REPORTS.includes(id));
   const [countries, sectors] = await Promise.all([
     buyerIds.length ? prisma.buyer.findMany({ where: scopeFor(role), distinct: ["country"], select: { country: true }, orderBy: { country: "asc" } }) : [],
@@ -159,8 +160,18 @@ export async function ReportsPage({ user, base, filters }: { user: User; base: s
           <div className="grid gap-5 md:grid-cols-2">
             {matchIds.map((id) => (
               <ReportCard key={id} id={id} href={`/api/reports/${id}`}
-                note={id === "match-list" ? (role === "DIC" || role === "ADMIN" ? "Published mapping. The working list is downloadable from Matchmaking." : "Published mapping only.") : "Published mapping; the working list is on the Matchmaking pages."} />
+                note={id === "match-list" ? (role === "DIC" || role === "ADMIN" ? "Published mapping (final once locked). The working list is below and on the Matchmaking pages." : role === "DISTRICT" ? "Published mapping — sellers of your district." : "Published mapping only.")
+                  : id === "match-coverage" ? "Published mapping; the working list version is on Matchmaking → Results & gaps."
+                  : id === "match-checks" ? "Checks the current working list." : undefined} />
             ))}
+            {(role === "DIC" || role === "ADMIN") && (
+              <Card className="relative flex flex-col overflow-hidden p-6">
+                <span className="absolute inset-x-0 top-0 h-1 bg-tx-yellow" />
+                <h3 className="text-base font-bold text-ink">Buyer–Seller Mapping — Working List</h3>
+                <p className="mt-1 text-sm text-slate-500">Step 4 — the mapping being prepared (not yet seen by participants), with the same detail as the published mapping, changes against the published version and pairs removed by the Directorate.</p>
+                <div className="mt-5 flex flex-1 items-end justify-end"><DownloadButtons href="/api/reports/match-list?v=draft" /></div>
+              </Card>
+            )}
           </div>
         </section>
       )}

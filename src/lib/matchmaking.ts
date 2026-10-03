@@ -121,6 +121,35 @@ export function fit(b: PoolBuyer, s: PoolSeller, prefRank: number | null): Fit {
   return { score, sectors, products, certs, prefRank };
 }
 
+/** The points behind a fit score, in plain words (same rules as `fit`). */
+export function fitParts(f: Fit, s: PoolSeller) {
+  const parts: { label: string; points: number }[] = [];
+  if (f.prefRank) parts.push({ label: `Seller's preference #${f.prefRank}`, points: 60 - (f.prefRank - 1) * 5 });
+  if (f.sectors.length) parts.push({ label: `Common sector${f.sectors.length > 1 ? "s" : ""}: ${f.sectors.join(", ")}`, points: 20 });
+  if (f.products.length) parts.push({ label: `Matching product${f.products.length > 1 ? "s" : ""}: ${f.products.join(", ")}`, points: Math.min(30, f.products.length * 10) });
+  if (f.certs.length) parts.push({ label: `Holds required certification${f.certs.length > 1 ? "s" : ""}: ${f.certs.join(", ")}`, points: Math.min(10, f.certs.length * 5) });
+  if (s.exportExperience && (f.sectors.length || f.prefRank)) parts.push({ label: "Export experience", points: 5 });
+  return parts;
+}
+
+/**
+ * Why a seller is (or would be) matched with a buyer. `internal` adds the seller's preference rank and the
+ * fit points (Directorate / Admin); others see the sector, product and certification match only.
+ */
+export function whyMatched(f: Fit, s: PoolSeller, internal: boolean) {
+  const parts = fitParts(f, s).filter((p) => internal || !p.label.startsWith("Seller's preference"));
+  if (!parts.length) return "No common sector with the buyer";
+  return internal
+    ? `${parts.map((p) => `${p.label} (+${p.points})`).join("; ")} = fit ${f.score}`
+    : parts.map((p) => p.label).join("; ");
+}
+
+/** A buyer's approved sectors with products (and certifications asked for), one line per sector. */
+export const buyerNeeds = (b: PoolBuyer) =>
+  b.sectors.map((x) => `${x.name}: ${x.products}${x.certifications.length ? ` [certifications: ${x.certifications.join(", ")}]` : ""}`).join("\n");
+/** A seller's sectors with the products ready to export, one line per sector. */
+export const sellerOffers = (s: PoolSeller) => s.sectors.map((x) => `${x.name}: ${x.products}`).join("\n");
+
 /** Buyers one seller may meet: the Directorate's setting, or enough to give every buyer the target (rounded up). */
 export function sellerCap(pool: Pool, state: MatchState) {
   if (state.maxPerSeller > 0) return state.maxPerSeller;
@@ -329,12 +358,12 @@ export async function coverage(which: "published" | "draft") {
   const target = pool.target;
 
   const buyersBelow = pool.buyers.map((b) => ({ id: b.id, name: b.name, approvedNo: b.approvedNo, country: b.country,
-    sectors: b.sectors.map((s) => s.name), n: byBuyer.get(b.id)?.length ?? 0 }))
+    sectors: b.sectors.map((s) => s.name), needs: buyerNeeds(b), n: byBuyer.get(b.id)?.length ?? 0 }))
     .filter((b) => b.n < target).map((b) => ({ ...b, shortfall: target - b.n })).sort((a, b) => a.n - b.n);
 
   const prefSellers = new Set(pool.prefs.map((p) => p.sellerId));
   const sellersWithout = pool.sellers.filter((s) => !bySeller.has(s.id)).map((s) => ({
-    id: s.id, name: s.name, approvedNo: s.approvedNo, district: s.district, sectors: s.sectors.map((x) => x.name), gavePreferences: prefSellers.has(s.id),
+    id: s.id, name: s.name, approvedNo: s.approvedNo, district: s.district, sectors: s.sectors.map((x) => x.name), offers: sellerOffers(s), gavePreferences: prefSellers.has(s.id),
   }));
 
   // Sector coverage: demand (approved buyers) vs supply (approved sellers) vs what the mapping uses.

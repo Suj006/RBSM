@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Minus, Plus } from "lucide-react";
 import type { User } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { canEditMatches, fit, loadBoard, matchChecks } from "@/lib/matchmaking";
+import { canEditMatches, fit, loadBoard, matchChecks, whyMatched } from "@/lib/matchmaking";
 import { mapPairAction } from "@/app/actions/matchmaking";
 import { Alert, Badge, Card, CardHeader, PageHeader } from "@/components/ui";
 import { ActionButton } from "./action-button";
@@ -51,6 +51,21 @@ export async function BuyerMapping({ user, base, buyerId, staffBase }: { user: U
       <div className="grid items-start gap-6 xl:grid-cols-[1fr_340px]">
         <div className="min-w-0 space-y-6">
           <Card className="overflow-hidden">
+            <CardHeader title="What the buyer needs" subtitle="Approved sector requirements — sellers are matched against these" />
+            <ul className="divide-y divide-slate-100">
+              {row.buyer.sectors.map((x) => (
+                <li key={x.id} className="grid gap-1 px-5 py-3 text-sm sm:grid-cols-[200px_1fr]">
+                  <div className="font-semibold text-ink">{x.name}</div>
+                  <div className="text-slate-700">
+                    {x.products}
+                    {x.certifications.length > 0 && <div className="mt-1 text-xs text-slate-500">Certifications: {x.certifications.join(", ")}</div>}
+                    {x.quantity && <div className="text-xs text-slate-500">Volume: {x.quantity}</div>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Card>
+          <Card className="overflow-hidden">
             <CardHeader title={`Mapped sellers (${row.matches.length})`} subtitle="Working list — buyers and sellers see it only after it is published" />
             <div className="table-scroll relative overflow-x-auto">
               <table className="w-full min-w-[820px] text-sm">
@@ -64,6 +79,7 @@ export async function BuyerMapping({ user, base, buyerId, staffBase }: { user: U
                       <td className="px-4 py-2.5">
                         <Link href={`${staffBase}/sellers/${m.sellerId}`} className="font-semibold text-ink hover:text-brand-700">{m.seller.name}</Link>
                         <div className="text-xs text-slate-500">{m.seller.district}{m.seller.exportExperience ? " · export experience" : ""}</div>
+                        <div className="mt-0.5 max-w-64 text-[11px] text-slate-500">{m.seller.sectors.map((x) => `${x.name}: ${x.products}`).join(" · ")}</div>
                         {state.version > 0 && !m.inPublished && <div className="mt-0.5 text-[11px] font-semibold text-amber-700">Not yet published</div>}
                       </td>
                       <td className="max-w-72 px-3 py-2.5 text-xs">
@@ -72,7 +88,7 @@ export async function BuyerMapping({ user, base, buyerId, staffBase }: { user: U
                         {m.fit.certs.length > 0 && <div className="text-brand-700">Certified: {m.fit.certs.join(", ")}</div>}
                       </td>
                       <td className="px-3 py-2.5"><SourceBadges source={m.source} prefRank={m.fit.prefRank} /></td>
-                      <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{m.fit.score}</td>
+                      <td className="px-3 py-2.5 text-right font-semibold tabular-nums" title={whyMatched(m.fit, m.seller, true)}>{m.fit.score}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{load.get(m.sellerId) ?? 0}</td>
                       <td className="px-3 py-2.5 text-right">
                         {editable && <ActionButton action={mapPairAction} fields={{ op: "remove", buyerId, sellerId: m.sellerId }} compact variant="ghost" label={<><Minus className="size-3.5" /> Remove</>} />}

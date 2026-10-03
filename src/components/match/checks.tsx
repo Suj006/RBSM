@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { matchChecks } from "@/lib/matchmaking";
 import { Badge, Card, EmptyState, PageHeader, StatCard } from "@/components/ui";
+import { DownloadButtons } from "@/components/staff/download-buttons";
 
 const TONE = { high: "red", medium: "amber", low: "slate" } as const;
 
@@ -12,11 +13,12 @@ export async function MatchChecks({ base }: { base: string }) {
   return (
     <>
       <PageHeader eyebrow="Matchmaking" title="Mapping checks"
-        subtitle="Pairs and buyers that may need attention before publishing. These are shown only to the Directorate, for reference — they do not stop publishing." />
+        subtitle="Pairs and buyers that may need attention before publishing. These are shown only to the Directorate, for reference — they do not stop publishing."
+        actions={<DownloadButtons href="/api/reports/match-checks" label="Checks report" compact />} />
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <StatCard label="High — likely incorrect" value={n("high")} accent="red" hint="No common sector, or buyer / seller no longer approved" />
         <StatCard label="Medium — incomplete" value={n("medium")} accent="yellow" hint="Buyer below target, seller over the limit" />
-        <StatCard label="Low — worth a look" value={n("low")} accent="slate" hint="Same sector but no named product, above target" />
+        <StatCard label="Low — worth a look" value={n("low")} accent="slate" hint="No named product, required certification not held, above target" />
       </div>
       <Card className="overflow-hidden">
         {issues.length ? (

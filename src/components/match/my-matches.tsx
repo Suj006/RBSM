@@ -8,10 +8,12 @@ import { optLabel, UNIT_CATEGORIES, UNIT_TYPES } from "@/lib/config";
 
 /** A seller's published buyer meetings (nothing is shown before the Directorate publishes). */
 export async function SellerMeetings({ sellerId }: { sellerId: string }) {
-  const [state, rows, prefs] = await Promise.all([
+  const [state, rows, prefs, mine] = await Promise.all([
     getMatchState(), publishedMatches({ sellerId }),
     prisma.sellerPreference.findMany({ where: { sellerId }, select: { buyerId: true, rank: true } }),
+    prisma.sellerProduct.findMany({ where: { sellerId }, select: { sector: { select: { name: true } } } }),
   ]);
+  const mySectors = new Set(mine.map((p) => p.sector.name));
   const rankOf = new Map(prefs.map((p) => [p.buyerId, p.rank]));
   return (
     <Card id="meetings" className="scroll-mt-24">
@@ -31,6 +33,8 @@ export async function SellerMeetings({ sellerId }: { sellerId: string }) {
                 <span className="text-sm text-slate-500">{r.buyer.country}</span>
               </div>
               {r.buyer.pocName && <div className="text-xs text-slate-500">Contact: {r.buyer.pocName}{r.buyer.pocDesignation ? `, ${r.buyer.pocDesignation}` : ""}</div>}
+              {(() => { const common = (r.buyer.requirement?.items ?? []).map((i) => i.sector.name).filter((n) => mySectors.has(n));
+                return common.length ? <div className="mt-1 text-xs font-medium text-brand-700">Matched on: {common.join(", ")}</div> : null; })()}
               <ul className="mt-2 space-y-1.5">
                 {r.buyer.requirement?.items.map((i) => (
                   <li key={i.sector.name} className="text-sm">
@@ -75,6 +79,8 @@ export async function BuyerMatches({ buyerId, full }: { buyerId: string; full?: 
                 </span>
               </div>
               <div className="mt-1 text-sm text-slate-600">{r.seller.products.map((p) => `${p.sector.name}: ${p.products}`).join(" · ")}</div>
+              {(() => { const need = new Set((r.buyer.requirement?.items ?? []).map((i) => i.sector.name)); const common = r.seller.products.map((p) => p.sector.name).filter((n) => need.has(n));
+                return common.length ? <div className="mt-0.5 text-xs font-medium text-brand-700">Matched on: {common.join(", ")}</div> : null; })()}
               {parseCerts(r.seller.exportCountries).length > 0 && (
                 <div className="mt-1 text-xs text-slate-500">Has exported to {parseCerts(r.seller.exportCountries).join(", ")}</div>
               )}

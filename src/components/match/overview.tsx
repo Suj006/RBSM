@@ -33,6 +33,21 @@ function Step({ n, title, done, current, children, status }: {
   );
 }
 
+/** Downloads for one step: Excel and PDF of each report. */
+function StepReports({ items }: { items: { label: string; href: string }[] }) {
+  return (
+    <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
+      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500"><FileSpreadsheet className="size-3.5" /> Reports for this step</div>
+      {items.map((it) => (
+        <div key={it.href} className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-sm font-medium text-ink">{it.label}</span>
+          <DownloadButtons href={it.href} compact />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** The matchmaking control room: process steps, controls, position and activity. */
 export async function MatchOverview({ user, base }: { user: User; base: string }) {
   const dic = user.role === "DIC";
@@ -93,11 +108,14 @@ export async function MatchOverview({ user, base }: { user: User; base: string }
                   : <ActionButton action={matchControlAction} fields={{ op: "showBuyers" }} variant="primary" label={<><Eye className="size-4" /> Show buyer directory to sellers</>} />}
               </div>
             )}
+            <StepReports items={[{ label: "Buyer directory as sellers see it", href: "/api/reports/match-buyer-directory" }]} />
           </Step>
 
           <Step n={2} title="Sellers give preferences" done={state.prefsFrozen} current={stage === 2}
             status={<Badge tone="violet">{ps.submitted} of {ps.sellers} sellers</Badge>}>
-            Each seller ranks up to 5 buyers, once. <Link href={`${base}/preferences`} className="font-semibold text-brand-700 hover:underline">See every seller&apos;s preferences →</Link>
+            Each seller ranks up to 5 buyers, once, after completing the seller profile. {ps.sellers - ps.submitted} approved seller{ps.sellers - ps.submitted === 1 ? " has" : "s have"} not given preferences yet.{" "}
+            <Link href={`${base}/preferences`} className="font-semibold text-brand-700 hover:underline">See every seller&apos;s preferences →</Link>
+            <StepReports items={[{ label: "Seller preferences — with both sides' sectors & products, and sellers yet to respond", href: "/api/reports/seller-preferences" }]} />
           </Step>
 
           <Step n={3} title="Freeze seller preferences" done={state.prefsFrozen} current={stage === 2}
@@ -113,13 +131,14 @@ export async function MatchOverview({ user, base }: { user: User; base: string }
                   confirm="Reopen seller preferences? Sellers who have not submitted can submit; the Directorate can freeze again later." />
               )}
             </div>
+            {state.prefsFrozen && <StepReports items={[{ label: "Frozen preferences (final list of seller choices)", href: "/api/reports/seller-preferences" }]} />}
           </Step>
 
           <Step n={4} title="Build and refine the mapping" done={pairs > 0 && atTarget === rows.length} current={stage === 4}
             status={<Badge tone={pairs ? "green" : "slate"}>{pairs} pairs</Badge>}>
-            The portal suggests up to {pool.target} sellers per buyer from sellers sharing the buyer&apos;s sectors — seller preferences first, then the best fit on products and export experience.
+            The portal suggests up to {pool.target} sellers per buyer from sellers sharing the buyer&apos;s sectors — seller preferences first, then the best fit on matching products, certifications the buyer requires and export experience.
             Add or remove sellers for any buyer; manual changes are kept when suggestions are refreshed.
-            {dic && (
+            {dic && editable && (
               <div className="mt-3 flex flex-wrap items-start gap-2">
                 <ActionButton action={matchControlAction} fields={{ op: "fill" }} variant="primary" label={<><Sparkles className="size-4" /> {pairs ? "Fill gaps with suggestions" : "Generate suggestions"}</>} />
                 {pairs > 0 && (
@@ -128,11 +147,15 @@ export async function MatchOverview({ user, base }: { user: User; base: string }
                 )}
               </div>
             )}
-            {dic && !editable && <p className="mt-2 text-xs text-slate-500">{state.locked ? "Locked — no changes." : "Available once preferences are frozen."}</p>}
+            {dic && !editable && <p className="mt-2 text-xs text-slate-500">{state.locked ? "Locked — no changes (Admin can unlock)." : "Available once preferences are frozen."}</p>}
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Link href={`${base}/board`} className="font-semibold text-brand-700 hover:underline">Open the mapping board →</Link>
-              {dic && <CapForm current={state.maxPerSeller} auto={board.cap} />}
+              {dic && editable && <CapForm current={state.maxPerSeller} auto={board.cap} />}
             </div>
+            {pairs > 0 && <StepReports items={[
+              { label: "Working list — every pair with both sides' sectors & products and why matched", href: "/api/reports/match-list?v=draft" },
+              { label: "Results & gaps of the working list", href: "/api/reports/match-coverage?v=draft" },
+            ]} />}
           </Step>
 
           <Step n={5} title="Check and publish" done={state.version > 0} current={stage === 4 || stage === 5}
@@ -150,6 +173,13 @@ export async function MatchOverview({ user, base }: { user: User; base: string }
                   confirm={`${state.version ? "Republish" : "Publish"} the mapping (${pairs} pairs)?${issues.length ? ` ${issues.length} item(s) are flagged for review (${high} high).` : ""} Buyers, sellers, FIEO and district centres will see it.`} />
               </div>
             )}
+            {(pairs > 0 || state.version > 0) && <StepReports items={[
+              ...(pairs > 0 ? [{ label: "Checks — mappings to review", href: "/api/reports/match-checks" }] : []),
+              ...(state.version ? [
+                { label: `Published mapping (version ${state.version})`, href: "/api/reports/match-list" },
+                { label: "Results & gaps of the published mapping", href: "/api/reports/match-coverage" },
+              ] : []),
+            ]} />}
           </Step>
 
           <Step n={6} title="Lock the final mapping" done={state.locked} current={stage === 5 || stage === 6}
@@ -165,16 +195,32 @@ export async function MatchOverview({ user, base }: { user: User; base: string }
                   confirm="Unlock the final mapping? The Directorate can then change, republish and lock again." />
               )}
             </div>
+            {state.locked && <StepReports items={[
+              { label: `Final mapping (version ${state.version})`, href: "/api/reports/match-list" },
+              { label: "Final results & gaps", href: "/api/reports/match-coverage" },
+              { label: "Seller preferences and final outcome", href: "/api/reports/seller-preferences" },
+            ]} />}
           </Step>
         </ol>
 
         <div className="space-y-6">
           <Card>
-            <CardHeader title="Reports" icon={<FileSpreadsheet className="size-4" />} />
-            <div className="space-y-4 p-5 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium text-ink">Working list (draft)</span><DownloadButtons href="/api/reports/match-list?v=draft" compact /></div>
-              <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium text-ink">Published mapping</span><DownloadButtons href="/api/reports/match-list" compact /></div>
-              <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium text-ink">Seller preferences &amp; outcome</span><DownloadButtons href="/api/reports/seller-preferences" compact /></div>
+            <CardHeader title="All matchmaking reports" icon={<FileSpreadsheet className="size-4" />} subtitle="Excel for full detail; PDF for printing." />
+            <div className="space-y-3 p-5 text-sm">
+              {[
+                ["1", "Buyer directory for sellers", "/api/reports/match-buyer-directory"],
+                ["2–3", "Seller preferences and outcome", "/api/reports/seller-preferences"],
+                ["4", "Working list (draft)", "/api/reports/match-list?v=draft"],
+                ["5", "Checks", "/api/reports/match-checks"],
+                ["5–6", state.locked ? "Final mapping" : "Published mapping", "/api/reports/match-list"],
+                ["5–6", "Results & gaps (published)", "/api/reports/match-coverage"],
+                ["4", "Results & gaps (working list)", "/api/reports/match-coverage?v=draft"],
+              ].map(([n, label, href]) => (
+                <div key={href} className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium text-ink"><span className="mr-2 inline-block w-8 rounded bg-slate-100 text-center text-[11px] font-bold text-slate-500">{n}</span>{label}</span>
+                  <DownloadButtons href={href} compact />
+                </div>
+              ))}
             </div>
           </Card>
           <Card>
