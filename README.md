@@ -73,6 +73,23 @@ gaps**: buyers below 10 sellers, approved sellers without a buyer, sector covera
 covered by the matched sellers, and district position. Reports: mapping (published or working list), seller
 preferences and outcome, results and gaps. Buyers see their matched sellers; sellers their buyer meetings;
 district centres the meetings of their sellers. Participants whose list changes are e-mailed on publishing.
+The Directorate and Admin work the module from one **Matchmaking** menu entry with tabs: Overview, Mapping
+board, Seller preferences, Checks, Results & gaps, Published.
+
+## Insights (Directorate / Admin)
+
+A decision page built from live data, with an Excel / PDF report of every section:
+
+- **Key findings and recommended actions** — plain-language points ranked by urgency (targets at risk,
+  biggest drop-off, overdue files, lagging districts, sellers short in sectors, products with no supplier,
+  high rework, matchmaking gaps), each with the next step and a link to the list behind it
+- **Registration funnels** — buyers (sign-up → basic details → FIEO approval → sector submitted → approved)
+  and sellers (registered → recommended → approved), with conversion from each previous stage
+- **Progress to targets and pace** — approvals per week over the last 14 days and weeks to target
+- **District performance** — districts ranked by approved sellers against target, files waiting over a
+  week, average days to recommend, rejections
+- Matchmaking readiness per approved buyer, sector supply gaps, district × sector supply, markets × sectors
+  demand, certifications, **rework and rejection** rates, turnaround and ageing, and the matchmaking position
 
 ## Logins (phase-1 defaults — change before going live)
 

@@ -22,12 +22,7 @@ export default async function DicLayout({ children }: { children: React.ReactNod
       { href: "/dic/insights", label: "Insights", icon: "insights", group: "Programme" },
       { href: "/dic/targets", label: "Targets", icon: "target", group: "Programme" },
       { href: "/dic/reports", label: "Reports", icon: "reports", group: "Programme" },
-      { href: "/dic/matchmaking", label: "Matchmaking", icon: "match", exact: true, group: "Matchmaking" },
-      { href: "/dic/matchmaking/board", label: "Mapping board", icon: "board", group: "Matchmaking" },
-      { href: "/dic/matchmaking/preferences", label: "Seller preferences", icon: "star", group: "Matchmaking" },
-      { href: "/dic/matchmaking/checks", label: "Mapping checks", icon: "checks", group: "Matchmaking" },
-      { href: "/dic/matchmaking/results", label: "Results & gaps", icon: "results", group: "Matchmaking" },
-      { href: "/dic/matchmaking/published", label: "Published mapping", icon: "approved", group: "Matchmaking" },
+      { href: "/dic/matchmaking", label: "Matchmaking", icon: "match", group: "Matchmaking" },
     ]}>{children}</AppShell>
   );
 }

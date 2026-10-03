@@ -11,7 +11,7 @@ export async function MatchChecks({ base }: { base: string }) {
   const n = (s: string) => issues.filter((i) => i.severity === s).length;
   return (
     <>
-      <PageHeader back={{ href: base, label: "Back to matchmaking" }} eyebrow="Matchmaking" title="Mapping checks"
+      <PageHeader eyebrow="Matchmaking" title="Mapping checks"
         subtitle="Pairs and buyers that may need attention before publishing. These are shown only to the Directorate, for reference — they do not stop publishing." />
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <StatCard label="High — likely incorrect" value={n("high")} accent="red" hint="No common sector, or buyer / seller no longer approved" />

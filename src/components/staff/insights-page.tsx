@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { AlertTriangle, Award, Clock, Gauge, Handshake, Map, PackageX, Globe2 } from "lucide-react";
+import { AlertTriangle, Award, Clock, Gauge, Handshake, Map, PackageX, Globe2, Compass, Filter, TrendingUp, RotateCcw, Building2, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/cn";
 import type { User } from "@/generated/prisma/client";
 import { AGE_BUCKETS, buildInsights } from "@/lib/insights";
+import { buildDecisionView, type FunnelStep } from "@/lib/decision";
 import { Badge, Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
 import { BarList } from "@/components/charts";
 import { DownloadButtons } from "./download-buttons";
@@ -19,6 +21,35 @@ function Heat({ v, max, rgb, href }: { v: number; max: number; rgb: string; href
   );
 }
 
+function Funnel({ title, steps, tone }: { title: string; steps: FunnelStep[]; tone: string }) {
+  const top = Math.max(1, steps[0]?.value ?? 1);
+  return (
+    <Card>
+      <CardHeader title={title} subtitle={`${steps.length ? Math.round(((steps.at(-1)!.value) / top) * 100) : 0}% of ${steps[0]?.label.toLowerCase()} reach the last step`} />
+      <ol className="space-y-3 p-5">
+        {steps.map((st, i) => {
+          const prev = i ? steps[i - 1].value : st.value;
+          const conv = prev ? Math.round((st.value / prev) * 100) : 0;
+          const body = (
+            <>
+              <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
+                <span className="font-medium text-ink">{st.label}</span>
+                <span className="tabular-nums"><b className="text-ink">{st.value}</b>{i > 0 && <span className={cn("ml-2 text-xs", conv < 60 ? "font-semibold text-tx-red" : "text-slate-500")}>{conv}% of previous</span>}</span>
+              </div>
+              <div className="h-3 rounded-full bg-slate-100"><div className={cn("h-3 rounded-full", tone)} style={{ width: `${Math.max(st.value ? 2 : 0, (st.value / top) * 100)}%` }} /></div>
+            </>
+          );
+          return <li key={st.label}>{st.href ? <Link href={st.href} className="block rounded-lg hover:bg-slate-50">{body}</Link> : body}</li>;
+        })}
+      </ol>
+    </Card>
+  );
+}
+
+const FINDING = {
+  red: "border-l-tx-red bg-red-50/40", amber: "border-l-tx-yellow bg-amber-50/40", green: "border-l-tx-green bg-brand-50/40", blue: "border-l-tx-blue bg-sky-50/40",
+} as const;
+
 function Section({ id, icon, title, children, note }: { id: string; icon: React.ReactNode; title: string; children: React.ReactNode; note?: string }) {
   return (
     <section id={id} className="mt-10 scroll-mt-24">
@@ -34,6 +65,7 @@ function Section({ id, icon, title, children, note }: { id: string; icon: React.
 
 export async function InsightsPage({ user, root }: { user: User; root: string }) {
   const d = await buildInsights(user);
+  const v = await buildDecisionView(d, root);
   const s = d.summary;
   const maxDS = Math.max(0, ...d.districtSector.flatMap((r) => r.cells));
   const maxCS = Math.max(0, ...d.countrySector.flatMap((r) => r.cells));
@@ -58,10 +90,96 @@ export async function InsightsPage({ user, root }: { user: User; root: string })
       </div>
 
       <nav className="mt-6 flex flex-wrap gap-2 text-sm" aria-label="Sections">
-        {[["readiness", "Matchmaking readiness"], ["gaps", "Supply gaps"], ["supply", "District × sector supply"], ["markets", "Markets × sectors"], ["certs", "Certifications"], ["speed", "Turnaround & ageing"]].map(([h, l]) => (
+        {[["findings", "Key findings"], ["funnel", "Funnels"], ["pace", "Targets & pace"], ["districts", "Districts"], ["readiness", "Matchmaking readiness"], ["gaps", "Supply gaps"], ["supply", "District × sector supply"], ["markets", "Markets × sectors"], ["certs", "Certifications"], ["rework", "Rework"], ["speed", "Turnaround & ageing"], ["matching", "Matchmaking position"]].map(([h, l]) => (
           <a key={h} href={`#${h}`} className="rounded-lg bg-white px-3 py-1.5 font-medium text-slate-600 ring-1 ring-slate-200 hover:text-brand-700">{l}</a>
         ))}
       </nav>
+
+      <Section id="findings" icon={<Compass className="size-4" />} title="Key findings and recommended actions"
+        note="Generated from the live data each time the page opens — the points that most need the Directorate's attention.">
+        <div className="grid gap-3 lg:grid-cols-2">
+          {v.findings.map((f) => (
+            <div key={f.title} className={cn("rounded-xl border border-l-4 border-slate-200 p-4", FINDING[f.tone])}>
+              <div className="font-bold text-ink">{f.title}</div>
+              <p className="mt-1 text-sm text-slate-600">{f.detail}</p>
+              {(f.action || f.href) && (
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+                  {f.action && <span className="font-medium text-slate-800">→ {f.action}</span>}
+                  {f.href && <Link href={f.href} className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline">Open <ArrowRight className="size-3.5" /></Link>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section id="funnel" icon={<Filter className="size-4" />} title="Registration funnels"
+        note="How many buyers and sellers reach each stage, and the conversion from the previous stage (red below 60%) — to see where applicants drop out.">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Funnel title="International buyers" steps={v.buyerFunnel} tone="bg-tx-blue" />
+          <Funnel title="Kerala MSME sellers" steps={v.sellerFunnel} tone="bg-tx-green" />
+        </div>
+      </Section>
+
+      <Section id="pace" icon={<TrendingUp className="size-4" />} title="Progress to targets and pace"
+        note="Approvals in the last 14 days, and how long the target will take at that pace.">
+        <div className="grid gap-4 md:grid-cols-2">
+          {v.pace.map((p) => {
+            const pc = p.target ? Math.min(100, (p.value / p.target) * 100) : 0;
+            return (
+              <Card key={p.label} className="p-5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <Link href={p.href} className="font-bold text-ink hover:text-brand-700">{p.label}</Link>
+                  <span className="text-sm tabular-nums"><b className="text-2xl font-extrabold text-ink">{p.value}</b> / {p.target}</span>
+                </div>
+                <div className="mt-3 h-3 rounded-full bg-slate-100"><div className="h-3 rounded-full bg-tx-green" style={{ width: `${Math.max(pc, p.value ? 2 : 0)}%` }} /></div>
+                <div className="mt-2 flex flex-wrap justify-between gap-2 text-sm text-slate-600">
+                  <span>{pc.toFixed(0)}% of target · {Math.max(0, p.target - p.value)} to go</span>
+                  <span className={cn("font-semibold", p.weeks === null ? "text-tx-red" : p.weeks > 4 ? "text-amber-700" : "text-brand-700")}>
+                    {p.value >= p.target ? "Target reached" : p.weeks === null ? "No approvals in 14 days" : `${p.perWeek.toFixed(1)}/week · ~${p.weeks} week${p.weeks === 1 ? "" : "s"} to target`}
+                  </span>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section id="districts" icon={<Building2 className="size-4" />} title="District performance"
+        note="District Industries Centres ranked by approved sellers against target, with speed of recommendation and files waiting over 7 days.">
+        <Card className="overflow-hidden">
+          <div className="table-scroll relative overflow-x-auto">
+            <table className="w-full min-w-[860px] text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr><th className="px-4 py-2.5 text-left">#</th><th className="px-3 py-2.5 text-left">District</th><th className="px-3 py-2.5 text-right">Registered</th>
+                  <th className="px-3 py-2.5 text-right">Approved</th><th className="px-3 py-2.5 text-right">Target</th><th className="w-48 px-3 py-2.5 text-left">Achieved</th>
+                  <th className="px-3 py-2.5 text-right">With district</th><th className="px-3 py-2.5 text-right">Waiting &gt; 7 days</th><th className="px-3 py-2.5 text-right">Avg days to recommend</th><th className="px-4 py-2.5 text-right">Rejected</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {v.districts.map((r, i) => (
+                  <tr key={r.district} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 text-slate-400 tabular-nums">{i + 1}</td>
+                    <td className="px-3 py-2 font-medium text-ink"><Link href={`${root}/sellers?district=${encodeURIComponent(r.district)}`} className="hover:text-brand-700">{r.district}</Link></td>
+                    <td className="px-3 py-2 text-right tabular-nums">{r.registered}</td>
+                    <td className="px-3 py-2 text-right font-semibold tabular-nums">{r.approved}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-slate-500">{r.target}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 flex-1 rounded-full bg-slate-100"><div className={cn("h-2 rounded-full", r.achieved >= 1 ? "bg-tx-green" : r.achieved >= 0.5 ? "bg-tx-yellow" : "bg-tx-red")} style={{ width: `${Math.min(100, r.achieved * 100)}%` }} /></div>
+                        <span className="w-10 text-right text-xs tabular-nums">{Math.round(r.achieved * 100)}%</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{r.pendingWithDistrict}</td>
+                    <td className={cn("px-3 py-2 text-right tabular-nums", r.waitingOver7 ? "font-bold text-tx-red" : "text-slate-400")}>{r.waitingOver7}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.avgDaysToRecommend === null ? "—" : r.avgDaysToRecommend.toFixed(1)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-slate-500">{r.rejected}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </Section>
 
       <Section id="readiness" icon={<Handshake className="size-4" />} title="Matchmaking readiness — approved buyers"
         note={`For every approved buyer: approved sellers in the buyer's approved sectors, and those offering the very products the buyer asked for. Target: ${d.target} sellers per buyer.`}>
@@ -206,6 +324,26 @@ export async function InsightsPage({ user, root }: { user: User; root: string })
         </div>
       </Section>
 
+      <Section id="rework" icon={<RotateCcw className="size-4" />} title="Rework and rejection"
+        note="How often files are sent back at each stage. High rates suggest guidance or forms need to be clearer.">
+        <Card className="overflow-hidden">
+          <ul className="divide-y divide-slate-100">
+            {v.rework.map((r) => {
+              const pc = r.of ? (r.count / r.of) * 100 : 0;
+              return (
+                <li key={r.label}>
+                  <Link href={r.href} className="grid items-center gap-2 px-5 py-3 text-sm hover:bg-slate-50 sm:grid-cols-[1fr_200px_110px]">
+                    <span className="font-medium text-ink">{r.label}</span>
+                    <div className="h-2 rounded-full bg-slate-100"><div className={cn("h-2 rounded-full", pc >= 20 ? "bg-tx-red" : pc >= 10 ? "bg-tx-yellow" : "bg-tx-green")} style={{ width: `${Math.max(pc, r.count ? 2 : 0)}%` }} /></div>
+                    <span className="text-right tabular-nums"><b>{r.count}</b> <span className="text-slate-500">of {r.of} · {pc.toFixed(0)}%</span></span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      </Section>
+
       <Section id="speed" icon={<Gauge className="size-4" />} title="Turnaround and ageing"
         note="Average time each stage takes (including any correction rounds), and how long items now pending have been waiting.">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -240,6 +378,15 @@ export async function InsightsPage({ user, root }: { user: User; root: string })
             </table>
           </div>
         </Card>
+      </Section>
+      <Section id="matching" icon={<Handshake className="size-4" />} title={`Matchmaking position — ${v.state.version ? `published version ${v.state.version}${v.state.locked ? " (final)" : ""}` : "working list (not published)"}`}
+        note="Coverage of the buyer–seller mapping. Full detail, with the products and sectors left out, is on Matchmaking → Results & gaps.">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Buyer–seller pairs" value={v.cov.pairs} accent="blue" hint={`${v.cov.source.preference} preference · ${v.cov.source.system} system · ${v.cov.source.manual} manual`} href={`${root}/matchmaking/results`} />
+          <StatCard label={`Buyers with ${v.cov.target}+ sellers`} value={`${v.cov.buyersAtTarget} / ${v.cov.buyers}`} accent="green" hint={`${v.cov.sellersNeeded} seller slot${v.cov.sellersNeeded === 1 ? "" : "s"} still needed`} href={`${root}/matchmaking/results`} />
+          <StatCard label="Sellers with a buyer" value={`${v.cov.sellersMatched} / ${v.cov.sellers}`} accent="violet" hint={`${v.cov.sellersWithout.length} approved seller${v.cov.sellersWithout.length === 1 ? "" : "s"} without a buyer`} href={`${root}/matchmaking/results`} />
+          <StatCard label="Requested products not covered" value={v.cov.productGaps.length} accent="red" hint={`${v.cov.productGaps.filter((p) => !p.availableSellers).length} with no approved seller at all`} href={`${root}/matchmaking/results`} />
+        </div>
       </Section>
     </>
   );

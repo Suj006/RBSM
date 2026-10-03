@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { CalendarClock, Handshake } from "lucide-react";
+import { prisma } from "@/lib/prisma";
 import { getMatchState, publishedMatches } from "@/lib/matchmaking";
 import { fmtDateTime, parseCerts } from "@/lib/format";
 import { Badge, Card, CardHeader } from "@/components/ui";
 
 /** A seller's published buyer meetings (nothing is shown before the Directorate publishes). */
 export async function SellerMeetings({ sellerId }: { sellerId: string }) {
-  const [state, rows] = await Promise.all([getMatchState(), publishedMatches({ sellerId })]);
+  const [state, rows, prefs] = await Promise.all([
+    getMatchState(), publishedMatches({ sellerId }),
+    prisma.sellerPreference.findMany({ where: { sellerId }, select: { buyerId: true, rank: true } }),
+  ]);
+  const rankOf = new Map(prefs.map((p) => [p.buyerId, p.rank]));
   return (
     <Card id="meetings" className="scroll-mt-24">
       <CardHeader title={`Your buyer meetings${state.version ? ` (${rows.length})` : ""}`} icon={<CalendarClock className="size-4" />}
@@ -18,7 +23,10 @@ export async function SellerMeetings({ sellerId }: { sellerId: string }) {
           {rows.map((r) => (
             <li key={r.id} className="px-5 py-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <div className="font-bold text-ink">{r.buyer.name}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-ink">{r.buyer.name}</span>
+                  {rankOf.has(r.buyer.id) && <Badge tone="violet">Your preference #{rankOf.get(r.buyer.id)}</Badge>}
+                </div>
                 <span className="text-sm text-slate-500">{r.buyer.country}</span>
               </div>
               {r.buyer.pocName && <div className="text-xs text-slate-500">Contact: {r.buyer.pocName}{r.buyer.pocDesignation ? `, ${r.buyer.pocDesignation}` : ""}</div>}
@@ -34,7 +42,12 @@ export async function SellerMeetings({ sellerId }: { sellerId: string }) {
             </li>
           ))}
         </ul>
-      ) : <p className="p-6 text-sm text-slate-500">No buyer has been matched with you in the published list.</p>}
+      ) : <p className="p-6 text-sm text-slate-500">No buyer has been matched with you in the published list. The Directorate may add meetings later; you will be informed by e-mail.</p>}
+      {state.version > 0 && prefs.length > 0 && (
+        <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+          {rows.filter((r) => rankOf.has(r.buyer.id)).length} of your {prefs.length} preferred buyer{prefs.length === 1 ? "" : "s"} {rows.filter((r) => rankOf.has(r.buyer.id)).length === 1 ? "is" : "are"} in your meeting list.
+        </p>
+      )}
     </Card>
   );
 }

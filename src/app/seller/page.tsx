@@ -53,7 +53,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
           <div>
             <h2 className="text-lg font-bold text-ink">You are an approved RBSM seller</h2>
             <p className="mt-1 text-sm text-slate-600">
-              International buyers will be matched with sellers based on their product requirements. Your buyer meetings and schedule will appear here.
+              {match.version
+                ? <>The buyer–seller matchmaking has been published. Your buyer meetings are listed below{match.locked ? " (final)" : ""}.</>
+                : match.buyersVisible && !match.prefsFrozen && !s.prefSubmittedAt
+                  ? <>Approved international buyers are listed under <Link href="/seller/buyers" className="font-semibold text-brand-700 hover:underline">Buyers &amp; preferences</Link>. Your buyer meetings will appear here once the Directorate publishes the matchmaking.</>
+                  : <>International buyers are matched with sellers based on their requirements. Your buyer meetings will appear here once the Directorate publishes the matchmaking.</>}
             </p>
           </div>
         </div>

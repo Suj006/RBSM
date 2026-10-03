@@ -36,14 +36,14 @@ const SELLER_STEPS = [
   { icon: Store, title: "Register your enterprise", body: "Self-register online and get a login to track your application — or register through your District Industries Centre." },
   { icon: Landmark, title: "Verified by your district centre", body: "Udyam number and contact details are checked locally. If anything needs correcting, you fix it yourself online." },
   { icon: BadgeCheck, title: "Approved by the Directorate", body: "You receive your RBSM seller number; your login becomes your permanent seller login." },
-  { icon: Handshake, title: "Meet international buyers", body: "Matched on sector and products for one-to-one B2B meetings." },
+  { icon: Handshake, title: "Choose buyers, then meet them", body: "See approved buyers' requirements, name up to five preferred buyers, and get your published meeting list." },
 ];
 const MODULES = [
   { icon: Users, title: "Buyer registration & profiling", body: "Structured buyer profiles with sourcing value, timelines and sector-wise requirements.", tone: "bg-tx-blue", live: true },
   { icon: Store, title: "MSME seller registry", body: "Sellers from all 14 districts — individual entry, Excel bulk upload or self-registration.", tone: "bg-tx-green", live: true },
   { icon: ShieldCheck, title: "Two-level verification", body: "FIEO and the Directorate approve buyers sector by sector; district centres verify sellers.", tone: "bg-tx-yellow", live: true },
   { icon: BarChart3, title: "Sector demand intelligence", body: "Which products buyers want in every sector — and which approved sellers offer them.", tone: "bg-tx-red", live: true },
-  { icon: Handshake, title: "Buyer–seller matchmaking", body: "Each buyer mapped to at least ten relevant sellers, guided by demand and supply data.", tone: "bg-tx-green", live: false },
+  { icon: Handshake, title: "Buyer–seller matchmaking", body: "Sellers state their preferred buyers; the Directorate maps each buyer to ten relevant sellers using preferences and sector–product fit.", tone: "bg-tx-green", live: true },
   { icon: CalendarClock, title: "B2B meetings & follow-up", body: "One-to-one meeting schedules during the event, then leads, MoUs and outcomes.", tone: "bg-tx-blue", live: false },
 ];
 const OFFICIAL = [

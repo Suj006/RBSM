@@ -20,7 +20,7 @@ export async function MatchBoard({ user, base, filters }: { user: User; base: st
 
   return (
     <>
-      <PageHeader back={{ href: base, label: "Back to matchmaking" }} eyebrow="Matchmaking" title="Mapping board"
+      <PageHeader eyebrow="Matchmaking" title="Mapping board"
         subtitle={`Working list: ${rows.reduce((n, r) => n + r.matches.length, 0)} pairs across ${rows.length} approved buyers. Target ${pool.target} sellers per buyer. Open a buyer to add or remove sellers.`}
         actions={<DownloadButtons href="/api/reports/match-list?v=draft" label="Working list" compact />} />
       {!state.prefsFrozen && (

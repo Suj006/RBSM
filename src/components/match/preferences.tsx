@@ -25,7 +25,7 @@ export async function PreferencesPage({ user, base, staffBase, filters }: { user
 
   return (
     <>
-      <PageHeader back={{ href: base, label: "Back to matchmaking" }} eyebrow="Matchmaking" title="Seller preferences"
+      <PageHeader eyebrow="Matchmaking" title="Seller preferences"
         subtitle="Each approved seller's tentative preferences (up to 5 buyers, in order) and whether each one is in the working list and in the published mapping."
         actions={<DownloadButtons href="/api/reports/seller-preferences" label="Preferences report" compact />} />
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

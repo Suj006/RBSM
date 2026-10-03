@@ -28,7 +28,7 @@ export async function MatchResults({ base, staffBase, which }: { base: string; s
 
   return (
     <>
-      <PageHeader back={{ href: base, label: "Back to matchmaking" }} eyebrow="Matchmaking" title="Results & gaps"
+      <PageHeader eyebrow="Matchmaking" title="Results & gaps"
         subtitle={`Position of the ${label}: who is matched, who is left out, and where to act next.`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -43,7 +43,7 @@ export async function MatchResults({ base, staffBase, which }: { base: string; s
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Buyer–seller pairs" value={c.pairs} accent="blue" hint={`${c.source.preference} preference · ${c.source.system} system · ${c.source.manual} manual`} />
         <StatCard label={`Buyers with ${c.target}+ sellers`} value={`${c.buyersAtTarget} / ${c.buyers}`} accent="green" hint={`${c.buyersBelow.length} below target · ${c.buyers - c.buyersMatched} with none`} />
-        <StatCard label="Sellers with at least one buyer" value={`${c.sellersMatched} / ${c.sellers}`} accent="violet" hint={`${c.sellersWithout.length} approved sellers without a buyer`} />
+        <StatCard label="Sellers with at least one buyer" value={`${c.sellersMatched} / ${c.sellers}`} accent="violet" hint={`${c.sellersWithout.length} approved seller${c.sellersWithout.length === 1 ? "" : "s"} without a buyer`} />
         <StatCard label="Average sellers per buyer" value={c.buyers ? (c.pairs / c.buyers).toFixed(1) : "—"} accent="yellow" hint={`Target ${c.target}`} />
       </div>
 

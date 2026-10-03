@@ -5,5 +5,5 @@ import { PublishedMapping } from "@/components/match/published";
 export const metadata: Metadata = { title: "Published mapping" };
 export default async function Page() {
   const user = await requireUser("DIC");
-  return <PublishedMapping user={user} staffBase="/dic" back={{ href: "/dic/matchmaking", label: "Back to matchmaking" }} />;
+  return <PublishedMapping user={user} staffBase="/dic" />;
 }

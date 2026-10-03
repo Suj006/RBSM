@@ -15,6 +15,7 @@ import { fmtMobile } from "@/lib/text";
 import { getTargets } from "@/lib/targets";
 import { productDemand, sectorDemandSummary } from "@/lib/demand";
 import { AGE_BUCKETS, buildInsights } from "@/lib/insights";
+import { buildDecisionView } from "@/lib/decision";
 import { coverage, fit, getMatchState, loadPool, preferenceOutcomes, SOURCE_LABEL } from "@/lib/matchmaking";
 
 export const REPORTS = {
@@ -52,7 +53,7 @@ export const REPORTS = {
   },
   "insights": {
     title: "Directorate Insights",
-    description: "Matchmaking readiness of approved buyers, supply gaps, district × sector supply, markets × sectors demand, certifications required, turnaround and ageing.",
+    description: "Key findings with recommended actions, registration funnels, pace to targets, district performance, rework, matchmaking readiness, supply gaps, district × sector supply, markets × sectors demand, certifications required, turnaround and ageing.",
   },
   "match-list": {
     title: "Buyer–Seller Mapping",
@@ -867,6 +868,7 @@ async function productDemandReport(user: User, f: BuyerFilters & { view?: string
 
 async function insightsReport(user: User): Promise<Report> {
   const d = await buildInsights(user);
+  const v = await buildDecisionView(d, user.role === "ADMIN" ? "/admin" : "/dic");
   const label = { ready: "Ready", sector: "Sector match only", short: "Short of sellers" } as const;
   const num = (key: string, header: string, width = 10) => ({ key, header, width, kind: "number" as const, align: "right" as const });
   return {
@@ -877,7 +879,39 @@ async function insightsReport(user: User): Promise<Report> {
       { label: "Products with no supplier", value: `${d.summary.productGaps} / ${d.summary.products}`, tone: "yellow" },
       { label: "Pending > 7 days", value: d.summary.overdue, tone: "violet" },
     ],
-    tables: [
+    tables: ([
+      {
+        name: "Key Findings", heading: "Key findings and recommended actions",
+        columns: [{ key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" }, { key: "priority", header: "Priority", width: 11 },
+          { key: "title", header: "Finding", width: 38 }, { key: "detail", header: "Detail", width: 46 }, { key: "action", header: "Recommended Action", width: 40 }],
+        rows: v.findings.map((f, i) => ({ sl: i + 1, priority: { red: "High", amber: "Medium", blue: "Note", green: "On track" }[f.tone], title: f.title, detail: f.detail, action: f.action ?? "" })),
+      },
+      {
+        name: "Funnels", heading: "Registration funnels",
+        columns: [{ key: "who", header: "Applicant", width: 18 }, { key: "stage", header: "Stage", width: 36 }, num("n", "Count"), num("conv", "% of Previous", 13)],
+        rows: [...v.buyerFunnel.map((st, i, a) => ({ who: i ? "" : "Buyers", stage: st.label, n: st.value, conv: i ? (a[i - 1].value ? Math.round((st.value / a[i - 1].value) * 100) : 0) : "" })),
+          ...v.sellerFunnel.map((st, i, a) => ({ who: i ? "" : "Sellers", stage: st.label, n: st.value, conv: i ? (a[i - 1].value ? Math.round((st.value / a[i - 1].value) * 100) : 0) : "" }))],
+      },
+      {
+        name: "Targets and Pace", heading: "Progress to targets and pace (approvals in the last 14 days)",
+        columns: [{ key: "label", header: "Measure", width: 22 }, num("value", "Achieved"), num("target", "Target"), num("pct", "% of Target", 12),
+          { key: "pace", header: "Per Week", width: 11, align: "right" }, { key: "weeks", header: "Weeks to Target", width: 15, align: "right" }],
+        rows: v.pace.map((x) => ({ label: x.label, value: x.value, target: x.target, pct: x.target ? Math.round((x.value / x.target) * 100) : 0,
+          pace: x.perWeek.toFixed(1), weeks: x.weeks === null ? "No recent approvals" : x.weeks === 0 ? "Reached" : `~${x.weeks}` })),
+      },
+      {
+        name: "District Performance", heading: "District performance (approved sellers against target)",
+        columns: [{ key: "sl", header: "Rank", width: 6, kind: "number", align: "center" }, { key: "district", header: "District", width: 20 },
+          num("registered", "Registered"), num("approved", "Approved"), num("target", "Target"), num("pct", "% Achieved", 11),
+          num("pending", "With District"), num("waiting", "Waiting > 7 Days", 13), { key: "avg", header: "Avg Days to Recommend", width: 14, align: "right" }, num("rejected", "Rejected")],
+        rows: v.districts.map((x, i) => ({ sl: i + 1, district: x.district, registered: x.registered, approved: x.approved, target: x.target, pct: Math.round(x.achieved * 100),
+          pending: x.pendingWithDistrict, waiting: x.waitingOver7, avg: x.avgDaysToRecommend === null ? "" : x.avgDaysToRecommend.toFixed(1), rejected: x.rejected })),
+      },
+      {
+        name: "Rework", heading: "Rework and rejection",
+        columns: [{ key: "label", header: "Measure", width: 50 }, num("count", "Count"), num("of", "Out of"), num("pct", "%")],
+        rows: v.rework.map((r) => ({ label: r.label, count: r.count, of: r.of, pct: r.of ? Math.round((r.count / r.of) * 100) : 0 })),
+      },
       {
         name: "Matchmaking Readiness", heading: `1. Matchmaking readiness (target ${d.target} sellers per buyer)`,
         columns: [
@@ -932,9 +966,9 @@ async function insightsReport(user: User): Promise<Report> {
       {
         name: "Pending Ageing", heading: "8. Pending now, by waiting time",
         columns: [{ key: "stage", header: "Stage", width: 40 }, ...AGE_BUCKETS.map((b, i) => num(`b${i}`, b, 11)), num("total", "Total"), num("oldest", "Oldest (days)", 12)],
-        rows: d.ageing.map((a) => ({ stage: a.stage, total: a.total, oldest: a.oldest ?? "", ...Object.fromEntries(a.buckets.map((v, i) => [`b${i}`, v])) })),
+        rows: d.ageing.map((a) => ({ stage: a.stage, total: a.total, oldest: a.oldest ?? "", ...Object.fromEntries(a.buckets.map((n, i) => [`b${i}`, n])) })),
       },
-    ],
+    ] as Table[]).map((t, i) => ({ ...t, heading: `${i + 1}. ${(t.heading ?? t.name).replace(/^\d+\. /, "")}` })),
   };
 }
 
