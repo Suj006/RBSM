@@ -757,17 +757,17 @@ async function sectorDemandReport(user: User, f: BuyerFilters): Promise<Report> 
         columns: [
           { key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" },
           { key: "sector", header: "Sector", width: 26 },
-          { key: "buyers", header: "Buyers", width: 9, kind: "number", align: "right" },
-          { key: "approved", header: "Approved Req.", width: 11, kind: "number", align: "right" },
+          { key: "buyers", header: "Buyers (incl. Pending)", width: 11, kind: "number", align: "right" },
+          { key: "approved", header: "Approved Buyers", width: 11, kind: "number", align: "right" },
           { key: "pending", header: "Under Review", width: 11, kind: "number", align: "right" },
           { key: "top", header: "Most Requested Products (buyers)", width: 52 },
           { key: "sellers", header: "Approved Sellers", width: 11, kind: "number", align: "right" },
-          { key: "ratio", header: "Sellers per Buyer", width: 11, align: "right" },
+          { key: "ratio", header: "Sellers per Approved Buyer", width: 13, align: "right" },
         ],
         rows: rows.map((r, i) => ({
           sl: i + 1, sector: r.name, buyers: r.buyers, approved: r.approvedReqs, pending: r.pendingReqs,
           top: r.products.slice(0, 6).map((p) => `${p.product} (${p.buyers})`).join(", "), sellers: r.sellers,
-          ratio: r.buyers ? (r.sellers / r.buyers).toFixed(1) : "—",
+          ratio: r.approvedReqs ? (r.sellers / r.approvedReqs).toFixed(1) : "—",
         })),
         totals: {
           sector: "Total", buyers: rows.reduce((a, r) => a + r.buyers, 0), approved: rows.reduce((a, r) => a + r.approvedReqs, 0),

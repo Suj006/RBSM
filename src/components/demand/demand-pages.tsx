@@ -28,11 +28,11 @@ export async function DemandSummaryPage({ user, base }: { user: User; base: stri
               <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Sector</th>
-                  <th className="px-3 py-3 text-right">Buyers</th>
-                  <th className="px-3 py-3 text-right">Approved</th>
+                  <th className="px-3 py-3 text-right">Buyers<div className="text-[10px] font-medium normal-case tracking-normal text-slate-400">incl. pending</div></th>
+                  <th className="px-3 py-3 text-right">Approved buyers</th>
                   <th className="px-4 py-3">Most requested products</th>
                   <th className="px-3 py-3 text-right">Approved sellers</th>
-                  <th className="px-3 py-3 text-right">Sellers / buyer</th>
+                  <th className="px-3 py-3 text-right">Sellers per approved buyer</th>
                   <th className="px-3 py-3"><span className="sr-only">Open</span></th>
                 </tr>
               </thead>
@@ -54,7 +54,7 @@ export async function DemandSummaryPage({ user, base }: { user: User; base: stri
                       </div>
                     </td>
                     <td className="px-3 py-3 text-right align-top tabular-nums">{r.sellers || <span className="font-semibold text-tx-red">0</span>}</td>
-                    <td className="px-3 py-3 text-right align-top tabular-nums text-slate-600">{r.buyers ? (r.sellers / r.buyers).toFixed(1) : "—"}</td>
+                    <td className="px-3 py-3 text-right align-top tabular-nums text-slate-600">{r.approvedReqs ? (r.sellers / r.approvedReqs).toFixed(1) : "—"}</td>
                     <td className="px-3 py-3 text-right align-top">
                       <Link href={`${base}/${r.id}`} aria-label={`Open ${r.name}`} className="inline-grid size-8 place-items-center rounded-lg text-slate-400 group-hover:bg-white group-hover:text-brand-700"><ChevronRight className="size-4" /></Link>
                     </td>
@@ -62,6 +62,10 @@ export async function DemandSummaryPage({ user, base }: { user: User; base: stri
                 ))}
               </tbody>
             </table>
+            <p className="px-4 py-3 text-xs text-slate-500">
+              <b>Buyers</b> counts every buyer who submitted a requirement in the sector (approved and still in verification).
+              <b> Sellers per approved buyer</b> = approved sellers ÷ approved buyers in that sector.
+            </p>
           </div>
         ) : <EmptyState icon={<Package className="size-5" />} title="No sector demand yet">Buyer requirements appear here once submitted.</EmptyState>}
       </Card>
