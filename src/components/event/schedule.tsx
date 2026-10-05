@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 import { countryCode } from "@/lib/country-codes";
 import { Flag, UidPill, uid } from "@/components/ids";
 
-type GridMeeting = { id: string; buyerId: string; sellerId: string; startAt: Date; seller: { name: string; approvedNo: string | null; regNo: string }; ticketNo?: string; status?: string };
+type GridMeeting = { id: string; buyerId: string; sellerId: string; startAt: Date; seller: { name: string; approvedNo: string | null; regNo: string }; ticketNo?: string; status?: string; movedAt?: Date | null };
 type GridBuyer = { id: string; name: string; pavilionNo: number | null; country: string; approvedNo: string | null; regNo: string };
 
 export function DayTabs({ cfg, day, href }: { cfg: EventConfig; day: string; href: (d: string) => string }) {
@@ -66,7 +66,7 @@ export function ScheduleGrid({ cfg, day, buyers, meetings, cellHref }: {
                   <td key={s.no} className="border-b border-l border-slate-100 p-1">
                     {m ? (cellHref
                       ? <Link href={cellHref(m)} title={`${m.seller.name} (${uid(m.seller)}) — ${fmtTime(m.startAt)}${m.ticketNo ? ` · ${m.ticketNo}` : ""}`} className="block truncate rounded-md bg-brand-50 px-1.5 py-1 font-medium text-brand-800 ring-1 ring-brand-200 hover:bg-brand-100">{m.seller.name}</Link>
-                      : <span title={`${m.seller.name} (${uid(m.seller)})${m.ticketNo ? ` · ${m.ticketNo}` : ""}`} className="block truncate rounded-md bg-brand-50 px-1.5 py-1 font-medium text-brand-800 ring-1 ring-brand-200">{m.seller.name}</span>)
+                      : <span title={`${m.seller.name} (${uid(m.seller)})${m.ticketNo ? ` · ${m.ticketNo}` : ""}${m.movedAt ? " · changed on the event day" : ""}`} className={cn("block truncate rounded-md bg-brand-50 px-1.5 py-1 font-medium text-brand-800 ring-1 ring-brand-200", m.movedAt && "bg-amber-50 text-amber-900 ring-2 ring-amber-400")}>{m.movedAt && "⇄ "}{m.seller.name}</span>)
                       : <span className="block h-6" />}
                   </td>
                 );

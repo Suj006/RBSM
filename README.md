@@ -131,11 +131,15 @@ board, Seller preferences, Checks, Results & gaps, Published.
    to see the board as at any time of an event day.
 7. **Fill this slot** (nodal officer for their buyers; Directorate from the live monitor) — when a seller is marked
    absent, or has not checked in after the slot starts, the slot can be given to **any other seller matched with that
-   buyer** who is free now (no meeting elsewhere in that slot, buffer kept); sellers already at the venue are listed
-   first. Their later meeting with the buyer moves forward and keeps its ticket number; a matched pair without a
+   buyer** who is available now: each seller's other meetings that day are checked (no overlap, buffer kept), sellers
+   marked absent elsewhere today or who have already met the buyer are left out (the reason is shown), sellers already
+   at the venue are listed first with their day's timetable, and the list can be searched by name, ID, district,
+   contact, mobile or product. Their later meeting with the buyer moves forward and keeps its ticket number; a matched pair without a
    meeting gets a new ticket. Only pairs of the published mapping are offered. If the absent seller arrives late, they
    can be given a later slot that day free for both sides. Moves show in My meetings, on the ticket, the live board and
-   the attendance report (Event-Day Change), and are copied into the draft so a republish keeps them.
+   the attendance report (Event-Day Change), and are copied into the draft so a republish keeps them. The live
+   board marks every changed slot (⇄, dashed outline) and lists the **Event-day changes** — who was absent, who took
+   the slot, moved from when, by whom — for the Directorate, FIEO and Admin.
 
 Reports: **Meeting Schedule** (published or draft — by time, buyer, seller, pavilions and nodal officers) and
 **Event Day Attendance** (every meeting's status, day-wise summary, buyers' attendance, nodal officers' marking).
@@ -152,7 +156,9 @@ schedules, the live board, nodal officers' pages and tickets:
 
 Buyers carry their country's flag and ISO short code (🇦🇪 AE). **Find by ID** (Directorate, FIEO, Admin, districts —
 also the search box on the dashboard) takes any of these IDs, part of one, or a meeting ticket number and shows the
-participant's identity, status, sectors, matches, pavilion, nodal officer and every meeting, with links to the full
+participant's identity, status, sectors, matches, pavilion, nodal officer and every meeting. It also finds by name,
+contact person, mobile, e-mail, Udyam / IEC number, district, country or product (FIEO: not by sellers' personal
+data). Nodal officers can look a seller up by ticket, ID, name or mobile, with links to the full
 profile, matchmaking and messages. Districts find only their own sellers. Buyer and seller lists and the messages list
 also search by ID.
 

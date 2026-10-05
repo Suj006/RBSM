@@ -45,7 +45,7 @@ function VerifyBox({ value }: { value?: string }) {
   return (
     <form action="/nodal/verify" className="flex flex-wrap items-center gap-2">
       <ScanLine className="size-5 text-brand-700" />
-      <Input name="t" defaultValue={value} placeholder="Ticket no. (TX-D1-P07-1030) or seller ID" className="max-w-sm font-mono uppercase placeholder:normal-case" aria-label="Ticket number or seller ID" autoComplete="off" />
+      <Input name="t" defaultValue={value} placeholder="Ticket no., seller ID, name or mobile" className="max-w-sm font-mono uppercase placeholder:normal-case" aria-label="Ticket number or seller ID" autoComplete="off" />
       <button className="rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-800">Verify</button>
     </form>
   );
@@ -141,7 +141,7 @@ export async function NodalVerify({ user, t }: { user: User; t?: string }) {
   return (
     <>
       <PageHeader back={{ href: "/nodal", label: "Back to today" }} eyebrow={`Nodal officer · ${o.name}`} title="Verify a ticket"
-        subtitle="Enter the ticket number from the seller's ticket (printed or on the phone), or the seller's ID (RBSM-Seller-…, RBSM-S-…)." />
+        subtitle="Enter the ticket number from the seller's ticket (printed or on the phone), or the seller's ID (RBSM-Seller-…, RBSM-S-…), name or mobile number." />
       <Card className="mb-6 p-5"><VerifyBox value={ticket} /></Card>
       {ticket && !m && <Alert tone="red" title="No such ticket"><XCircle className="mr-1 inline size-4" /> {ticket} is not in the published schedule. Check the number, or ask the seller to show the ticket from their login.</Alert>}
       {m && (
@@ -163,8 +163,10 @@ export async function NodalVerify({ user, t }: { user: User; t?: string }) {
 
 /** Nodal officer: a seller looked up by ID — all their meetings; the officer marks those at their own pavilions. */
 async function SellerById({ o, q }: { o: { id: string; name: string }; q: string }) {
-  const sellers = await prisma.seller.findMany({ where: { status: "APPROVED", OR: [{ approvedNo: { contains: q } }, { regNo: { contains: q } }, { user: { username: { contains: q } } }] },
-    take: 5, select: { id: true, name: true, district: true, approvedNo: true, regNo: true, contactName: true, contactMobile: true } });
+  const digits = q.replace(/\D/g, "");
+  const sellers = await prisma.seller.findMany({ where: { status: "APPROVED", scheduled: { some: {} }, OR: [{ approvedNo: { contains: q } }, { regNo: { contains: q } }, { user: { username: { contains: q } } },
+    ...(q.length >= 3 ? [{ name: { contains: q } }, { contactName: { contains: q } }] : []), ...(digits.length >= 5 ? [{ contactMobile: { contains: digits } }] : [])] },
+    take: 10, select: { id: true, name: true, district: true, approvedNo: true, regNo: true, contactName: true, contactMobile: true } });
   const exact = sellers.find((s) => [s.approvedNo, s.regNo].some((x) => x?.toUpperCase() === q));
   const list = exact ? [exact] : sellers;
   const [cfg, meetings] = await Promise.all([getEventConfig(), list.length === 1 ? loadMeetings({ sellerId: list[0].id }) : Promise.resolve([])]);
@@ -175,7 +177,7 @@ async function SellerById({ o, q }: { o: { id: string; name: string }; q: string
       <PageHeader back={{ href: "/nodal", label: "Back to today" }} eyebrow={`Nodal officer · ${o.name}`} title="Verify a seller"
         subtitle="The seller's meetings in the published schedule. You can mark the meetings at your own pavilions." />
       <Card className="mb-6 p-5"><VerifyBox value={q} /></Card>
-      {!list.length && <Alert tone="red" title="No approved seller with this ID"><XCircle className="mr-1 inline size-4" /> {q} did not match a seller. Seller IDs look like RBSM-Seller-2026012 or RBSM-S-012.</Alert>}
+      {!list.length && <Alert tone="red" title="No seller in the schedule matches this"><XCircle className="mr-1 inline size-4" /> {q} did not match a seller. Seller IDs look like RBSM-Seller-2026012 or RBSM-S-012.</Alert>}
       {list.length > 1 && (
         <Card className="overflow-hidden"><ul className="divide-y divide-slate-100">
           {list.map((s) => <li key={s.id} className="px-5 py-3 text-sm"><Link href={`/nodal/verify?t=${encodeURIComponent(s.approvedNo ?? s.regNo)}`} className="font-semibold text-brand-700 hover:underline">{s.name}</Link> <UidPill id={uid(s)} tone="seller" /> <span className="text-slate-500">{s.district}</span></li>)}

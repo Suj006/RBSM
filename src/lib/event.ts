@@ -260,8 +260,10 @@ export async function slotOptions(meetingId: string, now: Date = new Date()) {
   if (!target) return null;
   const [pairs, sameDay, buyerAll] = await Promise.all([
     prisma.publishedMatch.findMany({ where: { buyerId: target.buyerId, sellerId: { not: target.sellerId }, seller: { status: "APPROVED" } }, orderBy: { slot: "asc" },
-      select: { seller: { select: { id: true, name: true, district: true, contactName: true, contactMobile: true, ...PARTY } } } }),
-    prisma.scheduledMeeting.findMany({ where: { day: target.day }, select: { id: true, buyerId: true, sellerId: true, startAt: true, endAt: true, status: true, pavilionNo: true } }),
+      select: { seller: { select: { id: true, name: true, district: true, contactName: true, contactMobile: true, ...PARTY,
+        products: { orderBy: { sortOrder: "asc" }, select: { products: true, sector: { select: { name: true } } } } } } } }),
+    prisma.scheduledMeeting.findMany({ where: { day: target.day }, orderBy: { startAt: "asc" },
+      select: { id: true, buyerId: true, sellerId: true, startAt: true, endAt: true, status: true, pavilionNo: true, buyer: { select: { name: true } } } }),
     prisma.scheduledMeeting.findMany({ where: { buyerId: target.buyerId }, select: { id: true, sellerId: true, day: true, startAt: true, endAt: true, status: true, ticketNo: true } }),
   ]);
   const busy = sameDay.filter((m) => BUSY.includes(m.status));
@@ -269,15 +271,28 @@ export async function slotOptions(meetingId: string, now: Date = new Date()) {
   // Someone else already sits with the buyer in this slot (e.g. the slot was filled before).
   const filledBy = busy.find((m) => m.buyerId === target.buyerId && m.id !== target.id && clashes(m, slot, 0));
   const atVenue = new Set(sameDay.filter((m) => m.status === "SELLER_PRESENT" || m.status === "COMPLETED").map((m) => m.sellerId));
-  const candidates = pairs.flatMap(({ seller }) => {
-    const own = buyerAll.find((m) => m.sellerId === seller.id);
+  const absentToday = new Set(sameDay.filter((m) => m.status === "SELLER_ABSENT" && !atVenue.has(m.sellerId)).map((m) => m.sellerId));
+  type Seller = (typeof pairs)[number]["seller"];
+  const candidates: { seller: Seller; own: (typeof buyerAll)[number] | null; atVenue: boolean; next: (typeof busy)[number] | null; day: (typeof busy)[number][] }[] = [];
+  const excluded: { seller: Seller; reason: string }[] = [];
+  for (const { seller } of pairs) {
+    const own = buyerAll.find((m) => m.sellerId === seller.id) ?? null;
     // Only a meeting still to come can be moved forward; a pair already met / missed is not offered.
-    if (own && (own.status !== "SCHEDULED" && own.status !== "SELLER_PRESENT" || own.startAt.getTime() <= target.startAt.getTime())) return [];
-    if (busy.some((m) => m.sellerId === seller.id && m.id !== own?.id && clashes(m, slot, cfg.bufferMinutes))) return [];
-    const next = busy.filter((m) => m.sellerId === seller.id && m.id !== own?.id && m.startAt.getTime() > target.startAt.getTime())
-      .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())[0] ?? null;
-    return [{ seller, own: own ?? null, atVenue: atVenue.has(seller.id), next }];
-  }).sort((a, b) => Number(b.atVenue) - Number(a.atVenue) || Number(!!b.own) - Number(!!a.own)
+    if (own && (own.status !== "SCHEDULED" && own.status !== "SELLER_PRESENT" || own.startAt.getTime() <= target.startAt.getTime())) {
+      excluded.push({ seller, reason: own.status === "SELLER_ABSENT" ? `Absent for this buyer at ${fmtTime(own.startAt)}` : `Already met or due to meet this buyer at ${fmtTime(own.startAt)}` }); continue;
+    }
+    if (absentToday.has(seller.id)) { excluded.push({ seller, reason: "Marked absent at another pavilion today" }); continue; }
+    // The seller's other meetings that day (with other buyers) must not overlap this slot, buffer included.
+    const theirs = busy.filter((m) => m.sellerId === seller.id && m.id !== own?.id);
+    const clash = theirs.find((m) => clashes(m, slot, cfg.bufferMinutes));
+    if (clash) {
+      excluded.push({ seller, reason: `${clash.startAt.getTime() < target.endAt.getTime() && target.startAt.getTime() < clash.endAt.getTime() ? "In a meeting" : "Meeting too close (buffer)"} at ${fmtTime(clash.startAt)}, pavilion ${clash.pavilionNo ?? "–"} (${clash.buyer.name})` });
+      continue;
+    }
+    const next = theirs.find((m) => m.startAt.getTime() > target.startAt.getTime()) ?? null;
+    candidates.push({ seller, own, atVenue: atVenue.has(seller.id), next, day: theirs });
+  }
+  candidates.sort((a, b) => Number(b.atVenue) - Number(a.atVenue) || Number(!!b.own) - Number(!!a.own)
     || (a.own?.startAt.getTime() ?? 0) - (b.own?.startAt.getTime() ?? 0) || a.seller.name.localeCompare(b.seller.name));
   const day = cfg.days.find((d) => d.date === target.day);
   const later = target.status === "SELLER_ABSENT" && day
@@ -286,7 +301,7 @@ export async function slotOptions(meetingId: string, now: Date = new Date()) {
     : [];
   const replacement = await prisma.scheduledMeeting.findFirst({ where: { replacesId: target.id, startAt: target.startAt }, orderBy: { movedAt: "desc" },
     select: { ticketNo: true, movedFrom: true, status: true, seller: { select: { name: true, ...PARTY } }, movedBy: { select: { displayName: true } } } });
-  return { cfg, target, candidates, later, filledBy: filledBy ?? null, replacement, fillable: canFill(target, now) && !filledBy };
+  return { cfg, target, candidates, excluded, later, filledBy: filledBy ?? null, replacement, fillable: canFill(target, now) && !filledBy };
 }
 export type SlotOptions = NonNullable<Awaited<ReturnType<typeof slotOptions>>>;
 

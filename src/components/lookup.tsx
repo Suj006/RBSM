@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ScanSearch, Ticket as TicketIcon } from "lucide-react";
-import type { User } from "@/generated/prisma/client";
+import type { Prisma, User } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sellerScope } from "@/lib/seller-query";
 import { fmtDay, fmtTime, getEventConfig, LIVE_META, liveStatus } from "@/lib/event";
@@ -19,8 +19,8 @@ export function IdSearch({ action, value, autoFocus }: { action: string; value?:
     <form action={action} className="flex flex-wrap items-center gap-2">
       <ScanSearch className="size-5 text-brand-700" />
       <input name="q" defaultValue={value} autoFocus={autoFocus} autoComplete="off" aria-label="Buyer ID, seller ID or ticket number"
-        placeholder="RBSM-Buyer-2026007 · RBSM-Seller-2026012 · RBSM-B-007 · Tradex2027-S012 · TX-D1-P03-1030"
-        className="min-w-0 flex-1 rounded-lg border-0 px-3 py-2.5 font-mono text-sm uppercase ring-1 ring-slate-300 placeholder:normal-case placeholder:text-slate-400 focus:ring-2 focus:ring-brand-600 sm:max-w-xl" />
+        placeholder="ID (RBSM-Buyer-2026007, RBSM-S-012, Tradex2027-S012), ticket, name, contact, mobile, district, country or product"
+        className="min-w-0 flex-1 rounded-lg border-0 px-3 py-2.5 text-sm ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-brand-600 sm:max-w-xl" />
       <button className="rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-800">Find</button>
     </form>
   );
@@ -79,18 +79,32 @@ export async function IdLookup({ user, base, q: raw }: { user: User; base: strin
   const dayNo = new Map(cfg.days.map((d) => [d.date, d.n]));
 
   const ticket = q && /^TX-/i.test(q) ? await prisma.scheduledMeeting.findUnique({ where: { ticketNo: Q }, select: { buyerId: true, sellerId: true } }) : null;
-  const idOr = (field: "buyer" | "seller") => q ? [
-    { approvedNo: { contains: q } }, { regNo: { contains: q } },
-    { user: { username: { contains: q } } }, ...(q.length >= 3 ? [{ name: { contains: q } }] : []),
-    ...(ticket ? [{ id: field === "buyer" ? ticket.buyerId : ticket.sellerId }] : []),
+  // IDs (approved no., registration no., login) and — from 3 characters — any other identifying detail.
+  const text = q.length >= 3;
+  const digits = q.replace(/\D/g, "");
+  const buyerOr: Prisma.BuyerWhereInput[] = q ? [
+    { approvedNo: { contains: q } }, { regNo: { contains: q } }, { user: { username: { contains: q } } },
+    ...(text ? [{ name: { contains: q } }, { country: { contains: q } }, { pocName: { contains: q } }, { pocEmail: { contains: q.toLowerCase() } }, { signupEmail: { contains: q.toLowerCase() } },
+      ...(digits.length >= 5 ? [{ pocMobile: { contains: digits } }] : []),
+      { requirement: { items: { some: { status: "APPROVED" as const, OR: [{ products: { contains: q } }, { sector: { name: { contains: q } } }] } } } }] : []),
+    ...(ticket ? [{ id: ticket.buyerId }] : []),
+  ] : [];
+  // FIEO does not see sellers' personal data, so it cannot search by it either.
+  const personal = user.role !== "FIEO";
+  const sellerOr: Prisma.SellerWhereInput[] = q ? [
+    { approvedNo: { contains: q } }, { regNo: { contains: q } }, { user: { username: { contains: q } } },
+    ...(text ? [{ name: { contains: q } }, { district: { contains: q } }, { udyamNo: { contains: q.toUpperCase() } }, { iecNo: { contains: q.toUpperCase() } },
+      { products: { some: { OR: [{ products: { contains: q } }, { sector: { name: { contains: q } } }] } } },
+      ...(personal ? [{ contactName: { contains: q } }, { contactEmail: { contains: q.toLowerCase() } }, ...(digits.length >= 5 ? [{ contactMobile: { contains: digits } }] : [])] : [])] : []),
+    ...(ticket ? [{ id: ticket.sellerId }] : []),
   ] : [];
   const [buyers, sellers] = q ? await Promise.all([
-    district ? [] : prisma.buyer.findMany({ where: { OR: idOr("buyer") }, take: 12, orderBy: { regNo: "asc" },
+    district ? [] : prisma.buyer.findMany({ where: { OR: buyerOr }, take: 12, orderBy: { regNo: "asc" },
       select: { id: true, name: true, country: true, approvedNo: true, regNo: true, status: true, pocName: true, pavilionNo: true,
         user: { select: { username: true } }, nodalOfficer: { select: { name: true, mobile: true } },
         requirement: { select: { items: { where: { status: "APPROVED" }, orderBy: { sortOrder: "asc" }, select: { sector: { select: { name: true } } } } } },
         _count: { select: { publishedMatches: true } }, scheduled: MEET } }),
-    prisma.seller.findMany({ where: { AND: [sellerScope(user), { OR: idOr("seller") }] }, take: 12, orderBy: { regNo: "asc" },
+    prisma.seller.findMany({ where: { AND: [sellerScope(user), { OR: sellerOr }] }, take: 12, orderBy: { regNo: "asc" },
       select: { id: true, name: true, district: true, approvedNo: true, regNo: true, status: true,
         user: { select: { username: true } }, products: { orderBy: { sortOrder: "asc" }, select: { sector: { select: { name: true } } } },
         _count: { select: { publishedMatches: true, preferences: true } }, scheduled: MEET } }),
@@ -107,11 +121,12 @@ export async function IdLookup({ user, base, q: raw }: { user: User; base: strin
   return (
     <>
       <PageHeader eyebrow="Search" title="Find by ID"
-        subtitle="Every buyer and seller has a unique ID — the approved number (RBSM-Buyer-…, RBSM-Seller-…), the registration number (RBSM-B-…, RBSM-S-…) and the login ID (Tradex2027-…). Enter any of them, part of one, or a meeting ticket number." />
+        subtitle="Every buyer and seller has a unique ID — the approved number (RBSM-Buyer-…, RBSM-Seller-…), the registration number (RBSM-B-…, RBSM-S-…) and the login ID (Tradex2027-…). Enter any of them or part of one, a meeting ticket number — or a name, contact person, mobile, e-mail, Udyam / IEC number, district, country or product." />
       <Card className="mb-6 p-5"><IdSearch action={`${base}/find`} value={q} autoFocus={!q} /></Card>
       {q && !buyers.length && !sellers.length && (
-        <Card><EmptyState icon={<ScanSearch className="size-5" />} title={`Nothing found for "${q}"`}>Check the ID. Buyer IDs look like RBSM-Buyer-2026007 or RBSM-B-007; seller IDs like RBSM-Seller-2026012 or RBSM-S-012.</EmptyState></Card>
+        <Card><EmptyState icon={<ScanSearch className="size-5" />} title={`Nothing found for "${q}"`}>Check the spelling or the ID. Buyer IDs look like RBSM-Buyer-2026007 or RBSM-B-007; seller IDs like RBSM-Seller-2026012 or RBSM-S-012.</EmptyState></Card>
       )}
+      {(buyers.length === 12 || sellers.length === 12) && <p className="mb-4 text-sm text-slate-500">Showing the first 12 {buyers.length === 12 ? "buyers" : ""}{buyers.length === 12 && sellers.length === 12 ? " and " : ""}{sellers.length === 12 ? "sellers" : ""} — type more to narrow down, or use the full ID.</p>}
       {showTicket && <p className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-600"><TicketIcon className="size-4" /> Ticket <b className="font-mono text-ink">{showTicket}</b> — the buyer and seller of this meeting:</p>}
       <div className="space-y-6">
         {buyers.map((b) => (

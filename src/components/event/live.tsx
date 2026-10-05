@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlarmClock, CalendarX2, Radio } from "lucide-react";
+import { AlarmClock, ArrowLeftRight, CalendarX2, Radio } from "lucide-react";
 import type { User } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canFill, daySlots, fmtDay, fmtTime, getEventConfig, istAt, istDay, isTime, LIVE_META, liveStatus, type Live } from "@/lib/event";
@@ -39,7 +39,7 @@ export async function LiveMonitor({ user, base, day: dayParam, at }: { user: Use
   }
   const [meetings, attendance] = await Promise.all([
     prisma.scheduledMeeting.findMany({ where: { day }, orderBy: [{ startAt: "asc" }],
-      include: { buyer: { select: { id: true, name: true, country: true, approvedNo: true, regNo: true, pavilionNo: true, nodalOfficer: { select: { id: true, name: true, mobile: true } } } }, seller: { select: { id: true, name: true, district: true, approvedNo: true, regNo: true } } } }),
+      include: { buyer: { select: { id: true, name: true, country: true, approvedNo: true, regNo: true, pavilionNo: true, nodalOfficer: { select: { id: true, name: true, mobile: true } } } }, seller: { select: { id: true, name: true, district: true, approvedNo: true, regNo: true } }, movedBy: { select: { displayName: true, role: true } } } }),
     prisma.buyerDayAttendance.findMany({ where: { day } }),
   ]);
   const slots = daySlots(d, cfg);
@@ -82,6 +82,12 @@ export async function LiveMonitor({ user, base, day: dayParam, at }: { user: Use
   const late = st.filter((x) => x.s === "awaiting" || (x.s === "no_show" && canFill(x.m, now) && !st.some((y) => y.m.replacesId === x.m.id && y.m.startAt.getTime() === x.m.startAt.getTime())));
   const canAct = user.role === "DIC" && !rehearsal;
   const unmarked = st.filter((x) => x.s === "not_marked");
+  // Event-day changes: slots given to another seller, meetings moved for late sellers.
+  const changes = meetings.filter((m) => m.movedAt).sort((a, b) => b.movedAt!.getTime() - a.movedAt!.getTime());
+  const changeText = (m: (typeof meetings)[number]) => {
+    const was = m.replacesId ? meetings.find((x) => x.id === m.replacesId) : null;
+    return `${was ? `took ${was.seller.name}'s slot (absent); ` : ""}${m.movedFrom ? `moved from ${fmtTime(m.movedFrom)}` : "new meeting"}${m.movedBy ? ` — ${m.movedBy.displayName}` : ""}`;
+  };
   // Nodal officers
   const officers = new Map<string, { name: string; mobile: string; buyers: Set<string>; due: number; marked: number; inMeeting: number }>();
   for (const { m, s } of st) {
@@ -121,7 +127,7 @@ export async function LiveMonitor({ user, base, day: dayParam, at }: { user: Use
         <Kpi label="In meeting now" value={count("in_meeting")} tone="bg-brand-600 text-white ring-brand-700" />
         <Kpi label="Awaiting seller now" value={count("awaiting")} tone="bg-amber-50 text-amber-900 ring-amber-300" sub="Slot started, seller not checked in" />
         <Kpi label="Upcoming" value={count("upcoming", "checked_in")} tone="bg-slate-50 text-slate-800 ring-slate-200" sub={next ? `Next slot ${fmtTime(next.startAt)}` : "No more slots"} />
-        <Kpi label="No-shows" value={count("no_show", "buyer_absent")} tone="bg-red-50 text-red-800 ring-red-200" sub={`${count("no_show")} seller · ${count("buyer_absent")} buyer · ${count("not_marked")} not marked`} />
+        <Kpi label="No-shows" value={count("no_show", "buyer_absent")} tone="bg-red-50 text-red-800 ring-red-200" sub={`${count("no_show")} seller · ${count("buyer_absent")} buyer · ${count("not_marked")} not marked · ${changes.filter((c) => c.replacesId).length} slots filled`} />
       </div>
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="p-4"><div className="text-xs font-bold uppercase tracking-wider text-slate-500">Buyers now</div>
@@ -145,6 +151,7 @@ export async function LiveMonitor({ user, base, day: dayParam, at }: { user: Use
           <CardHeader title="Pavilion board" icon={<Radio className="size-4" />} subtitle="Every pavilion and slot — colour shows the live status; the current slot is outlined" />
           <div className="flex flex-wrap gap-2 border-b border-slate-100 px-5 py-3 text-[11px]">
             {(Object.keys(LIVE_META) as Live[]).map((k) => <span key={k} className={cn("rounded-md px-2 py-0.5 ring-1", LIVE_META[k].tone)}>{LIVE_META[k].label}</span>)}
+            <span className="rounded-md px-2 py-0.5 outline-2 outline-dashed outline-amber-500"><b className="text-amber-600">⇄</b> Changed on the day</span>
           </div>
           <div className="table-scroll relative overflow-x-auto">
             <table className="w-full border-separate border-spacing-0 text-[11px]">
@@ -171,8 +178,9 @@ export async function LiveMonitor({ user, base, day: dayParam, at }: { user: Use
                       const x = at2(b.id, sl.startAt);
                       return (
                         <td key={sl.no} className={cn("border-b border-l border-slate-100 p-0.5", current?.no === sl.no && "bg-brand-50/60")}>
-                          {x ? <span title={`${x.m.seller.name} · ${uid(x.m.seller)} (${x.m.seller.district}) · ${x.m.ticketNo} · ${LIVE_META[x.s].label}`}
-                            className={cn("block truncate rounded px-1 py-1 font-medium ring-1", LIVE_META[x.s].tone)}>{x.m.seller.name}</span> : <span className="block h-6" />}
+                          {x ? <span title={`${x.m.seller.name} · ${uid(x.m.seller)} (${x.m.seller.district}) · ${x.m.ticketNo} · ${LIVE_META[x.s].label}${x.m.movedAt ? ` · CHANGED ON THE DAY: ${changeText(x.m)}` : ""}`}
+                            className={cn("block truncate rounded px-1 py-1 font-medium ring-1", LIVE_META[x.s].tone, x.m.movedAt && "outline-2 outline-offset-1 outline-amber-500 outline-dashed")}>
+                            {x.m.movedAt && <span className="mr-0.5 font-bold text-amber-600" aria-label="changed on the day">⇄</span>}{x.m.seller.name}</span> : <span className="block h-6" />}
                         </td>
                       );
                     })}
@@ -196,6 +204,24 @@ export async function LiveMonitor({ user, base, day: dayParam, at }: { user: Use
                 </li>
               ))}
             </ul> : <p className="px-5 py-4 text-sm text-slate-500">Nothing late.</p>}
+          </Card>
+          <Card className={cn("overflow-hidden", changes.length > 0 && "ring-2 ring-amber-300")}>
+            <CardHeader title={`Event-day changes (${changes.length})`} icon={<ArrowLeftRight className="size-4" />} subtitle="Slots given to another seller and meetings moved, newest first" />
+            {changes.length ? <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
+              {changes.map((m) => {
+                const was = m.replacesId ? meetings.find((x) => x.id === m.replacesId) : null;
+                return (
+                  <li key={m.id} className="px-5 py-2.5 text-sm">
+                    <div className="flex flex-wrap items-center gap-1.5 font-semibold text-ink"><span className="rounded bg-ink px-1.5 text-xs text-white tabular-nums">P{m.pavilionNo ?? "–"}</span> {fmtTime(m.startAt)} · <Flag country={m.buyer.country} /> {m.buyer.name}</div>
+                    <div className="mt-0.5 text-xs text-slate-600">
+                      {was ? <><span className="text-tx-red line-through">{was.seller.name}</span> absent → <b className="text-ink">{m.seller.name}</b> <span className="font-mono">{uid(m.seller)}</span></>
+                        : <><b className="text-ink">{m.seller.name}</b> <span className="font-mono">{uid(m.seller)}</span> (late arrival)</>}
+                    </div>
+                    <div className="text-xs text-slate-500">{m.movedFrom ? `Moved from ${fmtTime(m.movedFrom)}` : "New meeting"} · {m.movedBy ? `${m.movedBy.displayName} (${m.movedBy.role === "NODAL" ? "nodal officer" : "Directorate"})` : ""} · {fmtTime(m.movedAt!)}</div>
+                  </li>
+                );
+              })}
+            </ul> : <p className="px-5 py-4 text-sm text-slate-500">No changes today.</p>}
           </Card>
           <Card className="overflow-hidden">
             <CardHeader title="Nodal officers" subtitle="Meetings due so far / marked" />
