@@ -24,12 +24,7 @@ export type Money = { usd: number; inr: number } | null;
 export const toMoney = (m: { amount: number | null; currency: string }, rate: number): Money =>
   m.amount === null ? null : m.currency === "INR" ? { inr: m.amount, usd: m.amount / rate } : { usd: m.amount, inr: m.amount * rate };
 
-/** US$ 1,250,000 / ₹ 1,10,00,000 */
-export const fmtUsd = (v: number) => `US$ ${Math.round(v).toLocaleString("en-US")}`;
-export const fmtInr = (v: number) => `₹ ${Math.round(v).toLocaleString("en-IN")}`;
-/** Compact: $1.25M, ₹11.0 Cr, ₹8.4 L */
-export const shortUsd = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(v >= 1e7 ? 1 : 2)}M` : v >= 1e3 ? `$${(v / 1e3).toFixed(v >= 1e5 ? 0 : 1)}K` : `$${Math.round(v)}`;
-export const shortInr = (v: number) => v >= 1e7 ? `₹${(v / 1e7).toFixed(v >= 1e9 ? 0 : 2)} Cr` : v >= 1e5 ? `₹${(v / 1e5).toFixed(1)} L` : `₹${Math.round(v).toLocaleString("en-IN")}`;
+export { fmtUsd, fmtInr, shortUsd, shortInr } from "@/lib/mou-format";
 
 /** "2026-05" → "May 2026" */
 export const fmtMonth = (m: string) => {

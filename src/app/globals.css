@@ -92,3 +92,20 @@ body {
 }
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* MoU live dashboard: scrolling ticker and feed (the list is rendered twice, so -50% loops seamlessly). */
+.tx-marquee { animation: tx-marquee var(--tx-dur, 60s) linear infinite; }
+.tx-feed { animation: tx-feed var(--tx-dur, 60s) linear infinite; }
+.tx-marquee:hover, .tx-feed:hover { animation-play-state: paused; }
+@keyframes tx-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes tx-feed { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+.tx-flash { animation: tx-flash 1.6s ease-out; }
+@keyframes tx-flash { 0% { box-shadow: 0 0 0 0 rgb(250 204 21 / 0.9); } 100% { box-shadow: 0 0 0 18px rgb(250 204 21 / 0); } }
+.tx-live-dot { animation: tx-live 1.4s ease-in-out infinite; }
+@keyframes tx-live { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) {
+  .tx-marquee, .tx-feed, .tx-flash, .tx-live-dot { animation: none; }
+}
+/* Display mode: the dashboard alone, full screen, for a wall or projector. */
+#mou-live:fullscreen { overflow-y: auto; background: #f1f5f9; padding: 28px 36px; }
+#mou-live:fullscreen .tx-hide-display { display: none; }
