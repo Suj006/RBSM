@@ -291,6 +291,39 @@ async function main() {
     prefSellers++;
   }
 
+  // Communications: two common communications and a few programme-desk conversations.
+  const staffDic = await prisma.user.findFirst({ where: { role: "DIC" } });
+  const staffFieo = await prisma.user.findFirst({ where: { role: "FIEO" } });
+  if (staffDic && staffFieo) {
+    const allBuyers = await prisma.buyer.findMany({ select: { id: true, userId: true, name: true } });
+    const apprSellers = await prisma.seller.findMany({ where: { status: "APPROVED", userId: { not: null } }, select: { id: true, userId: true, name: true } });
+    const ago = (d: number) => new Date(Date.now() - d * day);
+    await prisma.announcement.create({ data: {
+      authorId: staffDic.id, authorRole: "DIC", audience: "ALL_PARTICIPANTS", audienceLabel: "All buyers and approved sellers",
+      subject: "Welcome to the TRADEX 2.0 Reverse Buyer Seller Meet", createdAt: ago(6),
+      body: "Thank you for registering. The Directorate will open the approved buyer directory to sellers shortly. Please keep your details up to date and write to the programme desk for any help.",
+      recipients: { create: [...allBuyers.map((b) => ({ userId: b.userId, readAt: b.name.length % 2 ? ago(5) : null })), ...apprSellers.map((s) => ({ userId: s.userId!, readAt: s.name.length % 3 ? ago(4) : null }))] },
+    } });
+    await prisma.announcement.create({ data: {
+      authorId: staffFieo.id, authorRole: "FIEO", audience: "ALL_BUYERS", audienceLabel: "All registered buyers (every stage)",
+      subject: "Complete your sector requirements", createdAt: ago(3),
+      body: "Buyers who have not yet submitted their sector requirements are requested to do so this week, so that FIEO can review them before matchmaking.",
+      recipients: { create: allBuyers.map((b) => ({ userId: b.userId })) },
+    } });
+    const deskB = allBuyers.slice(0, 3);
+    for (const [i, b] of deskB.entries()) {
+      const c = await prisma.conversation.create({ data: { kind: "DESK_BUYER", buyerId: b.id, createdAt: ago(5 - i), lastMessageAt: ago(4 - i) } });
+      await prisma.message.create({ data: { conversationId: c.id, authorId: b.userId, authorRole: "BUYER", createdAt: ago(5 - i),
+        body: ["Can we send samples ahead of the meet? Please advise on the shipping address.", "Will interpreters be available during the one-to-one meetings?", "Could you confirm the meeting schedule format?"][i] } });
+      if (i < 2) await prisma.message.create({ data: { conversationId: c.id, authorId: (i ? staffFieo : staffDic).id, authorRole: i ? "FIEO" : "DIC", createdAt: ago(4 - i),
+        body: ["Yes. Samples can be sent to the Directorate of Industries & Commerce, Thiruvananthapuram, marked TRADEX 2.0. We will hand them over to the matched sellers.", "Yes, interpreters for major languages will be available on request. Please list the languages you need."][i] } });
+    }
+    for (const s of apprSellers.slice(0, 2)) {
+      const c = await prisma.conversation.create({ data: { kind: "DESK_SELLER", sellerId: s.id, createdAt: ago(2), lastMessageAt: ago(2) } });
+      await prisma.message.create({ data: { conversationId: c.id, authorId: s.userId!, authorRole: "SELLER", createdAt: ago(2), body: "How should we prepare for the buyer meetings? Is there a format for product presentations?" } });
+    }
+  }
+
   console.log(`Loaded ${BUYERS.length} demo buyers (${approvedSeq} approved) and ${sSeq} demo sellers (${sApproved} approved; ${profiles} profiles completed; ${prefSellers} with buyer preferences). Demo password: pass@123`);
 }
 

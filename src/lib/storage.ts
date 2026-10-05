@@ -44,3 +44,40 @@ const resolveSafe = (storedName: string) => {
 
 export const readUpload = (storedName: string) => readFile(/*turbopackIgnore: true*/ resolveSafe(storedName));
 export const deleteUpload = (storedName: string) => unlink(/*turbopackIgnore: true*/ resolveSafe(storedName)).catch(() => {});
+
+// ---------------------------------------------------------------- shared documents (communications)
+
+const ZIP = [[0x50, 0x4b, 0x03, 0x04]];
+const SHARED: Record<string, { ext: string; magic: number[][]; label: string }> = {
+  "application/pdf": { ext: "pdf", magic: [[0x25, 0x50, 0x44, 0x46]], label: "PDF" },
+  "image/jpeg": { ext: "jpg", magic: [[0xff, 0xd8, 0xff]], label: "JPG" },
+  "image/png": { ext: "png", magic: [[0x89, 0x50, 0x4e, 0x47]], label: "PNG" },
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { ext: "docx", magic: ZIP, label: "Word" },
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { ext: "xlsx", magic: ZIP, label: "Excel" },
+};
+const BY_EXT: Record<string, string> = Object.fromEntries(Object.entries(SHARED).map(([t, s]) => [s.ext, t]));
+BY_EXT.jpeg = "image/jpeg";
+export const SHARED_ACCEPT = ".pdf,.jpg,.jpeg,.png,.docx,.xlsx";
+export const MAX_SHARED_FILES = 3;
+
+/** The type of a shared document (browsers sometimes send no type for Word / Excel). */
+export const sharedType = (file: File) => (SHARED[file.type] ? file.type : BY_EXT[file.name.split(".").pop()?.toLowerCase() ?? ""] ?? "");
+
+export function validateShared(file: File): string | null {
+  if (file.size > MAX_UPLOAD_BYTES) return `${file.name}: the file must be 5 MB or smaller.`;
+  if (!sharedType(file)) return `${file.name}: share a PDF, JPG, PNG, Word (.docx) or Excel (.xlsx) file.`;
+  return null;
+}
+
+/** Saves a shared document after checking its content matches its type. */
+export async function storeShared(file: File, folder: string) {
+  const type = sharedType(file);
+  const spec = SHARED[type];
+  const buf = Buffer.from(await file.arrayBuffer());
+  if (!spec || !spec.magic.some((m) => m.every((b, i) => buf[i] === b))) throw new Error(`${file.name}: the file content does not match its type.`);
+  const dir = path.join(/*turbopackIgnore: true*/ ROOT, folder);
+  await mkdir(dir, { recursive: true });
+  const storedName = `${folder}/${randomBytes(10).toString("hex")}.${spec.ext}`;
+  await writeFile(path.join(/*turbopackIgnore: true*/ ROOT, storedName), buf);
+  return { storedName, mimeType: type, size: buf.length };
+}

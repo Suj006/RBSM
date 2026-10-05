@@ -201,6 +201,23 @@ export async function MatchOverview({ user, base }: { user: User; base: string }
               { label: "Seller preferences and final outcome", href: "/api/reports/seller-preferences" },
             ]} />}
           </Step>
+
+          <Step n={7} title="Open buyer–seller interaction" done={state.interaction} current={state.version > 0 && !state.interaction}
+            status={<Badge tone={state.interaction ? "green" : "slate"}>{state.interaction ? "Enabled" : "Not enabled"}</Badge>}>
+            Matched buyers and sellers (published mapping) can discuss, ask questions and share named documents; a buyer can also write to all its matched sellers.
+            Each discussion is seen only by that buyer, that seller, the Directorate and FIEO.{" "}
+            <Link href={`${base.replace("/matchmaking", "")}/messages`} className="font-semibold text-brand-700 hover:underline">Open messages →</Link>
+            {dic && (
+              <div className="mt-3">
+                {state.interaction
+                  ? <ActionButton action={matchControlAction} fields={{ op: "disableInteraction" }} label="Disable interaction"
+                      confirm="Disable buyer–seller interaction? Existing discussions stay readable but buyers and sellers cannot write to each other." />
+                  : state.version > 0
+                    ? <ActionButton action={matchControlAction} fields={{ op: "enableInteraction" }} variant="primary" label="Enable buyer–seller interaction" />
+                    : <p className="text-xs text-slate-500">Available after publishing.</p>}
+              </div>
+            )}
+          </Step>
         </ol>
 
         <div className="space-y-6">

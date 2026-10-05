@@ -17,6 +17,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       { href: "/admin/targets", label: "Targets", icon: "target", group: "Programme" },
       { href: "/admin/reports", label: "Reports", icon: "reports", group: "Programme" },
       { href: "/admin/matchmaking", label: "Matchmaking", icon: "match", group: "Matchmaking" },
+      { href: "/admin/messages", label: "Messages (read only)", icon: "messages", group: "Communications" },
       { href: "/admin/sectors", label: "Sector master", icon: "sectors", group: "Administration" },
       { href: "/admin/certifications", label: "Certification master", icon: "certs", group: "Administration" },
       { href: "/admin/users", label: "Users & logins", icon: "users", group: "Administration" },

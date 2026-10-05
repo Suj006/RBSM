@@ -1,13 +1,15 @@
 import { AppShell } from "@/components/shell/app-shell";
 import { requireUser } from "@/lib/auth";
+import { unreadTotal } from "@/lib/comms";
 import { prisma } from "@/lib/prisma";
 import { actionWhere } from "@/lib/buyer-query";
 
 export default async function DicLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser("DIC");
-  const [pending, sellerPending] = await Promise.all([
+  const [pending, sellerPending, unread] = await Promise.all([
     prisma.buyer.count({ where: actionWhere("DIC") }),
     prisma.seller.count({ where: { status: "RECOMMENDED" } }),
+    unreadTotal(user),
   ]);
   return (
     <AppShell role="DIC" user={user} nav={[
@@ -23,6 +25,7 @@ export default async function DicLayout({ children }: { children: React.ReactNod
       { href: "/dic/targets", label: "Targets", icon: "target", group: "Programme" },
       { href: "/dic/reports", label: "Reports", icon: "reports", group: "Programme" },
       { href: "/dic/matchmaking", label: "Matchmaking", icon: "match", group: "Matchmaking" },
+      { href: "/dic/messages", label: "Messages", icon: "messages", badge: unread, group: "Communications" },
     ]}>{children}</AppShell>
   );
 }

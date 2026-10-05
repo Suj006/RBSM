@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Alert, Badge, Card, CardHeader, DL, PageHeader } from "@/components/ui";
 import { SellerBadge } from "@/components/seller/seller-badge";
+import { UnreadBanner } from "@/components/comms/unread-banner";
 import { ApplicantView } from "@/components/seller/applicant-view";
 import { ExportCredentials, ProfileDetails } from "@/components/seller/profile-summary";
 import { EVENT, localBodyLabel } from "@/lib/config";
@@ -35,6 +36,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
       <PageHeader eyebrow={`${EVENT.name} · ${EVENT.short}`} title={`Welcome, ${s.name}`}
         subtitle={<>Seller no. <span className="font-semibold text-brand-700">{s.approvedNo}</span> · Registration no. <span className="font-semibold text-ink">{s.regNo}</span></>}
         actions={<SellerBadge status={s.status} />} />
+      <UnreadBanner user={user} href="/seller/messages" />
       {withinDays(s.approvedAt, 14) && (
         <Alert tone="green" className="mb-6" title="Welcome — your registration has been approved">
           This login is now your permanent seller login. Your seller number is {s.approvedNo}.

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, BadgeCheck, Clock, AlertTriangle, Plus, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireBuyer } from "@/lib/auth";
+import { UnreadBanner } from "@/components/comms/unread-banner";
 import { Alert, Badge, ButtonLink, Card, CardHeader, DL, PageHeader } from "@/components/ui";
 import { JourneyStepper } from "@/components/journey";
 import { Timeline } from "@/components/timeline";
@@ -24,7 +25,7 @@ const BASIC_STEP: Partial<Record<BuyerStatus, Step>> = {
 };
 
 export default async function BuyerDashboard() {
-  const { buyer: b } = await requireBuyer();
+  const { buyer: b, user } = await requireBuyer();
   const [logs, requirement, docs] = await Promise.all([
     prisma.reviewLog.findMany({ where: { buyerId: b.id }, orderBy: { createdAt: "desc" }, include: { actor: { select: { displayName: true } } } }),
     prisma.requirement.findUnique({ where: { buyerId: b.id }, include: { items: { orderBy: { sortOrder: "asc" }, include: { sector: true } } } }),
@@ -53,6 +54,7 @@ export default async function BuyerDashboard() {
         subtitle={<>Registration no. <span className="font-semibold text-ink">{b.regNo}</span>{b.approvedNo && <> · Buyer no. <span className="font-semibold text-brand-700">{b.approvedNo}</span></>}</>}
         actions={<StatusBadge status={b.status} />}
       />
+      <UnreadBanner user={user} href="/buyer/messages" />
 
       <Card className="mb-6 p-5 sm:p-6"><JourneyStepper status={b.status} /></Card>
 

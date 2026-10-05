@@ -203,3 +203,23 @@ You have been matched with ${count} ${who === "buyer" ? "Kerala MSME seller" : "
 Sign in at ${APP_URL}/login to see the details. Meeting schedules will be shared through the portal.${signature}`,
   }),
 };
+
+export const commsMail = {
+  /** A new message in a conversation (the text itself is read on the portal). */
+  message: (name: string, from: string, where: string, link: string) => ({
+    subject: `${EVENT.name} ${EVENT.short} — new message from ${from}`,
+    text: `Dear ${name},
+
+You have a new message from ${from} in "${where}" on the ${EVENT.short} portal.
+
+Sign in to read and reply: ${APP_URL}${link}${signature}`,
+  }),
+  announcement: (name: string, from: string, subject: string, link: string) => ({
+    subject: `${EVENT.name} ${EVENT.short} — ${subject}`,
+    text: `Dear ${name},
+
+${from} has sent you a communication: "${subject}".
+
+Sign in to read it and any documents shared: ${APP_URL}${link}${signature}`,
+  }),
+};

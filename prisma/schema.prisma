@@ -85,6 +85,12 @@ model User {
   sellerLogs   SellerLog[]
   targetsSet   Target[]     @relation("TargetUpdatedBy")
   matchEvents  MatchEvent[]
+
+  messages        Message[]               @relation("MessageAuthor")
+  hiddenMessages  Message[]               @relation("MessageHiddenBy")
+  announcements   Announcement[]          @relation("AnnouncementAuthor")
+  announcementsIn AnnouncementRecipient[]
+  convReads       ConversationRead[]
 }
 
 model Session {
@@ -142,6 +148,9 @@ model Buyer {
 
   documents   Document[]
   requirement Requirement?
+
+  conversations Conversation[]
+  announcements Announcement[]
   reviewLogs  ReviewLog[]
 
   @@index([status])
@@ -346,6 +355,8 @@ model Seller {
   products SellerProduct[]
   logs     SellerLog[]
 
+  conversations Conversation[]
+
   // Matchmaking: up to 5 preferred buyers, submitted once (cannot be changed afterwards).
   prefSubmittedAt  DateTime?
   preferences      SellerPreference[]
@@ -479,4 +490,108 @@ model MatchEvent {
   actorId   String?
   actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------- communications
+
+enum ConversationKind {
+  BUYER_SELLER // a matched buyer and seller (open once the Directorate enables interaction after publishing)
+  DESK_BUYER // a buyer and the programme team (Directorate / FIEO)
+  DESK_SELLER // a seller and the programme team (Directorate / FIEO)
+}
+
+// One conversation per buyer–seller pair, and one programme-desk conversation per buyer and per seller.
+// Seen by its participants, the Directorate and FIEO (Admin: read only) — never by other buyers or sellers.
+model Conversation {
+  id            String           @id @default(cuid())
+  kind          ConversationKind
+  buyerId       String?
+  buyer         Buyer?           @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId      String?
+  seller        Seller?          @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  closed        Boolean          @default(false) // closed by the Directorate / FIEO: participants cannot post
+  lastMessageAt DateTime         @default(now())
+  createdAt     DateTime         @default(now())
+
+  messages Message[]
+  reads    ConversationRead[]
+
+  @@index([kind, buyerId, sellerId])
+  @@index([lastMessageAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         User         @relation("MessageAuthor", fields: [authorId], references: [id])
+  authorRole     Role
+  body           String
+  hiddenAt       DateTime? // withdrawn by the Directorate / FIEO (kept for the record, shown as withdrawn)
+  hiddenById     String?
+  hiddenBy       User?        @relation("MessageHiddenBy", fields: [hiddenById], references: [id])
+  createdAt      DateTime     @default(now())
+
+  attachments Attachment[]
+
+  @@index([conversationId, createdAt])
+}
+
+model ConversationRead {
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime
+
+  @@id([conversationId, userId])
+}
+
+// A common communication: from the Directorate / FIEO to a group or one participant, or from a buyer to all
+// its matched sellers. Recipients are fixed when it is sent; only they (and the Directorate / FIEO / Admin) see it.
+model Announcement {
+  id            String   @id @default(cuid())
+  authorId      String
+  author        User     @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+  authorRole    Role
+  buyerId       String? // set when a buyer writes to its matched sellers
+  buyer         Buyer?   @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  audience      String // e.g. ALL_BUYERS, APPROVED_SELLERS, BUYER_MATCHED_SELLERS
+  audienceLabel String // plain-language description of who received it
+  subject       String
+  body          String
+  createdAt     DateTime @default(now())
+
+  recipients  AnnouncementRecipient[]
+  attachments Attachment[]
+
+  @@index([createdAt])
+}
+
+model AnnouncementRecipient {
+  id             String       @id @default(cuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt         DateTime?
+
+  @@unique([announcementId, userId])
+  @@index([userId, readAt])
+}
+
+// A shared document: the sender names it (e.g. "Product catalogue 2026").
+model Attachment {
+  id             String        @id @default(cuid())
+  messageId      String?
+  message        Message?      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  announcementId String?
+  announcement   Announcement? @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  name           String
+  originalName   String
+  storedName     String
+  mimeType       String
+  size           Int
+  createdAt      DateTime      @default(now())
 }

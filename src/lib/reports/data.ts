@@ -80,6 +80,10 @@ export const REPORTS = {
     title: "Matchmaking Results and Gaps",
     description: "Buyers below target, sellers without buyers, sector coverage, requested products not covered and district position.",
   },
+  "communications": {
+    title: "Communications Log",
+    description: "Buyer–seller discussions, programme-desk conversations and common communications: every message with its sender, the documents shared (by name) and who has read each communication.",
+  },
   "mis-summary": {
     title: "MIS Summary Report",
     description: "Programme-level summary: registration pipeline, sector approvals, country-wise and sector-wise position.",
@@ -89,7 +93,7 @@ export const REPORTS = {
 export type ReportId = keyof typeof REPORTS;
 /** Reports a role may open (district offices: seller reports only). */
 export const reportsFor = (role: User["role"]): ReportId[] =>
-  role === "DISTRICT" ? ["approved-sellers", "seller-register", "seller-district-summary", "seller-profile-analysis", "match-list"]
+  role === "DISTRICT" ? ["approved-sellers", "seller-register", "seller-district-summary", "seller-profile-analysis", "match-list"] as ReportId[]
   // Promoter details (gender, social category…) are internal to the Directorate and districts.
   : role === "FIEO" ? (Object.keys(REPORTS) as ReportId[]).filter((id) => !["insights", "seller-preferences", "match-coverage", "match-checks", "match-buyer-directory", "seller-profile-analysis"].includes(id))
   : role === "DIC" || role === "ADMIN" ? (Object.keys(REPORTS) as ReportId[])
@@ -570,6 +574,7 @@ export async function buildReport(id: ReportId, user: User, f: BuyerFilters & Se
     case "seller-preferences": return sellerPreferencesReport(user);
     case "match-buyer-directory": return buyerDirectoryReport(user);
     case "match-checks": return matchChecksReport(user);
+    case "communications": return communicationsReport(user, (f as { conversationId?: string }).conversationId);
     case "match-coverage": return matchCoverageReport(user, (f as { v?: string }).v === "draft" ? "draft" : "published");
   }
 }
@@ -974,6 +979,63 @@ async function productDemandReport(user: User, f: BuyerFilters & { view?: string
     }],
   };
 }
+
+// ---------------------------------------------------------------- communications
+
+async function communicationsReport(user: User, conversationId?: string): Promise<Report> {
+  const one = conversationId ? await prisma.conversation.findUnique({ where: { id: conversationId }, select: { id: true } }) : null;
+  const convWhere = one ? { id: one.id } : {};
+  const [convs, msgs, anns] = await Promise.all([
+    prisma.conversation.findMany({ where: convWhere, orderBy: { lastMessageAt: "desc" },
+      include: { buyer: { select: { name: true, approvedNo: true } }, seller: { select: { name: true, approvedNo: true } },
+        messages: { select: { authorRole: true, hiddenAt: true, _count: { select: { attachments: true } } } } } }),
+    prisma.message.findMany({ where: { conversation: convWhere }, orderBy: { createdAt: "asc" },
+      include: { author: { select: { displayName: true } }, attachments: { select: { name: true, mimeType: true, size: true } },
+        conversation: { select: { kind: true, buyer: { select: { name: true } }, seller: { select: { name: true } } } } } }),
+    one ? Promise.resolve([]) : prisma.announcement.findMany({ orderBy: { createdAt: "desc" },
+      include: { author: { select: { displayName: true } }, buyer: { select: { name: true } }, attachments: { select: { name: true } },
+        recipients: { select: { readAt: true } } } }),
+  ]);
+  const KIND: Record<string, string> = { BUYER_SELLER: "Buyer–seller", DESK_BUYER: "Desk — buyer", DESK_SELLER: "Desk — seller" };
+  const title = (c: { kind: string; buyer: { name: string } | null; seller: { name: string } | null }) =>
+    c.kind === "BUYER_SELLER" ? `${c.buyer?.name} – ${c.seller?.name}` : c.buyer?.name ?? c.seller?.name ?? "";
+  const roleName = (r: string) => ({ DIC: "Directorate", FIEO: "FIEO", BUYER: "Buyer", SELLER: "Seller", ADMIN: "Admin" } as Record<string, string>)[r] ?? r;
+  const docs = msgs.flatMap((m) => m.attachments.map((a) => ({ at: m.createdAt, where: title(m.conversation), from: m.author.displayName, name: a.name, type: a.mimeType.includes("sheet") ? "Excel" : a.mimeType.includes("word") ? "Word" : a.mimeType.startsWith("image/") ? "Image" : "PDF", kb: Math.round(a.size / 1024) })));
+  const r = base("communications", user, one && convs[0] ? [`Conversation: ${title(convs[0])}`] : []);
+  const tables: Table[] = [
+    { name: "Conversations", heading: "1. Conversations",
+      columns: [{ key: "kind", header: "Type", width: 14 }, { key: "title", header: "Buyer / Seller", width: 40 }, num("n", "Messages", 9), num("staff", "By Programme Team", 11), num("docs", "Documents", 9),
+        { key: "status", header: "Status", width: 9 }, { key: "created", header: "Started", width: 15, kind: "datetime" }, { key: "last", header: "Last Message", width: 15, kind: "datetime" }],
+      rows: convs.map((c) => ({ kind: KIND[c.kind], title: title(c), n: c.messages.length, staff: c.messages.filter((m) => m.authorRole === "DIC" || m.authorRole === "FIEO").length,
+        docs: c.messages.reduce((a, m) => a + m._count.attachments, 0), status: c.closed ? "Closed" : "Open", created: c.createdAt, last: c.lastMessageAt })) },
+    { name: "Messages", heading: "2. Messages",
+      columns: [{ key: "at", header: "Date & Time", width: 15, kind: "datetime" }, { key: "kind", header: "Type", width: 12 }, { key: "where", header: "Conversation", width: 30 },
+        { key: "from", header: "From", width: 20 }, { key: "role", header: "Role", width: 11 }, { key: "body", header: "Message", width: 60 }, { key: "docs", header: "Documents", width: 26 }],
+      rows: msgs.map((m) => ({ at: m.createdAt, kind: KIND[m.conversation.kind], where: title(m.conversation), from: m.author.displayName, role: roleName(m.authorRole),
+        body: (m.hiddenAt ? "[Withdrawn by the programme team] " : "") + m.body, docs: m.attachments.map((a) => a.name).join("\n") })) },
+    { name: "Documents", heading: "3. Documents shared",
+      columns: [{ key: "at", header: "Date & Time", width: 15, kind: "datetime" }, { key: "where", header: "Conversation", width: 32 }, { key: "from", header: "Shared By", width: 22 },
+        { key: "name", header: "Document Name", width: 36 }, { key: "type", header: "Type", width: 8 }, num("kb", "Size (KB)", 9)],
+      rows: docs },
+  ];
+  if (!one) tables.push({ name: "Communications Sent", heading: "4. Common communications",
+    columns: [{ key: "at", header: "Sent", width: 15, kind: "datetime" }, { key: "from", header: "From", width: 22 }, { key: "to", header: "To", width: 34 }, { key: "subject", header: "Subject", width: 36 },
+      num("n", "Recipients", 10), num("read", "Read", 8), { key: "docs", header: "Documents", width: 26 }],
+    rows: anns.map((a) => ({ at: a.createdAt, from: a.authorRole === "BUYER" ? `Buyer: ${a.buyer?.name}` : `${roleName(a.authorRole)} (${a.author.displayName})`, to: a.audienceLabel, subject: a.subject,
+      n: a.recipients.length, read: a.recipients.filter((x) => x.readAt).length, docs: a.attachments.map((d) => d.name).join("\n") })) });
+  return {
+    ...r,
+    title: one && convs[0] ? `Conversation — ${title(convs[0])}` : r.title,
+    kpis: [
+      { label: "Conversations", value: convs.length, tone: "blue" },
+      { label: "Messages", value: msgs.length, tone: "green" },
+      { label: "Documents shared", value: docs.length + (one ? 0 : anns.reduce((a, x) => a + x.attachments.length, 0)), tone: "violet" },
+      { label: one ? "Programme-team messages" : "Communications sent", value: one ? msgs.filter((m) => m.authorRole === "DIC" || m.authorRole === "FIEO").length : anns.length, tone: "yellow" },
+    ],
+    tables,
+  };
+}
+const num = (key: string, header: string, width = 10) => ({ key, header, width, kind: "number" as const, align: "right" as const });
 
 // ---------------------------------------------------------------- seller profile analysis
 

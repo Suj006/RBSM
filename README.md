@@ -104,6 +104,27 @@ reasons but without seller preference ranks or fit points. Buyers and sellers se
 The Directorate and Admin work the module from one **Matchmaking** menu entry with tabs: Overview, Mapping
 board, Seller preferences, Checks, Results & gaps, Published.
 
+## Communications
+
+**Messages** in every login (buyer, approved seller, FIEO, Directorate; Admin read only; district centres have no access).
+
+- **Programme desk** — from the start: each buyer and each approved seller has one conversation with the Directorate and
+  FIEO. Staff can open it from **Message a buyer / seller**; the participant can reply and share documents.
+- **Common communications** — the Directorate and FIEO send to all buyers and approved sellers, all registered buyers,
+  approved buyers, approved sellers, or the buyers and sellers in the published mapping, optionally narrowed to a sector or
+  (sellers) a district; optionally e-mailed. Only the recipients see them; staff see who has read each one.
+- **Buyer–seller discussions** — after the matchmaking is published and the Directorate enables **buyer–seller
+  interaction** (Matchmaking step 7, or the Messages page), each matched buyer and seller can discuss and share documents.
+  A discussion is seen only by that buyer, that seller, the Directorate and FIEO — never by other sellers or buyers.
+  A buyer can also send one communication to **all its matched sellers**; each seller replies privately.
+- **Documents** — PDF, JPG, PNG, Word (.docx) or Excel (.xlsx), up to 5 MB, up to 3 per message; the sender must give each
+  a **document name**. Files are content-checked and served only to those who can see the message.
+- **Intervention** — the Directorate and FIEO can write in any discussion (both parties see it), withdraw a message (kept
+  for the record, hidden from the parties) and close / reopen a conversation. Disabling interaction keeps discussions readable.
+- Unread counts on the menu and dashboards; buyers and sellers are e-mailed when someone writes to them.
+- **Communications Log** report (Excel / PDF): conversations, every message, documents shared, communications and read counts;
+  also per conversation.
+
 ## Insights (Directorate / Admin)
 
 A decision page built from live data, with an Excel / PDF report of every section:

@@ -5,14 +5,14 @@ import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, UserRound, ClipboardList, Users, ShieldCheck, Layers, Award, Mail, FileDown, BadgeCheck, Inbox,
-  Store, Upload, PlusCircle, Target, Boxes, PackageSearch, Lightbulb, Handshake, LayoutList, Star, ShieldAlert, ChartPie,
+  Store, Upload, PlusCircle, Target, Boxes, PackageSearch, Lightbulb, Handshake, LayoutList, Star, ShieldAlert, ChartPie, MessagesSquare,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const ICONS = {
   dashboard: LayoutDashboard, profile: UserRound, requirement: ClipboardList, buyers: Users, review: Inbox,
   approved: BadgeCheck, users: ShieldCheck, sectors: Layers, certs: Award, mail: Mail, reports: FileDown,
-  sellers: Store, upload: Upload, add: PlusCircle, target: Target, demand: Boxes, products: PackageSearch, insights: Lightbulb, match: Handshake, board: LayoutList, star: Star, checks: ShieldAlert, results: ChartPie,
+  sellers: Store, upload: Upload, add: PlusCircle, target: Target, demand: Boxes, products: PackageSearch, insights: Lightbulb, match: Handshake, board: LayoutList, star: Star, checks: ShieldAlert, results: ChartPie, messages: MessagesSquare,
 } as const;
 
 export type NavItem = {

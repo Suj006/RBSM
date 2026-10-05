@@ -24,6 +24,14 @@ export async function matchControlAction(_: FormState, form: FormData): Promise<
   const done = (message: string): FormState => { revalidateAll(); return { ok: true, message }; };
 
   switch (op) {
+    case "enableInteraction":
+    case "disableInteraction": {
+      const on = op === "enableInteraction";
+      if (on && !state.version) return { error: "Publish the matchmaking first — discussions are between the published buyer–seller pairs." };
+      await setMatchSetting("interaction", String(on));
+      await logMatchEvent(on ? "Buyer–seller interaction enabled" : "Buyer–seller interaction disabled", user.id);
+      return done(on ? "Matched buyers and sellers can now discuss, share documents and send common communications." : "Buyer–seller interaction disabled — existing discussions stay readable.");
+    }
     case "showBuyers":
     case "hideBuyers": {
       const on = op === "showBuyers";

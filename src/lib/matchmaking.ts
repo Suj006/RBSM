@@ -11,13 +11,14 @@ export type MatchState = {
   buyersVisible: boolean; // approved sellers can see the buyer directory and give preferences
   prefsFrozen: boolean; // seller preferences closed (Directorate freezes, only Admin reopens)
   locked: boolean; // final mapping locked (Directorate locks, only Admin unlocks)
+  interaction: boolean; // matched buyers and sellers can discuss (Directorate enables after publishing)
   version: number; // last published version (0 = never published)
   publishedAt: Date | null;
   generatedAt: Date | null;
   maxPerSeller: number; // 0 = automatic
 };
 
-const KEYS = ["buyersVisible", "prefsFrozen", "locked", "version", "publishedAt", "generatedAt", "maxPerSeller"] as const;
+const KEYS = ["buyersVisible", "prefsFrozen", "locked", "version", "publishedAt", "generatedAt", "maxPerSeller", "interaction"] as const;
 
 export async function getMatchState(): Promise<MatchState> {
   const rows = await prisma.matchSetting.findMany({ where: { key: { in: [...KEYS] } } });
@@ -26,6 +27,7 @@ export async function getMatchState(): Promise<MatchState> {
     buyersVisible: v("buyersVisible") === "true",
     prefsFrozen: v("prefsFrozen") === "true",
     locked: v("locked") === "true",
+    interaction: v("interaction") === "true",
     version: Number(v("version") ?? 0),
     publishedAt: v("publishedAt") ? new Date(v("publishedAt")!) : null,
     generatedAt: v("generatedAt") ? new Date(v("generatedAt")!) : null,
