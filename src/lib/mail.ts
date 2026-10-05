@@ -75,6 +75,20 @@ Password: ${password}
 
 Sign in at ${APP_URL}/login. You will be asked to change your password on first login and then to complete your basic details.${signature}`,
   }),
+  addedByFieo: (name: string, username: string, password: string, sectors: number) => ({
+    subject: `${EVENT.name} ${EVENT.short} — you have been registered as a buyer (temporary login)`,
+    text: `Dear ${name},
+
+FIEO has registered your organisation as an international buyer for ${EVENT.name} ${EVENT.programme}.
+
+Your temporary login:
+User name: ${username}
+Password: ${password}
+
+Sign in at ${APP_URL}/login. You will be asked to change your password first. Please check the details FIEO entered${sectors ? ` (including ${sectors} sector requirement${sectors > 1 ? "s" : ""} now with the Directorate for approval)` : ""} and add your sector requirements.
+
+This login becomes your permanent ${EVENT.short} login as soon as the Directorate approves your registration.${signature}`,
+  }),
   basicApproved: (name: string) => ({
     subject: `${EVENT.name} ${EVENT.short} — basic details approved`,
     text: `Dear ${name},
@@ -101,7 +115,7 @@ ${items.map((i) => `• ${i.sector}: "${i.comment}"`).join("\n")}
 
 Please sign in, update ${items.length > 1 ? "them" : "it"} and submit again. Your other sectors are not affected.${signature}`,
   }),
-  sectorsApproved: (name: string, approvedNo: string, sectors: string[], firstTime: boolean) => ({
+  sectorsApproved: (name: string, approvedNo: string, sectors: string[], firstTime: boolean, username?: string) => ({
     subject: firstTime
       ? `${EVENT.name} ${EVENT.short} — registration approved (${approvedNo})`
       : `${EVENT.name} ${EVENT.short} — sector requirement approved`,
@@ -111,7 +125,8 @@ ${firstTime
   ? `We are pleased to inform you that your registration has been approved by the Directorate and you have been added to the ${EVENT.short} buyer list.
 
 Your buyer number: ${approvedNo}
-
+${username ? `Your login ${username} is now your permanent ${EVENT.short} login.
+` : ""}
 `
   : ""}The following sector requirement${sectors.length > 1 ? "s have" : " has"} been approved:
 ${sectors.map((s) => `• ${s}`).join("\n")}

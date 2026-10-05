@@ -30,6 +30,7 @@ export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; i
   const b = await prisma.buyer.findFirst({
     where: { AND: [{ id }, scopeFor(role)] },
     include: {
+      createdBy: { select: { displayName: true } },
       user: { select: { username: true, lastLoginAt: true } },
       documents: true,
       requirement: {
@@ -60,7 +61,9 @@ export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; i
         back={backFor(base, "Back to buyers")}
         eyebrow={<>{b.regNo}{b.approvedNo && <> · <span className="text-brand-700">{b.approvedNo}</span></>}</>}
         title={<span className="inline-flex items-center gap-2"><Flag country={b.country} /> {b.name}</span>}
-        subtitle={<span className="inline-flex flex-wrap items-center gap-2"><CountryTag country={b.country} name flag={false} /> · Login {b.user.username}</span>}
+        subtitle={<span className="inline-flex flex-wrap items-center gap-2"><CountryTag country={b.country} name flag={false} /> · Login <span className="font-mono">{b.user.username}</span>
+          {b.source !== "SELF" && <span className={b.status === "APPROVED" ? "rounded bg-brand-50 px-1.5 text-xs font-semibold text-brand-800 ring-1 ring-brand-200" : "rounded bg-amber-50 px-1.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200"}>{b.status === "APPROVED" ? "permanent" : "temporary until approval"}</span>}
+          · {b.source === "SELF" ? "Signed up on the portal" : `${b.source === "BULK" ? "Bulk upload" : "Added"} by FIEO${b.createdBy ? ` (${b.createdBy.displayName})` : ""}`}</span>}
         actions={<><StatusBadge status={b.status} /><DownloadButtons href={`/api/reports/buyer-profile?buyerId=${b.id}`} label="Buyer profile" compact /></>}
       />
       {(basicPending || pendingItems > 0) && (

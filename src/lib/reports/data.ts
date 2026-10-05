@@ -168,6 +168,8 @@ async function buyerRegister(user: User, f: BuyerFilters): Promise<Report> {
       approvedSectors: items.filter((it) => it.status === "APPROVED").length,
       totalSectors: items.length,
       createdAt: b.createdAt, basicApprovedAt: b.basicApprovedAt, approvedAt: b.approvedAt,
+      source: b.source === "SELF" ? "Self sign-up" : b.source === "BULK" ? "FIEO bulk upload" : "Added by FIEO",
+      login: b.source === "SELF" ? b.user.username : `${b.user.username} (${b.status === "APPROVED" ? "permanent" : "temporary"})`,
     };
   });
   const n = (s: BuyerStatus[]) => buyers.filter((b) => s.includes(b.status)).length;
@@ -195,6 +197,8 @@ async function buyerRegister(user: User, f: BuyerFilters): Promise<Report> {
         { key: "status", header: "Registration Status", width: 20, kind: "buyerStatus" },
         { key: "sectors", header: "Sectors (Status): Products", width: 46 },
         { key: "approvedSectors", header: "Approved Sectors", width: 13, kind: "number", align: "center" },
+        { key: "source", header: "Registered By", width: 16 },
+        { key: "login", header: "Login", width: 26, excelOnly: true },
         { key: "createdAt", header: "Registered On", width: 15, kind: "date" },
         { key: "approvedAt", header: "Approved On", width: 15, kind: "date" },
       ],

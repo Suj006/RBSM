@@ -2,7 +2,8 @@ import type { Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { buyerWhere, itemScope, PAGE_SIZE, scopeFor, type BuyerFilters as F } from "@/lib/buyer-query";
 import { ALL_ITEM_STATUSES, ALL_STATUSES, ITEM_META } from "@/lib/status";
-import { Card, PageHeader } from "@/components/ui";
+import { ButtonLink, Card, PageHeader } from "@/components/ui";
+import { Upload, UserPlus } from "lucide-react";
 import { BuyerFilters } from "./buyer-filters";
 import { BuyerTable } from "./buyer-table";
 import { Pagination } from "./pagination";
@@ -39,6 +40,10 @@ export async function BuyerListPage({ role, base, filters, title, subtitle }: {
         subtitle={subtitle}
         actions={
           <div className="flex flex-wrap items-center gap-3">
+            {role === "FIEO" && <>
+              <ButtonLink href="/fieo/buyers/new"><UserPlus className="size-4" /> Add buyer</ButtonLink>
+              <ButtonLink href="/fieo/buyers/upload" variant="secondary"><Upload className="size-4" /> Bulk upload</ButtonLink>
+            </>}
             <DownloadButtons href={`/api/reports/buyer-register${qs ? `?${qs}` : ""}`} label="Register" compact />
             <DownloadButtons href={`/api/reports/sector-requirements${qs ? `?${qs}` : ""}`} label="Sector-wise" compact />
           </div>

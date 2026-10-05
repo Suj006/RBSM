@@ -9,7 +9,7 @@ import { CountryTag } from "@/components/ids";
 
 export type BuyerRow = {
   id: string; regNo: string; approvedNo: string | null; name: string; country: string; status: BuyerStatus;
-  signupEmail: string; pocName: string | null; updatedAt: Date; createdAt: Date;
+  signupEmail: string; pocName: string | null; updatedAt: Date; createdAt: Date; source?: "SELF" | "FIEO" | "BULK";
   user: { username: string };
   requirement: { items: { status: ItemStatus; sector: { name: string } }[] } | null;
 };
@@ -40,6 +40,7 @@ export function BuyerTable({ rows, base }: { rows: BuyerRow[]; base: string }) {
                 </td>
                 <td className="px-4 py-3 align-top">
                   <Link href={`${base}/${r.id}`} className="font-semibold text-ink hover:text-brand-700">{r.name}</Link>
+                  {r.source && r.source !== "SELF" && <span className="ml-1.5 rounded bg-violet-50 px-1.5 py-px text-[10px] font-semibold text-violet-700 ring-1 ring-violet-200">{r.source === "BULK" ? "FIEO bulk" : "Added by FIEO"}</span>}
                   <div className="text-xs text-slate-500">{r.pocName ? `${r.pocName} · ` : ""}{r.signupEmail}</div>
                 </td>
                 <td className="px-4 py-3 align-top text-slate-700"><CountryTag country={r.country} /><div className="text-xs text-slate-500">{r.country}</div></td>

@@ -17,12 +17,28 @@ Buyer sign-up ─► e-mail with login (Tradex2027-NNN / pass@123) ─► forced
    ─► approved buyers can add sectors or modify approved ones — same approval flow
 ```
 
+**Buyers added by FIEO.** (Buyers who sign up themselves follow the workflow above, unchanged.) FIEO can also register buyers itself — **Add buyer** (one at a time, with optional company
+documents) or **Bulk upload buyers** (Excel template with drop-downs for country, sourcing profile and up to 3 sector
+requirements; every row is checked first, then the valid rows are imported). Each buyer gets a **temporary login**
+(`Tradex2027-NNN`, e-mailed, password changed at first sign-in). Basic details entered by FIEO count as verified;
+sector requirements entered by FIEO go straight to the Directorate as FIEO-recommended (the sourcing profile is then
+required). The buyer signs in with the temporary login, sees a notice, checks the details and can add more sectors.
+When the Directorate approves the first sector, the same login becomes the buyer's **permanent login** — the approval
+e-mail says so. Lists show "Added by FIEO" / "FIEO bulk", can be filtered by how the buyer was registered, and the
+buyer page and Buyer Register report show the source and whether the login is temporary or permanent.
+
+```
+FIEO adds a buyer (form or bulk Excel) ─► temporary login e-mailed ─► basic details verified (by FIEO)
+   ─► sectors entered by FIEO: recommended to the Directorate ─► Directorate approves
+   ─► RBSM-Buyer-2026NNN; the temporary login becomes the permanent login
+```
+
 FIEO and the Directorate decide each sector on its own (e.g. recommend one sector and return
 another in the same step), with "Recommend all" / "Approve all" shortcuts.
 
 | Number | Format | Assigned |
 |---|---|---|
-| Login ID | `Tradex2027-001` | at sign-up |
+| Login ID | `Tradex2027-001` | at sign-up (or when FIEO adds the buyer: temporary until approval, then permanent) |
 | Registration no. | `RBSM-B-001` | at sign-up |
 | Buyer no. | `RBSM-Buyer-2026001` | when the first sector is approved by the Directorate |
 

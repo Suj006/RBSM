@@ -96,6 +96,7 @@ model User {
   nodalOfficer     NodalOfficer?
   meetingsMarked   ScheduledMeeting[]   @relation("MeetingMarkedBy")
   meetingsMoved    ScheduledMeeting[]   @relation("MeetingMovedBy")
+  buyersAdded      Buyer[]              @relation("BuyersAdded")
   buyerDaysMarked  BuyerDayAttendance[]
 }
 
@@ -139,6 +140,10 @@ model Buyer {
   pocMobile      String?
 
   status BuyerStatus @default(SIGNED_UP)
+
+  source      BuyerSource @default(SELF)
+  createdById String?
+  createdBy   User?       @relation("BuyersAdded", fields: [createdById], references: [id], onDelete: SetNull)
 
   basicSubmittedAt DateTime?
   basicApprovedAt  DateTime?
@@ -291,6 +296,13 @@ enum SellerStatus {
   RETURNED // Directorate returned it to the district with a comment
   APPROVED // approved by the Directorate — login allotted, visible to FIEO
   REJECTED // rejected by the district or the Directorate
+}
+
+// How a buyer came in: own sign-up, or added by FIEO one at a time or by bulk upload (temporary login until approval).
+enum BuyerSource {
+  SELF
+  FIEO
+  BULK
 }
 
 enum SellerSource {

@@ -55,6 +55,12 @@ export default async function BuyerDashboard() {
         actions={<StatusBadge status={b.status} />}
       />
       <UnreadBanner user={user} href="/buyer/messages" />
+      {b.status !== "APPROVED" && b.source !== "SELF" && (
+        <Alert tone="amber" className="mb-6" title={`Temporary login: ${user.username}`}>
+          {<>FIEO has registered your organisation and entered your basic details{b.recommendedAt ? " and sector requirements (now with the Directorate)" : ""}. Please check them and add any further sector requirements. </>}
+          This login becomes your permanent {EVENT.short} login as soon as the Directorate approves your registration.
+        </Alert>
+      )}
 
       <Card className="mb-6 p-5 sm:p-6"><JourneyStepper status={b.status} /></Card>
 

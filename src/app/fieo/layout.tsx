@@ -12,6 +12,8 @@ export default async function FieoLayout({ children }: { children: React.ReactNo
       { href: "/fieo", label: "Dashboard", icon: "dashboard", exact: true },
       { href: "/fieo/find", label: "Find by ID", icon: "find" },
       { href: "/fieo/buyers", label: "Buyer applications", icon: "buyers", badge: pending, group: "Buyers" },
+      { href: "/fieo/buyers/new", label: "Add buyer", icon: "add", exact: true, group: "Buyers" },
+      { href: "/fieo/buyers/upload", label: "Bulk upload buyers", icon: "upload", group: "Buyers" },
       { href: "/fieo/requirements", label: "Sector requirements", icon: "requirement", group: "Buyers" },
       { href: "/fieo/approved", label: "RBSM buyer list", icon: "approved", group: "Buyers" },
       { href: "/fieo/seller-list", label: "RBSM seller list", icon: "sellers", group: "Sellers" },

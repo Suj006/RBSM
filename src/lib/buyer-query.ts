@@ -2,7 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { BuyerStatus, ItemStatus, Role } from "@/generated/prisma/enums";
 import { ALL_ITEM_STATUSES, ALL_STATUSES, DIC_ITEM_QUEUE, FIEO_ITEM_QUEUE } from "@/lib/status";
 
-export type BuyerFilters = { q?: string; status?: string; item?: string; country?: string; sector?: string; page?: string };
+export type BuyerFilters = { q?: string; status?: string; item?: string; country?: string; sector?: string; source?: string; page?: string };
 
 /**
  * Sector rows a staff role may see. FIEO, the Directorate (the central team) and Admin
@@ -61,6 +61,8 @@ export function buyerWhere(role: Role, f: BuyerFilters): Prisma.BuyerWhereInput 
   }
   if (filterItems) and.push({ requirement: { items: { some: item } } });
   if (f.country) and.push({ country: f.country });
+  if (f.source === "SELF" || f.source === "FIEO" || f.source === "BULK") and.push({ source: f.source });
+  else if (f.source === "STAFF") and.push({ source: { in: ["FIEO", "BULK"] } });
   return { AND: and };
 }
 

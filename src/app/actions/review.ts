@@ -161,7 +161,9 @@ export async function itemReviewAction(_: FormState, form: FormData): Promise<Fo
     await sendMail(to, m.subject, m.text);
   }
   if (approved.length) {
-    const m = mailTemplates.sectorsApproved(buyer.name, buyer.approvedNo!, approved.map((a) => a.sector), newlyApproved);
+    // A buyer added by FIEO had a temporary login: on the first approval it becomes the permanent login.
+    const login = newlyApproved && buyer.source !== "SELF" ? (await prisma.user.findFirst({ where: { buyer: { id: buyer.id } }, select: { username: true } }))?.username : undefined;
+    const m = mailTemplates.sectorsApproved(buyer.name, buyer.approvedNo!, approved.map((a) => a.sector), newlyApproved, login);
     await sendMail(to, m.subject, m.text);
   }
 
