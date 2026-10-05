@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 import { countryCode } from "@/lib/country-codes";
 import { Flag, UidPill, uid } from "@/components/ids";
 
-type GridMeeting = { id: string; buyerId: string; sellerId: string; startAt: Date; seller: { name: string; approvedNo: string | null; regNo: string }; ticketNo?: string };
+type GridMeeting = { id: string; buyerId: string; sellerId: string; startAt: Date; seller: { name: string; approvedNo: string | null; regNo: string }; ticketNo?: string; status?: string };
 type GridBuyer = { id: string; name: string; pavilionNo: number | null; country: string; approvedNo: string | null; regNo: string };
 
 export function DayTabs({ cfg, day, href }: { cfg: EventConfig; day: string; href: (d: string) => string }) {
@@ -36,7 +36,9 @@ export function ScheduleGrid({ cfg, day, buyers, meetings, cellHref }: {
   const d = cfg.days.find((x) => x.date === day);
   if (!d) return null;
   const slots = daySlots(d, cfg);
-  const at = new Map(meetings.map((m) => [`${m.buyerId}|${m.startAt.getTime()}`, m]));
+  // A filled slot (event day) shows the seller who took it rather than the absent one.
+  const at = new Map(meetings.filter((m) => m.status !== "SELLER_ABSENT").concat(meetings.filter((m) => m.status === "SELLER_ABSENT")).reverse()
+    .map((m) => [`${m.buyerId}|${m.startAt.getTime()}`, m]));
   return (
     <div className="table-scroll relative overflow-x-auto">
       <table className="w-full border-separate border-spacing-0 text-xs">

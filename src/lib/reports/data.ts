@@ -1052,7 +1052,7 @@ async function eventAttendanceReport(user: User): Promise<Report> {
   const cfg = await getEventConfig();
   const dayNo = new Map(cfg.days.map((d) => [d.date, d.n]));
   const [ms, att] = await Promise.all([
-    prisma.scheduledMeeting.findMany({ orderBy: [{ startAt: "asc" }], include: { buyer: { select: { name: true, pavilionNo: true, nodalOfficer: { select: { name: true } } } }, seller: { select: { name: true, district: true } }, markedBy: { select: { displayName: true } } } }),
+    prisma.scheduledMeeting.findMany({ orderBy: [{ startAt: "asc" }], include: { buyer: { select: { name: true, approvedNo: true, pavilionNo: true, nodalOfficer: { select: { name: true } } } }, seller: { select: { name: true, district: true, approvedNo: true } }, markedBy: { select: { displayName: true } }, movedBy: { select: { displayName: true } } } }),
     prisma.buyerDayAttendance.findMany({ include: { buyer: { select: { name: true, pavilionNo: true } }, markedBy: { select: { displayName: true } } } }),
   ]);
   const now = new Date();
@@ -1066,6 +1066,7 @@ async function eventAttendanceReport(user: User): Promise<Report> {
       { label: "Completed", value: by("completed"), tone: "green" },
       { label: "Seller / buyer absent", value: by("no_show") + by("buyer_absent"), tone: "red" },
       { label: "Not marked (past)", value: by("not_marked"), tone: "yellow" },
+      { label: "Slots filled on the day", value: ms.filter((m) => m.replacesId).length, tone: "violet" },
     ],
     tables: [
       { name: "Summary", heading: "1. Day-wise summary",
@@ -1073,9 +1074,10 @@ async function eventAttendanceReport(user: User): Promise<Report> {
         rows: cfg.days.map((d) => ({ day: `Day ${d.n} · ${fmtDay(d.date)}`, total: ms.filter((m) => m.day === d.date).length, ...Object.fromEntries((["completed", "in_meeting", "awaiting", "upcoming", "checked_in", "no_show", "buyer_absent", "not_marked", "cancelled"] as Live[]).map((k) => [k, by(k, d.date)])) })) },
       { name: "Meetings", heading: "2. Every meeting",
         columns: [{ key: "ticket", header: "Ticket No.", width: 17, kind: "mono" }, { key: "when", header: "Day · Time", width: 18 }, { key: "pav", header: "Pavilion", width: 8, kind: "number", align: "center" },
-          { key: "buyer", header: "Buyer", width: 22 }, { key: "seller", header: "Seller", width: 22 }, { key: "status", header: "Status", width: 16 }, { key: "by", header: "Marked By", width: 18 }, { key: "at", header: "Marked At", width: 16, kind: "datetime" }, { key: "note", header: "Note", width: 24, excelOnly: true }],
-        rows: live.map(({ m, s }) => ({ ticket: m.ticketNo, when: `D${dayNo.get(m.day)} ${fmtTime(m.startAt)}`, pav: m.pavilionNo ?? "", buyer: m.buyer.name, seller: `${m.seller.name} (${m.seller.district})`,
-          status: LIVE_META[s].label, by: m.markedBy?.displayName ?? "", at: m.markedAt, note: m.note ?? "" })) },
+          { key: "buyer", header: "Buyer", width: 22 }, { key: "seller", header: "Seller", width: 22 }, { key: "status", header: "Status", width: 16 }, { key: "by", header: "Marked By", width: 18 }, { key: "at", header: "Marked At", width: 16, kind: "datetime" }, { key: "change", header: "Event-Day Change", width: 24 }, { key: "note", header: "Note", width: 24, excelOnly: true }],
+        rows: live.map(({ m, s }) => ({ ticket: m.ticketNo, when: `D${dayNo.get(m.day)} ${fmtTime(m.startAt)}`, pav: m.pavilionNo ?? "", buyer: `${m.buyer.name} (${m.buyer.approvedNo ?? ""})`, seller: `${m.seller.name} (${m.seller.approvedNo ?? ""}, ${m.seller.district})`,
+          status: LIVE_META[s].label, by: m.markedBy?.displayName ?? "", at: m.markedAt, note: m.note ?? "",
+          change: !m.movedAt ? "" : `${m.movedFrom ? `Moved from ${fmtTime(m.movedFrom)}` : "Added"}${m.replacesId ? `, took ${ms.find((x) => x.id === m.replacesId)?.seller.name ?? "an absent seller"}'s slot` : ""}${m.movedBy ? ` — ${m.movedBy.displayName}` : ""}` })) },
       { name: "Buyer Attendance", heading: "3. Buyers' attendance by day",
         columns: [{ key: "day", header: "Day", width: 22 }, { key: "pav", header: "Pavilion", width: 8, kind: "number", align: "center" }, { key: "buyer", header: "Buyer", width: 28 }, { key: "present", header: "Present", width: 9, align: "center" }, { key: "by", header: "Marked By", width: 20 }, { key: "at", header: "Marked At", width: 16, kind: "datetime" }],
         rows: att.sort((a, b) => a.day.localeCompare(b.day) || (a.buyer.pavilionNo ?? 999) - (b.buyer.pavilionNo ?? 999)).map((a) => ({ day: `Day ${dayNo.get(a.day)} · ${fmtDay(a.day)}`, pav: a.buyer.pavilionNo ?? "", buyer: a.buyer.name, present: a.present ? "Yes" : "No", by: a.markedBy?.displayName ?? "", at: a.markedAt })) },

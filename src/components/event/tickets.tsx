@@ -44,6 +44,7 @@ export function MeetingTicket({ m, dayNo, venue }: { m: FullMeeting; dayNo: numb
             <span className="inline-flex items-center gap-1.5 font-bold"><CalendarClock className="size-4 text-brand-700" /> Day {dayNo} · {fmtDay(m.day)}</span>
             <span className="text-lg font-extrabold tabular-nums">{fmtTime(m.startAt)} – {fmtTime(m.endAt)}</span>
           </div>
+          {m.movedAt && <div className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-200">{m.movedFrom ? `Time changed on the event day — was ${fmtTime(m.movedFrom)}.` : "Meeting added on the event day."} This ticket is valid for the time shown.</div>}
           {venue && <div className="inline-flex items-center gap-1.5 text-sm text-slate-600"><MapPin className="size-4" /> {venue}</div>}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
@@ -106,7 +107,8 @@ export async function MyMeetings({ user, base }: { user: User; base: "/buyer" | 
                 <li key={m.id} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
                   <div className="grid items-start gap-3 sm:grid-cols-[1fr_auto]">
                     <div className="flex min-w-0 items-start gap-4">
-                      <div className="text-center"><div className="text-xl font-extrabold tabular-nums text-ink">{fmtTime(m.startAt)}</div><div className="text-xs text-slate-500">to {fmtTime(m.endAt)}</div></div>
+                      <div className="text-center"><div className="text-xl font-extrabold tabular-nums text-ink">{fmtTime(m.startAt)}</div><div className="text-xs text-slate-500">to {fmtTime(m.endAt)}</div>
+                        {m.movedAt && <div className="mt-1 max-w-24 text-[11px] font-semibold leading-tight text-amber-700">{m.movedFrom ? `Moved from ${fmtTime(m.movedFrom)}` : "Added on the day"}</div>}</div>
                       <div>
                         <div className="flex items-center gap-1.5 text-base font-bold text-ink">{!isBuyer && <Flag country={m.buyer.country} />}{isBuyer ? m.seller.name : m.buyer.name}</div>
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600">

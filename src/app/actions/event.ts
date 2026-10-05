@@ -6,7 +6,7 @@ import { hashPassword, requireUser } from "@/lib/auth";
 import { EVENT } from "@/lib/config";
 import {
   allSlots, assignNodalOfficers, assignPavilions, clashes, fmtDay, fmtTime, generateSchedule, getEventConfig, isDay, isTime, minutes,
-  setEventSetting, ticketNo, type Break,
+  freeTicketNo, setEventSetting, slotOptions, syncDraft, ticketNo, type Break,
 } from "@/lib/event";
 import { eventMail, sendMail } from "@/lib/mail";
 import { emailField, indianMobile, personName, designation as designationField } from "@/lib/text";
@@ -190,9 +190,14 @@ export async function scheduleAction(_: FormState, form: FormData): Promise<Form
             ...(old && old.startAt.getTime() !== m.startAt.getTime() ? { status: "SCHEDULED", markedAt: null, markedById: null } : {}) },
         });
       }
+      const used = new Set<string>();
       for (const m of draft) {
+        const base = ticketNo(dayNo.get(m.day) ?? 0, m.buyer.pavilionNo, m.buyer.approvedSeq, m.startAt);
+        let tn = base;
+        for (let i = 0; used.has(tn); i++) tn = `${base}-${"ABCDEFGHJKLMNPQRSTUVWXYZ"[i % 24]}${i >= 24 ? i : ""}`;
+        used.add(tn);
         await tx.scheduledMeeting.update({ where: { buyerId_sellerId: { buyerId: m.buyerId, sellerId: m.sellerId } },
-          data: { ticketNo: ticketNo(dayNo.get(m.day) ?? 0, m.buyer.pavilionNo, m.buyer.approvedSeq, m.startAt) } });
+          data: { ticketNo: tn } });
       }
     }, { timeout: 60000 });
     await setEventSetting("event.version", String(version));
@@ -277,4 +282,70 @@ export async function buyerDayAction(_: FormState, form: FormData): Promise<Form
   if (!present) await prisma.scheduledMeeting.updateMany({ where: { buyerId, day, status: "SCHEDULED" }, data: { status: "BUYER_ABSENT", markedAt: new Date(), markedById: user.id } });
   else await prisma.scheduledMeeting.updateMany({ where: { buyerId, day, status: "BUYER_ABSENT" }, data: { status: "SCHEDULED", markedAt: null, markedById: null } });
   return ok(`${b.name}: ${present ? "present" : "absent"} on ${fmtDay(day)}.`);
+}
+
+/* ------------------------------------------------------------------ event day: filling a slot */
+
+/** Loads a slot's options and checks that this user may change it (nodal officer of the buyer, or Directorate). */
+async function slotFor(form: FormData) {
+  const user = await requireUser(["NODAL", "DIC"]);
+  const o = await slotOptions(String(form.get("meetingId") ?? ""));
+  if (!o) return { error: "Meeting not found." } as const;
+  if (user.role === "NODAL" && o.target.buyer.nodalOfficer?.userId !== user.id) return { error: "This meeting is with a buyer assigned to another nodal officer." } as const;
+  return { user, o } as const;
+}
+
+/**
+ * Nodal officer / Directorate: give an absent seller's slot to another matched seller of the buyer who is free now —
+ * their later meeting with the buyer moves forward (same ticket), or a matched pair without a meeting gets a new one.
+ */
+export async function fillSlotAction(_: FormState, form: FormData): Promise<FormState> {
+  const r = await slotFor(form);
+  if ("error" in r) return { error: r.error };
+  const { user, o } = r;
+  const { target, cfg } = o;
+  if (!o.fillable) return { error: o.filledBy ? "This slot has already been given to another seller." : "This slot can no longer be filled — it is over, or its seller is present." };
+  const c = o.candidates.find((x) => x.seller.id === String(form.get("sellerId") ?? ""));
+  if (!c) return { error: "This seller is not free in this slot any more. Refresh the list." };
+  const now = new Date();
+  const at = { day: target.day, startAt: target.startAt, endAt: target.endAt };
+  if (target.status !== "SELLER_ABSENT") {
+    await prisma.scheduledMeeting.update({ where: { id: target.id }, data: { status: "SELLER_ABSENT", markedAt: now, markedById: user.id } });
+  }
+  const moved = { movedAt: now, movedById: user.id, replacesId: target.id };
+  let msg: string;
+  if (c.own) {
+    await prisma.scheduledMeeting.update({ where: { id: c.own.id }, data: { ...at, pavilionNo: target.pavilionNo, status: "SCHEDULED", markedAt: null, markedById: null, movedFrom: c.own.startAt, ...moved } });
+    msg = `${c.seller.name} moved forward from ${fmtDay(c.own.day)}, ${fmtTime(c.own.startAt)} to ${fmtTime(target.startAt)} (ticket ${c.own.ticketNo}).`;
+  } else {
+    const dayNo = cfg.days.find((d) => d.date === target.day)?.n ?? 0;
+    const tn = await freeTicketNo(ticketNo(dayNo, target.buyer.pavilionNo, target.buyer.approvedSeq, target.startAt));
+    await prisma.scheduledMeeting.create({ data: { ticketNo: tn, buyerId: target.buyerId, sellerId: c.seller.id, ...at, pavilionNo: target.pavilionNo, version: cfg.version, ...moved } });
+    msg = `${c.seller.name} added at ${fmtTime(target.startAt)} with a new ticket ${tn}.`;
+  }
+  // Draft: the absent pair takes the freed slot if it fits, else leaves the draft; the new pair takes this slot.
+  const freed = c.own ? { day: c.own.day, startAt: c.own.startAt, endAt: c.own.endAt } : null;
+  if (!freed || !(await syncDraft(target.buyerId, target.sellerId, freed, cfg.bufferMinutes))) await syncDraft(target.buyerId, target.sellerId, null, cfg.bufferMinutes);
+  await syncDraft(target.buyerId, c.seller.id, at, cfg.bufferMinutes);
+  await logMatchEvent(`Slot filled at pavilion ${target.pavilionNo ?? "–"}, ${fmtDay(target.day)} ${fmtTime(target.startAt)}`, user.id,
+    `${target.buyer.name}: ${target.seller.name} absent; ${c.seller.name} ${c.own ? `moved forward from ${fmtTime(c.own.startAt)}` : "added"}`);
+  return ok(`${target.seller.name} marked absent. ${msg} Mark the seller present when they reach the pavilion.`);
+}
+
+/** Nodal officer / Directorate: an absent seller who arrives late gets a later slot that day, free for both sides. */
+export async function laterSlotAction(_: FormState, form: FormData): Promise<FormState> {
+  const r = await slotFor(form);
+  if ("error" in r) return { error: r.error };
+  const { user, o } = r;
+  const { target, cfg } = o;
+  const start = new Date(String(form.get("slot") ?? ""));
+  const s = o.later.find((x) => x.startAt.getTime() === start.getTime());
+  if (!s) return { error: "This slot is not free any more. Choose another." };
+  const at = { day: s.day, startAt: s.startAt, endAt: s.endAt };
+  await prisma.scheduledMeeting.update({ where: { id: target.id }, data: { ...at, status: "SCHEDULED", markedAt: null, markedById: null,
+    movedFrom: target.movedFrom ?? target.startAt, movedAt: new Date(), movedById: user.id } });
+  await syncDraft(target.buyerId, target.sellerId, at, cfg.bufferMinutes);
+  await logMatchEvent(`Absent seller given a later slot at pavilion ${target.pavilionNo ?? "–"}`, user.id,
+    `${target.seller.name} with ${target.buyer.name}: ${fmtTime(target.startAt)} → ${fmtTime(s.startAt)}`);
+  return ok(`${target.seller.name} now meets ${target.buyer.name} at ${fmtTime(s.startAt)} (ticket ${target.ticketNo} stays valid).`);
 }

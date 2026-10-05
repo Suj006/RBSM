@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle2, ScanLine, UserCheck, UserX, Undo2, XCircle } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, ScanLine, UserCheck, UserX, Undo2, XCircle } from "lucide-react";
 import type { User } from "@/generated/prisma/client";
 import type { MeetingStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
-import { fmtDay, fmtTime, getEventConfig, istDay, LIVE_META, liveStatus } from "@/lib/event";
+import { canFill, fmtDay, fmtTime, getEventConfig, istDay, LIVE_META, liveStatus } from "@/lib/event";
 import { buyerDayAction, markMeetingAction } from "@/app/actions/event";
 import { Alert, Badge, Card, CardHeader, EmptyState, Input, PageHeader } from "@/components/ui";
 import { ActionButton } from "@/components/match/action-button";
@@ -15,7 +15,7 @@ import { cn } from "@/lib/cn";
 import { CountryTag, Flag, UidPill, uid } from "@/components/ids";
 
 /** Mark buttons for one meeting (nodal officer / Directorate). */
-export function MarkButtons({ id, status }: { id: string; status: MeetingStatus }) {
+export function MarkButtons({ id, status, slot }: { id: string; status: MeetingStatus; slot?: { href: string; label: string } | null }) {
   const b = (s: MeetingStatus, label: React.ReactNode, variant: "primary" | "secondary" | "danger" | "success" | "ghost" = "secondary") =>
     <ActionButton key={s} action={markMeetingAction} fields={{ meetingId: id, status: s }} compact variant={variant} label={label} />;
   return (
@@ -23,8 +23,16 @@ export function MarkButtons({ id, status }: { id: string; status: MeetingStatus 
       {status === "SCHEDULED" && <>{b("SELLER_PRESENT", <><UserCheck className="size-3.5" /> Seller present</>, "success")}{b("SELLER_ABSENT", <><UserX className="size-3.5" /> Seller absent</>, "danger")}</>}
       {status === "SELLER_PRESENT" && b("COMPLETED", <><CheckCircle2 className="size-3.5" /> Meeting completed</>, "primary")}
       {status !== "SCHEDULED" && b("SCHEDULED", <><Undo2 className="size-3.5" /> Undo</>, "ghost")}
+      {slot && <Link href={slot.href} className="inline-flex items-center gap-1 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-200"><ArrowUpRight className="size-3.5" /> {slot.label}</Link>}
     </div>
   );
+}
+
+/** The "Fill this slot" / "Give a later slot" link for a meeting, when it applies. */
+export function slotLink(m: { id: string; status: MeetingStatus; startAt: Date; endAt: Date }, now: Date, base: string) {
+  if (canFill(m, now)) return { href: `${base}/${m.id}`, label: "Fill this slot" };
+  if (m.status === "SELLER_ABSENT") return { href: `${base}/${m.id}`, label: "Later slot" };
+  return null;
 }
 
 async function officerOf(user: User) {
@@ -99,11 +107,12 @@ export async function NodalHome({ user, day: dayParam }: { user: User; day?: str
                         const s = liveStatus(m, now);
                         return (
                           <tr key={m.id} className={cn(s === "in_meeting" && "bg-brand-50/60", s === "awaiting" && "bg-amber-50/60")}>
-                            <td className="whitespace-nowrap px-5 py-2 font-semibold tabular-nums">{fmtTime(m.startAt)}–{fmtTime(m.endAt)}</td>
+                            <td className="whitespace-nowrap px-5 py-2 font-semibold tabular-nums">{fmtTime(m.startAt)}–{fmtTime(m.endAt)}
+                              {m.movedAt && <div className="text-[11px] font-normal text-amber-700">{m.movedFrom ? `moved from ${fmtTime(m.movedFrom)}` : "added to fill a slot"}</div>}</td>
                             <td className="px-3 py-2"><div className="flex flex-wrap items-center gap-2 font-semibold text-ink">{m.seller.name} <UidPill id={uid(m.seller)} tone="seller" /></div><div className="text-xs text-slate-500">{m.seller.district} · {m.seller.contactName} · {m.seller.contactMobile}</div></td>
                             <td className="px-3 py-2 font-mono text-xs">{m.ticketNo}</td>
                             <td className="px-3 py-2"><span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold ring-1", LIVE_META[s].tone)}>{LIVE_META[s].label}</span></td>
-                            <td className="px-3 py-2"><MarkButtons id={m.id} status={m.status} /></td>
+                            <td className="px-3 py-2"><MarkButtons id={m.id} status={m.status} slot={slotLink(m, now, "/nodal/slot")} /></td>
                           </tr>
                         );
                       })}
@@ -142,7 +151,7 @@ export async function NodalVerify({ user, t }: { user: User; t?: string }) {
             <div className="mb-2 text-sm font-bold text-ink">Status</div>
             <span className={cn("rounded-md px-2 py-0.5 text-sm font-semibold ring-1", LIVE_META[s!].tone)}>{LIVE_META[s!].label}</span>
             <div className="mt-2 text-xs text-slate-500">Valid for {fmtDay(m.day)}, {fmtTime(m.startAt)}–{fmtTime(m.endAt)} at pavilion {m.pavilionNo ?? "–"}.</div>
-            {mine ? <div className="mt-4"><MarkButtons id={m.id} status={m.status} /></div>
+            {mine ? <div className="mt-4"><MarkButtons id={m.id} status={m.status} slot={slotLink(m, new Date(), "/nodal/slot")} /></div>
               : <Alert tone="amber" className="mt-4">This meeting is at a pavilion assigned to another nodal officer ({m.buyer.nodalOfficer?.name ?? "not assigned"}). Please direct the seller there.</Alert>}
             <Link href="/nodal" className="mt-4 inline-block text-sm font-semibold text-brand-700 hover:underline">Back to today&apos;s meetings</Link>
           </Card>
@@ -196,7 +205,7 @@ async function SellerById({ o, q }: { o: { id: string; name: string }; q: string
                           {!mine && <div className="text-xs text-slate-500">Nodal officer: {m.buyer.nodalOfficer?.name ?? "not assigned"}</div>}</td>
                         <td className="px-3 py-2 font-mono text-xs">{m.ticketNo}</td>
                         <td className="px-3 py-2"><span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold ring-1", LIVE_META[s].tone)}>{LIVE_META[s].label}</span></td>
-                        <td className="px-3 py-2">{mine ? <MarkButtons id={m.id} status={m.status} /> : <span className="text-xs text-slate-400">Another officer&apos;s pavilion</span>}</td>
+                        <td className="px-3 py-2">{mine ? <MarkButtons id={m.id} status={m.status} slot={slotLink(m, now, "/nodal/slot")} /> : <span className="text-xs text-slate-400">Another officer&apos;s pavilion</span>}</td>
                       </tr>
                     );
                   })}

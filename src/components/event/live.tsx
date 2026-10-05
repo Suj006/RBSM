@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AlarmClock, CalendarX2, Radio } from "lucide-react";
 import type { User } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { daySlots, fmtDay, fmtTime, getEventConfig, istAt, istDay, isTime, LIVE_META, liveStatus, type Live } from "@/lib/event";
+import { canFill, daySlots, fmtDay, fmtTime, getEventConfig, istAt, istDay, isTime, LIVE_META, liveStatus, type Live } from "@/lib/event";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { DownloadButtons } from "@/components/staff/download-buttons";
 import { AutoRefresh } from "./auto-refresh";
@@ -23,7 +23,6 @@ function Kpi({ label, value, sub, tone }: { label: string; value: number | strin
 
 /** Real-time picture of an event day: every pavilion and slot, who is meeting whom now, and what needs attention. */
 export async function LiveMonitor({ user, base, day: dayParam, at }: { user: User; base: string; day?: string; at?: string }) {
-  void user;
   const cfg = await getEventConfig();
   const today = istDay();
   const day = cfg.days.find((d) => d.date === dayParam)?.date ?? cfg.days.find((d) => d.date === today)?.date ?? cfg.days[0]?.date ?? "";
@@ -80,7 +79,8 @@ export async function LiveMonitor({ user, base, day: dayParam, at }: { user: Use
   const pct = active.length ? Math.round((concluded / active.length) * 100) : 0;
 
   // Attention: meetings running without a checked-in seller; past meetings not marked
-  const late = st.filter((x) => x.s === "awaiting");
+  const late = st.filter((x) => x.s === "awaiting" || (x.s === "no_show" && canFill(x.m, now) && !st.some((y) => y.m.replacesId === x.m.id && y.m.startAt.getTime() === x.m.startAt.getTime())));
+  const canAct = user.role === "DIC" && !rehearsal;
   const unmarked = st.filter((x) => x.s === "not_marked");
   // Nodal officers
   const officers = new Map<string, { name: string; mobile: string; buyers: Set<string>; due: number; marked: number; inMeeting: number }>();
@@ -92,7 +92,8 @@ export async function LiveMonitor({ user, base, day: dayParam, at }: { user: Use
     if (s === "in_meeting") e.inMeeting++;
     officers.set(k, e);
   }
-  const at2 = (b: string, t: Date) => st.find((x) => x.m.buyerId === b && x.m.startAt.getTime() === t.getTime());
+  // A filled slot shows the seller who took it, not the absent one.
+  const at2 = (b: string, t: Date) => { const all = st.filter((x) => x.m.buyerId === b && x.m.startAt.getTime() === t.getTime()); return all.find((x) => x.s !== "no_show") ?? all[0]; };
   const q = (extra: Record<string, string>) => `${base}/live?${new URLSearchParams({ day, ...(rehearsal ? { at: at! } : {}), ...extra })}`;
 
   return (
@@ -184,13 +185,14 @@ export async function LiveMonitor({ user, base, day: dayParam, at }: { user: Use
 
         <div className="space-y-6">
           <Card className="overflow-hidden">
-            <CardHeader title={`Needs attention now (${late.length})`} icon={<AlarmClock className="size-4" />} subtitle="Slot started — seller not checked in" />
+            <CardHeader title={`Needs attention now (${late.length})`} icon={<AlarmClock className="size-4" />} subtitle={canAct ? "Seller not checked in or absent — the slot can be given to another matched seller" : "Slot started — seller not checked in, or absent"} />
             {late.length ? <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
               {late.map(({ m }) => (
                 <li key={m.id} className="px-5 py-2.5 text-sm">
                   <div className="flex items-center gap-1.5 font-semibold text-ink">P{m.buyer.pavilionNo ?? "–"} <Flag country={m.buyer.country} /> {m.buyer.name} <UidPill id={uid(m.buyer)} tone="buyer" /></div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">{m.seller.name} <UidPill id={uid(m.seller)} tone="seller" /> · {fmtTime(m.startAt)} · {m.ticketNo}</div>
-                  <div className="text-xs text-slate-500">Nodal: {m.buyer.nodalOfficer?.name ?? "not assigned"}{m.buyer.nodalOfficer?.mobile ? ` · ${m.buyer.nodalOfficer.mobile}` : ""}</div>
+                  <div className="text-xs text-slate-500">{m.status === "SELLER_ABSENT" ? <b className="text-tx-red">Seller absent · </b> : ""}Nodal: {m.buyer.nodalOfficer?.name ?? "not assigned"}{m.buyer.nodalOfficer?.mobile ? ` · ${m.buyer.nodalOfficer.mobile}` : ""}</div>
+                  {canAct && <Link href={`${base}/live/slot/${m.id}`} className="mt-1 inline-block text-xs font-semibold text-brand-700 hover:underline">Fill this slot →</Link>}
                 </li>
               ))}
             </ul> : <p className="px-5 py-4 text-sm text-slate-500">Nothing late.</p>}

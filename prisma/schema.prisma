@@ -95,6 +95,7 @@ model User {
 
   nodalOfficer     NodalOfficer?
   meetingsMarked   ScheduledMeeting[]   @relation("MeetingMarkedBy")
+  meetingsMoved    ScheduledMeeting[]   @relation("MeetingMovedBy")
   buyerDaysMarked  BuyerDayAttendance[]
 }
 
@@ -678,6 +679,13 @@ model ScheduledMeeting {
   markedBy   User?         @relation("MeetingMarkedBy", fields: [markedById], references: [id], onDelete: SetNull)
   note       String?
   version    Int
+  // Event-day change by a nodal officer / the Directorate: original start, when and by whom,
+  // and the absent seller's meeting whose slot this meeting took.
+  movedFrom   DateTime?
+  movedAt     DateTime?
+  movedById   String?
+  movedBy     User?         @relation("MeetingMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
+  replacesId  String?
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 

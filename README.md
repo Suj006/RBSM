@@ -129,6 +129,13 @@ board, Seller preferences, Checks, Results & gaps, Published.
    in meeting / waiting / idle / done / absent; sellers in meeting / pending / finished; the pavilion × slot board in
    colour; late check-ins with the nodal officer to call; each officer's marking. A **rehearsal** time can be entered
    to see the board as at any time of an event day.
+7. **Fill this slot** (nodal officer for their buyers; Directorate from the live monitor) — when a seller is marked
+   absent, or has not checked in after the slot starts, the slot can be given to **any other seller matched with that
+   buyer** who is free now (no meeting elsewhere in that slot, buffer kept); sellers already at the venue are listed
+   first. Their later meeting with the buyer moves forward and keeps its ticket number; a matched pair without a
+   meeting gets a new ticket. Only pairs of the published mapping are offered. If the absent seller arrives late, they
+   can be given a later slot that day free for both sides. Moves show in My meetings, on the ticket, the live board and
+   the attendance report (Event-Day Change), and are copied into the draft so a republish keeps them.
 
 Reports: **Meeting Schedule** (published or draft — by time, buyer, seller, pavilions and nodal officers) and
 **Event Day Attendance** (every meeting's status, day-wise summary, buyers' attendance, nodal officers' marking).

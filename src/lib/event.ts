@@ -235,3 +235,77 @@ export function liveStatus(m: { status: MeetingStatus; startAt: Date; endAt: Dat
 export const STATUS_LABEL: Record<MeetingStatus, string> = {
   SCHEDULED: "Scheduled", SELLER_PRESENT: "Seller present", SELLER_ABSENT: "Seller absent", BUYER_ABSENT: "Buyer absent", COMPLETED: "Completed", CANCELLED: "Cancelled",
 };
+
+/* ------------------------------------------------------------------ event day: filling a slot */
+
+/** Statuses that keep a buyer / seller busy in a slot. */
+const BUSY: MeetingStatus[] = ["SCHEDULED", "SELLER_PRESENT", "COMPLETED"];
+
+/** A slot can be given to another seller while it runs (or before it) once its seller is absent or has not checked in after the start. */
+export const canFill = (m: { status: MeetingStatus; startAt: Date; endAt: Date }, now: Date) =>
+  now.getTime() < m.endAt.getTime() && (m.status === "SELLER_ABSENT" || (m.status === "SCHEDULED" && now.getTime() >= m.startAt.getTime()));
+
+const PARTY = { approvedNo: true, regNo: true } as const;
+
+/**
+ * Options for an absent seller's slot: the buyer's matched sellers who are free in that slot (their later meeting with
+ * this buyer is moved forward, or a new meeting is added for a matched pair without one), sellers at the venue first;
+ * and, for the absent seller, the later slots that day free for both sides.
+ */
+export async function slotOptions(meetingId: string, now: Date = new Date()) {
+  const cfg = await getEventConfig();
+  const target = await prisma.scheduledMeeting.findUnique({ where: { id: meetingId }, include: {
+    buyer: { select: { id: true, name: true, country: true, pavilionNo: true, approvedSeq: true, ...PARTY, nodalOfficer: { select: { id: true, userId: true, name: true } } } },
+    seller: { select: { id: true, name: true, district: true, contactName: true, contactMobile: true, ...PARTY } } } });
+  if (!target) return null;
+  const [pairs, sameDay, buyerAll] = await Promise.all([
+    prisma.publishedMatch.findMany({ where: { buyerId: target.buyerId, sellerId: { not: target.sellerId }, seller: { status: "APPROVED" } }, orderBy: { slot: "asc" },
+      select: { seller: { select: { id: true, name: true, district: true, contactName: true, contactMobile: true, ...PARTY } } } }),
+    prisma.scheduledMeeting.findMany({ where: { day: target.day }, select: { id: true, buyerId: true, sellerId: true, startAt: true, endAt: true, status: true, pavilionNo: true } }),
+    prisma.scheduledMeeting.findMany({ where: { buyerId: target.buyerId }, select: { id: true, sellerId: true, day: true, startAt: true, endAt: true, status: true, ticketNo: true } }),
+  ]);
+  const busy = sameDay.filter((m) => BUSY.includes(m.status));
+  const slot = { startAt: target.startAt, endAt: target.endAt };
+  // Someone else already sits with the buyer in this slot (e.g. the slot was filled before).
+  const filledBy = busy.find((m) => m.buyerId === target.buyerId && m.id !== target.id && clashes(m, slot, 0));
+  const atVenue = new Set(sameDay.filter((m) => m.status === "SELLER_PRESENT" || m.status === "COMPLETED").map((m) => m.sellerId));
+  const candidates = pairs.flatMap(({ seller }) => {
+    const own = buyerAll.find((m) => m.sellerId === seller.id);
+    // Only a meeting still to come can be moved forward; a pair already met / missed is not offered.
+    if (own && (own.status !== "SCHEDULED" && own.status !== "SELLER_PRESENT" || own.startAt.getTime() <= target.startAt.getTime())) return [];
+    if (busy.some((m) => m.sellerId === seller.id && m.id !== own?.id && clashes(m, slot, cfg.bufferMinutes))) return [];
+    const next = busy.filter((m) => m.sellerId === seller.id && m.id !== own?.id && m.startAt.getTime() > target.startAt.getTime())
+      .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())[0] ?? null;
+    return [{ seller, own: own ?? null, atVenue: atVenue.has(seller.id), next }];
+  }).sort((a, b) => Number(b.atVenue) - Number(a.atVenue) || Number(!!b.own) - Number(!!a.own)
+    || (a.own?.startAt.getTime() ?? 0) - (b.own?.startAt.getTime() ?? 0) || a.seller.name.localeCompare(b.seller.name));
+  const day = cfg.days.find((d) => d.date === target.day);
+  const later = target.status === "SELLER_ABSENT" && day
+    ? daySlots(day, cfg).filter((s) => s.startAt.getTime() > now.getTime()
+      && !busy.some((m) => (m.buyerId === target.buyerId || m.sellerId === target.sellerId) && m.id !== target.id && clashes(m, s, cfg.bufferMinutes)))
+    : [];
+  const replacement = await prisma.scheduledMeeting.findFirst({ where: { replacesId: target.id, startAt: target.startAt }, orderBy: { movedAt: "desc" },
+    select: { ticketNo: true, movedFrom: true, status: true, seller: { select: { name: true, ...PARTY } }, movedBy: { select: { displayName: true } } } });
+  return { cfg, target, candidates, later, filledBy: filledBy ?? null, replacement, fillable: canFill(target, now) && !filledBy };
+}
+export type SlotOptions = NonNullable<Awaited<ReturnType<typeof slotOptions>>>;
+
+/** A ticket number not yet used: the usual one, else with -A, -B … (a second meeting in the same pavilion slot). */
+export async function freeTicketNo(base: string) {
+  const used = new Set((await prisma.scheduledMeeting.findMany({ where: { ticketNo: { startsWith: base } }, select: { ticketNo: true } })).map((t) => t.ticketNo));
+  if (!used.has(base)) return base;
+  for (const c of "ABCDEFGHJKLMNPQRSTUVWXYZ") if (!used.has(`${base}-${c}`)) return `${base}-${c}`;
+  return `${base}-${Date.now().toString(36).toUpperCase()}`;
+}
+
+/**
+ * Keep the draft in step with an event-day change, so a later republish does not undo it: put the pair at `at`
+ * (or drop it from the draft when `at` is null). Returns false (draft left as is) if that would clash in the draft.
+ */
+export async function syncDraft(buyerId: string, sellerId: string, at: { day: string; startAt: Date; endAt: Date } | null, bufferMin: number) {
+  if (!at) { await prisma.meeting.deleteMany({ where: { buyerId, sellerId } }); return true; }
+  const others = await prisma.meeting.findMany({ where: { OR: [{ buyerId }, { sellerId }], NOT: { buyerId, sellerId } } });
+  if (others.some((m) => clashes(m, at, bufferMin))) return false;
+  await prisma.meeting.upsert({ where: { buyerId_sellerId: { buyerId, sellerId } }, create: { buyerId, sellerId, ...at, manual: true }, update: { ...at, manual: true } });
+  return true;
+}
