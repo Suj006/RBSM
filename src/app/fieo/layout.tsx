@@ -6,7 +6,8 @@ import { actionWhere } from "@/lib/buyer-query";
 
 export default async function FieoLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser("FIEO");
-  const [pending, unread] = await Promise.all([prisma.buyer.count({ where: actionWhere("FIEO") }), unreadTotal(user)]);
+  const [pending, unread, mous] = await Promise.all([prisma.buyer.count({ where: actionWhere("FIEO") }), unreadTotal(user),
+    prisma.mou.count({ where: { status: "SUBMITTED", fieoApprovedAt: null } })]);
   return (
     <AppShell role="FIEO" user={user} nav={[
       { href: "/fieo", label: "Dashboard", icon: "dashboard", exact: true },
@@ -21,6 +22,7 @@ export default async function FieoLayout({ children }: { children: React.ReactNo
       { href: "/fieo/products", label: "Product demand", icon: "products", group: "Programme" },
       { href: "/fieo/matches", label: "Buyer–seller mapping", icon: "match", group: "Programme" },
       { href: "/fieo/event", label: "Event day monitor", icon: "calendar", group: "Programme" },
+      { href: "/fieo/mou", label: "MoU dashboard", icon: "mou", badge: mous, group: "Programme" },
       { href: "/fieo/reports", label: "Reports", icon: "reports", group: "Programme" },
       { href: "/fieo/messages", label: "Messages", icon: "messages", badge: unread, group: "Communications" },
     ]}>{children}</AppShell>

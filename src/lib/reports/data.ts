@@ -4,7 +4,7 @@ import type { BuyerStatus, ItemStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { buyerWhere, itemScope, scopeFor, type BuyerFilters } from "@/lib/buyer-query";
 import { ACTION_LABEL, ALL_ITEM_STATUSES, ALL_STATUSES, ITEM_META, ROLE_LABEL, STATUS_META } from "@/lib/status";
-import { fmtDateTime, parseCerts } from "@/lib/format";
+import { fmtDate, fmtDateTime, parseCerts } from "@/lib/format";
 import { EVENT } from "@/lib/config";
 import type { Column, Kpi, Report, Row, Table } from "./types";
 import { describeProfileFilters, sellerScope, sellerWhere, type SellerFilters } from "@/lib/seller-query";
@@ -18,6 +18,7 @@ import { AGE_BUCKETS, buildInsights } from "@/lib/insights";
 import { buildDecisionView } from "@/lib/decision";
 import { buyerPrimarySectors, fmtDay, fmtTime, getEventConfig, LIVE_META, liveStatus, unscheduledPairs, type Live } from "@/lib/event";
 import { sellerProfileStats } from "@/lib/seller-profile-stats";
+import { fmtMonth, getMouRate, MOU_STATUS, mouStage, mouWhere, toMoney, type MouFilters } from "@/lib/mou";
 import { buyerNeeds, coverage, fit, getMatchState, loadPool, matchChecks, preferenceOutcomes, sellerOffers, SOURCE_LABEL, whyMatched } from "@/lib/matchmaking";
 
 export const REPORTS = {
@@ -92,6 +93,10 @@ export const REPORTS = {
   "communications": {
     title: "Communications Log",
     description: "Buyer–seller discussions, programme-desk conversations and common communications: every message with its sender, the documents shared (by name) and who has read each communication.",
+  },
+  "mou-register": {
+    title: "MoU Register",
+    description: "Memoranda of understanding signed after buyer–seller meetings: MoU number, buyer and seller with their IDs, goods, approximate value in US$ and INR, expected order month and verification — with country-, sector- and district-wise totals.",
   },
   "mis-summary": {
     title: "MIS Summary Report",
@@ -591,7 +596,72 @@ export async function buildReport(id: ReportId, user: User, f: BuyerFilters & Se
     case "event-attendance": return eventAttendanceReport(user);
     case "communications": return communicationsReport(user, (f as { conversationId?: string }).conversationId);
     case "match-coverage": return matchCoverageReport(user, (f as { v?: string }).v === "draft" ? "draft" : "published");
+    case "mou-register": return mouRegisterReport(user, f as MouFilters);
   }
+}
+
+// ---------------------------------------------------------------- MoUs
+
+async function mouRegisterReport(user: User, f: MouFilters): Promise<Report> {
+  const [rate, mous] = await Promise.all([
+    getMouRate(),
+    prisma.mou.findMany({ where: mouWhere(f), orderBy: { seq: "asc" }, include: {
+      buyer: { select: { name: true, country: true, approvedNo: true, regNo: true, nodalOfficer: { select: { name: true } } } },
+      seller: { select: { name: true, district: true, approvedNo: true, regNo: true } }, sector: { select: { name: true } },
+      nodalVerifiedBy: { select: { displayName: true } }, fieoApprovedBy: { select: { displayName: true } } } }),
+  ]);
+  const rows: Row[] = mous.map((m, i) => {
+    const v = toMoney(m, rate);
+    return {
+      sl: i + 1, mouNo: m.mouNo, date: m.submittedAt, status: m.status === "SUBMITTED" ? mouStage(m) : MOU_STATUS[m.status].label,
+      buyer: m.buyer.name, buyerId: m.buyer.approvedNo ?? m.buyer.regNo, country: m.buyer.country,
+      seller: m.seller.name, sellerId: m.seller.approvedNo ?? m.seller.regNo, district: m.seller.district,
+      sector: m.sector?.name ?? "", goods: m.goods, entered: m.amount === null ? "To be determined" : `${m.currency} ${m.amount.toLocaleString("en-IN")}`,
+      usd: v ? Math.round(v.usd) : null, inr: v ? Math.round(v.inr) : null, month: fmtMonth(m.orderMonth),
+      nodal: m.nodalVerifiedAt ? `${m.nodalVerifiedBy?.displayName ?? ""} ${fmtDate(m.nodalVerifiedAt)}` : `Pending${m.buyer.nodalOfficer ? ` (${m.buyer.nodalOfficer.name})` : ""}`,
+      fieo: m.fieoApprovedAt ? `${m.fieoApprovedBy?.displayName ?? ""} ${fmtDate(m.fieoApprovedAt)}` : "Pending",
+    };
+  });
+  const live = mous.filter((m) => m.status === "APPROVED" || m.status === "SUBMITTED");
+  const total = (list: typeof mous) => list.reduce((t, m) => { const v = toMoney(m, rate); return { usd: t.usd + (v?.usd ?? 0), inr: t.inr + (v?.inr ?? 0) }; }, { usd: 0, inr: 0 });
+  const approved = mous.filter((m) => m.status === "APPROVED");
+  const at = total(approved);
+  const group = (key: (m: (typeof mous)[number]) => string) => {
+    const g = new Map<string, { n: number; approved: number; usd: number; inr: number }>();
+    for (const m of live) { const k = key(m); const e = g.get(k) ?? { n: 0, approved: 0, usd: 0, inr: 0 }; const v = toMoney(m, rate); e.n++; if (m.status === "APPROVED") e.approved++; e.usd += v?.usd ?? 0; e.inr += v?.inr ?? 0; g.set(k, e); }
+    return [...g.entries()].sort((a, b) => b[1].usd - a[1].usd).map(([k, e]) => ({ k, n: e.n, approved: e.approved, usd: Math.round(e.usd), inr: Math.round(e.inr) }));
+  };
+  const sumCols = (h: string) => [{ key: "k", header: h, width: 30 }, { key: "n", header: "MoUs Signed", width: 12, kind: "number" as const, align: "right" as const },
+    { key: "approved", header: "Approved", width: 11, kind: "number" as const, align: "right" as const }, { key: "usd", header: "Value (US$)", width: 16, kind: "number" as const, align: "right" as const },
+    { key: "inr", header: "Value (INR)", width: 18, kind: "number" as const, align: "right" as const }];
+  const filters: string[] = [`1 US$ = Rs. ${rate}`];
+  if (f.q) filters.push(`Search: "${f.q}"`);
+  if (f.status) filters.push(`Status: ${MOU_STATUS[f.status as keyof typeof MOU_STATUS]?.label ?? f.status}`);
+  if (f.country) filters.push(`Country: ${f.country}`);
+  if (f.district) filters.push(`District: ${f.district}`);
+  return {
+    ...base("mou-register", user, filters),
+    kpis: [
+      { label: "MoUs signed", value: live.length, tone: "blue" },
+      { label: "Approved", value: approved.length, tone: "green" },
+      { label: "Approved value (US$)", value: Math.round(at.usd).toLocaleString("en-US"), tone: "green" },
+      { label: "Approved value (INR)", value: Math.round(at.inr).toLocaleString("en-IN"), tone: "violet" },
+    ],
+    tables: [
+      { name: "MoUs", heading: "1. Every MoU",
+        columns: [{ key: "sl", header: "Sl.", width: 5, kind: "number", align: "center" }, { key: "mouNo", header: "MoU No.", width: 26, kind: "mono" }, { key: "date", header: "Signed On", width: 12, kind: "date" },
+          { key: "buyer", header: "Buyer", width: 22 }, { key: "buyerId", header: "Buyer ID", width: 18, kind: "mono" }, { key: "country", header: "Country", width: 14 },
+          { key: "seller", header: "Seller", width: 22 }, { key: "sellerId", header: "Seller ID", width: 19, kind: "mono" }, { key: "district", header: "District", width: 14, excelOnly: true },
+          { key: "sector", header: "Sector", width: 18, excelOnly: true }, { key: "goods", header: "Description of Goods", width: 30 },
+          { key: "entered", header: "Value as Entered", width: 16, excelOnly: true }, { key: "usd", header: "Value (US$)", width: 13, kind: "number", align: "right" },
+          { key: "inr", header: "Value (INR)", width: 15, kind: "number", align: "right" }, { key: "month", header: "Order Month", width: 13 },
+          { key: "status", header: "Status", width: 18 }, { key: "nodal", header: "Nodal Officer Verification", width: 24, excelOnly: true }, { key: "fieo", header: "FIEO Approval", width: 22, excelOnly: true }],
+        rows },
+      { name: "By Country", heading: "2. By buyer country (signed = approved + awaiting verification)", columns: sumCols("Country"), rows: group((m) => m.buyer.country) },
+      { name: "By Sector", heading: "3. By sector", columns: sumCols("Sector"), rows: group((m) => m.sector?.name ?? "—") },
+      { name: "By District", heading: "4. By seller district", columns: sumCols("District"), rows: group((m) => m.seller.district) },
+    ],
+  };
 }
 
 // ---------------------------------------------------------------- single buyer profile (dossier)

@@ -97,6 +97,9 @@ model User {
   meetingsMarked   ScheduledMeeting[]   @relation("MeetingMarkedBy")
   meetingsMoved    ScheduledMeeting[]   @relation("MeetingMovedBy")
   buyersAdded      Buyer[]              @relation("BuyersAdded")
+  mousVerified     Mou[]                @relation("MouNodalVerified")
+  mousApproved     Mou[]                @relation("MouFieoApproved")
+  mousReturned     Mou[]                @relation("MouReturned")
   buyerDaysMarked  BuyerDayAttendance[]
 }
 
@@ -170,6 +173,7 @@ model Buyer {
   meetings         Meeting[]
   scheduled        ScheduledMeeting[]
   dayAttendance    BuyerDayAttendance[]
+  mous             Mou[]
   reviewLogs  ReviewLog[]
 
   @@index([status])
@@ -201,6 +205,7 @@ model Sector {
 
   requirementItems RequirementItem[]
   sellerProducts   SellerProduct[]
+  mous             Mou[]
 }
 
 model Certification {
@@ -384,6 +389,7 @@ model Seller {
   conversations Conversation[]
   meetings      Meeting[]
   scheduled     ScheduledMeeting[]
+  mous          Mou[]
 
   // Matchmaking: up to 5 preferred buyers, submitted once (cannot be changed afterwards).
   prefSubmittedAt  DateTime?
@@ -698,6 +704,7 @@ model ScheduledMeeting {
   movedById   String?
   movedBy     User?         @relation("MeetingMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
   replacesId  String?
+  mous        Mou[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
@@ -715,4 +722,55 @@ model BuyerDayAttendance {
   markedAt   DateTime @default(now())
 
   @@id([buyerId, day])
+}
+
+// ---------------------------------------------------------------- MoUs (intention for placing orders)
+
+enum MouStatus {
+  SUBMITTED // filled by the buyer; with the nodal officer and FIEO
+  RETURNED // returned to the buyer for correction
+  APPROVED // verified by the nodal officer and approved by FIEO — visible to the seller
+  WITHDRAWN // withdrawn by the buyer
+}
+
+/// A memorandum of understanding signed after a successful buyer–seller meeting.
+/// Number: RBSM-MOU-2026-B007-S012 (buyer and seller approved numbers), "-2" for a second MoU of the same pair.
+model Mou {
+  id       String    @id @default(cuid())
+  seq      Int       @unique // overall serial, 1, 2, 3…
+  mouNo    String    @unique
+  buyerId  String
+  buyer    Buyer     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId String
+  seller   Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  sectorId String?
+  sector   Sector?   @relation(fields: [sectorId], references: [id], onDelete: SetNull)
+  meetingId String?
+  meeting   ScheduledMeeting? @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+
+  goods      String // description of goods
+  currency   String // "USD" | "INR"
+  amount     Float? // approximate value; null = to be determined
+  orderMonth String // approximate month of placing the order, "2026-05"
+
+  status      MouStatus @default(SUBMITTED)
+  submittedAt DateTime  @default(now())
+  nodalVerifiedAt   DateTime?
+  nodalVerifiedById String?
+  nodalVerifiedBy   User?     @relation("MouNodalVerified", fields: [nodalVerifiedById], references: [id], onDelete: SetNull)
+  fieoApprovedAt    DateTime?
+  fieoApprovedById  String?
+  fieoApprovedBy    User?     @relation("MouFieoApproved", fields: [fieoApprovedById], references: [id], onDelete: SetNull)
+  approvedAt        DateTime?
+  returnComment     String?
+  returnedAt        DateTime?
+  returnedById      String?
+  returnedBy        User?     @relation("MouReturned", fields: [returnedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([buyerId])
+  @@index([sellerId])
 }

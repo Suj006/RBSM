@@ -123,7 +123,8 @@ export async function MyMeetings({ user, base }: { user: User; base: "/buyer" | 
                     </div>
                     <div className="flex flex-row items-center gap-3 sm:flex-col sm:items-end sm:gap-2">
                       <span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold ring-1", LIVE_META[live].tone)}>{LIVE_META[live].label}</span>
-                      {isBuyer ? <span className="whitespace-nowrap font-mono text-xs text-slate-500">Ref. {m.ticketNo}</span>
+                      {isBuyer ? <span className="flex flex-col items-end gap-1"><span className="whitespace-nowrap font-mono text-xs text-slate-500">Ref. {m.ticketNo}</span>
+                        <Link href={`/buyer/mou/new?sellerId=${m.sellerId}`} className="whitespace-nowrap text-xs font-semibold text-brand-700 hover:underline">Fill MoU →</Link></span>
                         : <Link href={`${base}/meetings/${m.ticketNo}`} className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-brand-700 hover:underline"><TicketIcon className="size-4" /> Ticket {m.ticketNo}</Link>}
                     </div>
                   </div>

@@ -5,6 +5,9 @@ export const EVENT = {
   short: "RBSM",
   organiser: "Directorate of Industries & Commerce",
   partner: "Federation of Indian Export Organisations (FIEO)",
+  // Scheme under which the meet is organised (shown on MoUs).
+  scheme: "RAMP (Raising and Accelerating MSME Performance) Programme",
+  hostCity: "Kochi, Kerala",
   // Buyer login IDs: Tradex2027-001, Tradex2027-002…
   usernamePrefix: "Tradex2027-",
   // Buyer registration numbers: RBSM-B-001…

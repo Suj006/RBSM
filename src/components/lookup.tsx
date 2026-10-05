@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { SellerBadge } from "@/components/seller/seller-badge";
 import { CountryTag, Flag, UidPill, uid } from "@/components/ids";
 import { cn } from "@/lib/cn";
+import { MOU_STATUS } from "@/lib/mou";
 
 const MEET = { orderBy: { startAt: "asc" as const }, select: { id: true, ticketNo: true, day: true, startAt: true, endAt: true, pavilionNo: true, status: true,
   buyer: { select: { name: true, country: true, approvedNo: true, regNo: true } }, seller: { select: { name: true, approvedNo: true, regNo: true } } } };
@@ -98,6 +99,11 @@ export async function IdLookup({ user, base, q: raw }: { user: User; base: strin
       ...(personal ? [{ contactName: { contains: q } }, { contactEmail: { contains: q.toLowerCase() } }, ...(digits.length >= 5 ? [{ contactMobile: { contains: digits } }] : [])] : [])] : []),
     ...(ticket ? [{ id: ticket.sellerId }] : []),
   ] : [];
+  // MoU numbers (RBSM-MOU-2026-B007-S012): the MoU itself, and its buyer and seller below.
+  const mous = q && /mou/i.test(q) && !district
+    ? await prisma.mou.findMany({ where: { mouNo: { contains: q } }, take: 10, orderBy: { seq: "desc" }, select: { id: true, mouNo: true, status: true, goods: true, buyerId: true, sellerId: true, buyer: { select: { name: true, country: true } }, seller: { select: { name: true } } } })
+    : [];
+  if (mous.length) { buyerOr.push({ id: { in: mous.map((m) => m.buyerId) } }); sellerOr.push({ id: { in: mous.map((m) => m.sellerId) } }); }
   const [buyers, sellers] = q ? await Promise.all([
     district ? [] : prisma.buyer.findMany({ where: { OR: buyerOr }, take: 12, orderBy: { regNo: "asc" },
       select: { id: true, name: true, country: true, approvedNo: true, regNo: true, status: true, pocName: true, pavilionNo: true,
@@ -127,6 +133,20 @@ export async function IdLookup({ user, base, q: raw }: { user: User; base: strin
         <Card><EmptyState icon={<ScanSearch className="size-5" />} title={`Nothing found for "${q}"`}>Check the spelling or the ID. Buyer IDs look like RBSM-Buyer-2026007 or RBSM-B-007; seller IDs like RBSM-Seller-2026012 or RBSM-S-012.</EmptyState></Card>
       )}
       {(buyers.length === 12 || sellers.length === 12) && <p className="mb-4 text-sm text-slate-500">Showing the first 12 {buyers.length === 12 ? "buyers" : ""}{buyers.length === 12 && sellers.length === 12 ? " and " : ""}{sellers.length === 12 ? "sellers" : ""} — type more to narrow down, or use the full ID.</p>}
+      {mous.length > 0 && (
+        <Card className="mb-6 overflow-hidden">
+          <div className="border-b border-slate-100 px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-brand-700">MoU{mous.length > 1 ? "s" : ""}</div>
+          <ul className="divide-y divide-slate-100">
+            {mous.map((m) => (
+              <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm">
+                <span className="flex flex-wrap items-center gap-2"><Link href={`${base}/mou/${m.id}`} className="font-mono font-bold text-brand-800 hover:underline">{m.mouNo}</Link>
+                  <Flag country={m.buyer.country} /> {m.buyer.name} ↔ {m.seller.name} <span className="text-slate-500">· {m.goods}</span></span>
+                <span className="text-xs font-semibold text-slate-600">{MOU_STATUS[m.status].label}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       {showTicket && <p className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-600"><TicketIcon className="size-4" /> Ticket <b className="font-mono text-ink">{showTicket}</b> — the buyer and seller of this meeting:</p>}
       <div className="space-y-6">
         {buyers.map((b) => (

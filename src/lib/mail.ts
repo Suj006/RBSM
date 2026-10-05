@@ -263,3 +263,24 @@ Your ID: ${id}
 ${seller ? `See the dates, times, pavilions and your meeting tickets at ${APP_URL}${link}. Please bring the ticket (printed or on your phone) to each meeting and show it to the nodal officer at the pavilion.` : `See the dates, times, your pavilion and the sellers you will meet at ${APP_URL}${link}. Sellers come to your pavilion; your nodal officer verifies their tickets.`}${signature}`,
   }),
 };
+
+export const mouMail = {
+  approved: (name: string, mouNo: string, other: string, link: string) => ({
+    subject: `${EVENT.name} ${EVENT.short} — MoU approved (${mouNo})`,
+    text: `Dear ${name},
+
+The memorandum of understanding ${mouNo} with ${other} has been verified by the nodal officer and approved by FIEO.
+
+View and download it at ${APP_URL}${link}.${signature}`,
+  }),
+  returned: (name: string, mouNo: string, comment: string) => ({
+    subject: `${EVENT.name} ${EVENT.short} — MoU returned for correction (${mouNo})`,
+    text: `Dear ${name},
+
+The memorandum of understanding ${mouNo} has been returned for correction:
+
+"${comment}"
+
+Please sign in, correct it under MoUs and submit it again.${signature}`,
+  }),
+};

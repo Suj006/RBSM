@@ -160,6 +160,33 @@ board, Seller preferences, Checks, Results & gaps, Published.
 Reports: **Meeting Schedule** (published or draft — by time, buyer, seller, pavilions and nodal officers) and
 **Event Day Attendance** (every meeting's status, day-wise summary, buyers' attendance, nodal officers' marking).
 
+## MoUs (memoranda of understanding)
+
+After a successful one-to-one meeting the buyer fills an MoU under **MoUs** (or **Fill MoU** next to a meeting): only
+the **description of goods**, the **approximate value** (US$ or INR, or "to be determined") and the **approximate month
+of placing the order**, plus the sector. Everything else is filled in automatically — buyer and seller names, IDs,
+addresses and contacts, the meeting (day, time, pavilion, ticket), the event, venue and dates — on a standard MoU
+("Intention for Placing Orders": purpose, products and quality, specifications, commercial terms, non-binding nature,
+validity, facilitation, verification and signature blocks).
+
+```
+Buyer fills the MoU ─► nodal officer of the buyer verifies  ┐ (either order; the Directorate can verify when no
+                    ─► FIEO approves                         ┘  officer is assigned)
+   ─► approved: shown to the seller; buyer and seller download the PDF; both e-mailed
+   either reviewer can return it with a comment ─► buyer corrects and submits again (or withdraws it)
+```
+
+**MoU number:** `RBSM-MOU-2026-B007-S012` — the year, the buyer's and the seller's approved numbers (`-2`, `-3` for further
+MoUs of the same pair), so the buyer and seller are recognisable from the number; Find by ID accepts it.
+
+**MoU dashboard** (Directorate, FIEO, Admin — live, refreshes every 30 s): approved / awaiting / all-signed value in US$
+and INR; MoUs approved, awaiting the nodal officer, awaiting FIEO, returned, withdrawn; buyers and sellers with an MoU
+against the approved totals; meetings → MoU conversion; recent MoUs; largest MoU; countries and districts reached;
+breakdowns by buyer country (flags), sector, top buyers, top sellers, seller district and nodal officer; the order
+pipeline by expected month and MoUs signed by day; "All signed" / "Approved only" views. The Directorate sets the US$ →
+INR rate used throughout. **All MoUs** lists and filters every MoU (status, country, sector, district, search by number,
+name or ID); the **MoU Register** report (Excel / PDF) has every MoU with country-, sector- and district-wise totals.
+
 ## Unique IDs, country flags and Find by ID
 
 Every buyer and seller is identified by a unique ID wherever they appear — lists, dashboards, matchmaking, messages,

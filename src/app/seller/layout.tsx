@@ -14,6 +14,7 @@ export default async function SellerLayout({ children }: { children: React.React
         { href: "/seller/profile", label: "My profile", icon: "profile" as const, badge: seller.profileCompletedAt ? undefined : 1 },
         { href: "/seller/buyers", label: "Buyers & preferences", icon: "buyers" as const },
         { href: "/seller/meetings", label: "My meetings", icon: "calendar" as const },
+        { href: "/seller/mou", label: "MoUs", icon: "mou" as const },
         { href: "/seller/messages", label: "Messages", icon: "messages" as const, badge: unread },
       ] : []),
     ]}>{children}</AppShell>

@@ -27,6 +27,7 @@ export default async function DicLayout({ children }: { children: React.ReactNod
       { href: "/dic/reports", label: "Reports", icon: "reports", group: "Programme" },
       { href: "/dic/matchmaking", label: "Matchmaking", icon: "match", group: "Matchmaking" },
       { href: "/dic/event", label: "Event days & schedule", icon: "calendar", group: "Matchmaking" },
+      { href: "/dic/mou", label: "MoU dashboard", icon: "mou", group: "Matchmaking" },
       { href: "/dic/messages", label: "Messages", icon: "messages", badge: unread, group: "Communications" },
     ]}>{children}</AppShell>
   );

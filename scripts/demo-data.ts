@@ -345,7 +345,43 @@ async function main() {
   const per = Math.ceil(seated.length / officerIds.length);
   for (const [i, b] of seated.entries()) await prisma.buyer.update({ where: { id: b.id }, data: { pavilionNo: i + 1, nodalOfficerId: officerIds[Math.floor(i / per)] } });
 
-  console.log(`Loaded ${BUYERS.length} demo buyers (${approvedSeq} approved) and ${sSeq} demo sellers (${sApproved} approved; ${profiles} profiles completed; ${prefSellers} with buyer preferences). Demo password: pass@123`);
+  // MoUs after successful meetings: approved, with the nodal officer / FIEO, and one returned — US$ and INR values.
+  const fieoU = await prisma.user.findFirst({ where: { role: "FIEO" } });
+  const dicU = await prisma.user.findFirst({ where: { role: "DIC" } });
+  const mouBuyers = await prisma.buyer.findMany({ where: { status: "APPROVED" }, orderBy: { approvedSeq: "asc" },
+    select: { id: true, approvedSeq: true, nodalOfficer: { select: { userId: true } }, requirement: { select: { items: { where: { status: "APPROVED" }, select: { sectorId: true, products: true } } } } } });
+  const mouSellers = await prisma.seller.findMany({ where: { status: "APPROVED" }, orderBy: { approvedSeq: "asc" }, select: { id: true, approvedSeq: true, products: { select: { sectorId: true, products: true } } } });
+  const GOODS = ["Instant chutney powders — 200 g retail packs", "Black pepper and green cardamom, bulk 25 kg bags", "Coir mats and brushed doormats, private label",
+    "Handloom table linen and cushion covers", "Frozen shrimp (PD, 16/20) — IQF cartons", "Ayurvedic herbal teas and wellness blends", "Teak and rosewood handicrafts",
+    "Roasted cashew kernels W240, vacuum packs", "Bamboo home décor and lamps", "Banana chips and tapioca snacks, export packs"];
+  let mouSeq = 0;
+  for (const [i, b] of mouBuyers.entries()) {
+    const sectors = new Set((b.requirement?.items ?? []).map((x) => x.sectorId));
+    const partners = mouSellers.filter((x) => x.products.some((p) => sectors.has(p.sectorId))).slice(i % 3, (i % 3) + 1 + (i % 3));
+    for (const [k, sel] of partners.entries()) {
+      mouSeq++;
+      const n = mouSeq;
+      const status = n % 9 === 0 ? "RETURNED" : n % 4 === 0 ? "SUBMITTED" : "APPROVED";
+      const usd = n % 5 !== 2;
+      const amount = n % 11 === 0 ? null : usd ? [25000, 60000, 120000, 45000, 250000, 80000, 15000, 500000][n % 8] : [1500000, 4200000, 9000000, 2500000][n % 4];
+      const when = new Date(Date.now() - (n % 3) * day - n * 37 * 60000);
+      const nodalBy = b.nodalOfficer?.userId ?? dicU!.id;
+      const prior = await prisma.mou.count({ where: { buyerId: b.id, sellerId: sel.id } });
+      await prisma.mou.create({ data: {
+        seq: n, mouNo: `RBSM-MOU-2026-B${String(b.approvedSeq).padStart(3, "0")}-S${String(sel.approvedSeq).padStart(3, "0")}${prior ? `-${prior + 1}` : ""}`,
+        buyerId: b.id, sellerId: sel.id, sectorId: sel.products.find((p) => sectors.has(p.sectorId))?.sectorId ?? null,
+        goods: (() => { const p = sel.products.find((x) => sectors.has(x.sectorId))?.products; return p ? `${p.split(/,\s*/).slice(0, 2).join(" and ")} — ${["export packs", "bulk, 25 kg bags", "private label", "retail packs"][n % 4]}` : GOODS[(n + k) % GOODS.length]; })(), currency: usd ? "USD" : "INR", amount,
+        orderMonth: new Date(Date.now() + (1 + (n % 5)) * 31 * day).toISOString().slice(0, 7),
+        status, submittedAt: when,
+        ...(status === "APPROVED" ? { nodalVerifiedAt: when, nodalVerifiedById: nodalBy, fieoApprovedAt: when, fieoApprovedById: fieoU!.id, approvedAt: when } : {}),
+        ...(status === "SUBMITTED" && n % 8 === 0 ? { nodalVerifiedAt: when, nodalVerifiedById: nodalBy } : {}),
+        ...(status === "RETURNED" ? { returnComment: "Please state the pack size and the quantity per order.", returnedAt: when, returnedById: fieoU!.id } : {}),
+      } });
+    }
+  }
+  await prisma.counter.upsert({ where: { name: "mou" }, create: { name: "mou", value: mouSeq }, update: { value: mouSeq } });
+
+  console.log(`Loaded ${BUYERS.length} demo buyers (${approvedSeq} approved) and ${sSeq} demo sellers (${sApproved} approved; ${profiles} profiles completed; ${prefSellers} with buyer preferences), ${mouSeq} MoUs. Demo password: pass@123`);
 }
 
 main().finally(() => prisma.$disconnect());
