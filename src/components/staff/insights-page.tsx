@@ -7,6 +7,7 @@ import { buildDecisionView, type FunnelStep } from "@/lib/decision";
 import { Badge, Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
 import { BarList } from "@/components/charts";
 import { DownloadButtons } from "./download-buttons";
+import { CountryTag } from "@/components/ids";
 
 const fmtDays = (d: number | null) => (d === null ? "—" : d < 1 ? "< 1 day" : `${d.toFixed(1)} days`);
 
@@ -255,7 +256,7 @@ export async function InsightsPage({ user, root }: { user: User; root: string })
                     <tr key={r.id} className="hover:bg-slate-50">
                       <td className="px-4 py-2"><Link href={`${root}/buyers/${r.id}`} className="font-semibold text-ink hover:text-brand-700">{r.name}</Link>
                         <div className="whitespace-nowrap font-mono text-[11px] text-slate-500">{r.approvedNo}</div></td>
-                      <td className="px-3 py-2 text-slate-600">{r.country}</td>
+                      <td className="px-3 py-2 text-slate-600"><CountryTag country={r.country} name /></td>
                       <td className="px-3 py-2 text-xs text-slate-600">{r.sectors.join(", ")}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{r.sectorSellers}</td>
                       <td className="px-3 py-2 text-right font-bold tabular-nums">{r.productSellers}</td>
@@ -354,7 +355,7 @@ export async function InsightsPage({ user, root }: { user: User; root: string })
               <tbody>
                 {d.countrySector.map((r) => (
                   <tr key={r.country}>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-ink">{r.country}</td>
+                    <td className="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-ink"><CountryTag country={r.country} name /></td>
                     {r.cells.map((v, i) => <Heat key={i} v={v} max={maxCS} rgb="46, 163, 230"
                       href={`${root}/requirements?item=&country=${encodeURIComponent(r.country)}&sector=${d.demandSectors[i].id}`} />)}
                     <td className="px-3 py-1.5 text-right text-sm font-bold tabular-nums">{r.total}</td>

@@ -1,4 +1,4 @@
-import { ShieldAlert, BarChart3, BadgeCheck, Boxes, ChartPie, ClipboardList, Handshake, Lightbulb, MapPinned, PackageSearch, Star, Store, Users, UsersRound, MessagesSquare } from "lucide-react";
+import { ShieldAlert, BarChart3, BadgeCheck, Boxes, ChartPie, ClipboardList, Handshake, Lightbulb, MapPinned, PackageSearch, Star, Store, Users, UsersRound, MessagesSquare, CalendarClock, ClipboardCheck } from "lucide-react";
 import type { User } from "@/generated/prisma/client";
 import type { SellerStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
@@ -14,16 +14,16 @@ import { ProfileFilters } from "@/components/seller/profile-filters";
 const ICON: Record<ReportId, typeof Users> = {
   "buyer-register": Users, "sector-requirements": ClipboardList, "approved-buyers": BadgeCheck, "approved-sellers": BadgeCheck,
   "seller-register": Store, "seller-district-summary": MapPinned, "seller-profile-analysis": UsersRound, "mis-summary": BarChart3, "sector-demand": Boxes,
-  "product-demand": PackageSearch, "insights": Lightbulb, "match-list": Handshake, "seller-preferences": Star, "match-coverage": ChartPie, "match-buyer-directory": Users, "match-checks": ShieldAlert, "communications": MessagesSquare,
+  "product-demand": PackageSearch, "insights": Lightbulb, "match-list": Handshake, "seller-preferences": Star, "match-coverage": ChartPie, "match-buyer-directory": Users, "match-checks": ShieldAlert, "communications": MessagesSquare, "event-schedule": CalendarClock, "event-attendance": ClipboardCheck,
 };
 const ACCENT: Record<ReportId, string> = {
   "buyer-register": "bg-tx-blue", "sector-requirements": "bg-tx-yellow", "approved-buyers": "bg-tx-green", "approved-sellers": "bg-tx-green",
   "seller-register": "bg-tx-green", "seller-district-summary": "bg-tx-blue", "seller-profile-analysis": "bg-violet-500", "mis-summary": "bg-tx-red", "sector-demand": "bg-violet-500",
-  "product-demand": "bg-violet-500", "insights": "bg-ink", "match-list": "bg-tx-green", "seller-preferences": "bg-violet-500", "match-coverage": "bg-tx-red", "match-buyer-directory": "bg-tx-blue", "match-checks": "bg-tx-yellow", "communications": "bg-ink",
+  "product-demand": "bg-violet-500", "insights": "bg-ink", "match-list": "bg-tx-green", "seller-preferences": "bg-violet-500", "match-coverage": "bg-tx-red", "match-buyer-directory": "bg-tx-blue", "match-checks": "bg-tx-yellow", "communications": "bg-ink", "event-schedule": "bg-tx-blue", "event-attendance": "bg-tx-green",
 };
 const SELLER_REPORTS: ReportId[] = ["approved-sellers", "seller-register", "seller-district-summary", "seller-profile-analysis"];
 // In the order of the matchmaking steps.
-const MATCH_REPORTS: ReportId[] = ["match-buyer-directory", "seller-preferences", "match-list", "match-checks", "match-coverage", "communications"];
+const MATCH_REPORTS: ReportId[] = ["match-buyer-directory", "seller-preferences", "match-list", "match-checks", "match-coverage", "event-schedule", "event-attendance", "communications"];
 
 type Params = F & { s_status?: string; s_district?: string; s_sector?: string; s_exp?: string;
   s_profile?: string; s_cat?: string; s_utype?: string; s_promoter?: string; s_iec?: string; s_cert?: string };
@@ -156,7 +156,7 @@ export async function ReportsPage({ user, base, filters }: { user: User; base: s
       )}
       {matchIds.length > 0 && (
         <section className="mt-10">
-          <h2 className="mb-3 text-lg font-bold text-ink">Matchmaking &amp; communications reports</h2>
+          <h2 className="mb-3 text-lg font-bold text-ink">Matchmaking, event days &amp; communications reports</h2>
           <div className="grid gap-5 md:grid-cols-2">
             {matchIds.map((id) => (
               <ReportCard key={id} id={id} href={`/api/reports/${id}`}

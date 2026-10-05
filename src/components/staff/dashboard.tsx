@@ -8,6 +8,9 @@ import { SectionBand, SectionJumps } from "@/components/section-band";
 import { BarList, ColumnChart, PipelineBar } from "@/components/charts";
 import { fmtDate } from "@/lib/format";
 import { EVENT } from "@/lib/config";
+import { Flag } from "@/components/ids";
+import { IdSearch } from "@/components/lookup";
+import { countryCode } from "@/lib/country-codes";
 
 const DAYS = 14;
 
@@ -74,6 +77,7 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
       <PageHeader eyebrow={`${ROLE_LABEL[role]} · ${EVENT.name} ${EVENT.short}`} title="Dashboard"
         subtitle="Real-time view of the whole programme — international buyers first, then Kerala MSME sellers."
         actions={<SectionJumps />} />
+      <Card className="mb-6 p-4"><IdSearch action={`${base}/find`} /></Card>
 
       <SectionBand id="buyers" kind="buyers" title="Buyer registration & sector approvals"
         summary={`${total} buyers registered · ${count("APPROVED")} approved · ${totalItems} sector requirements`}
@@ -119,7 +123,7 @@ export async function StaffDashboard({ role, base }: { role: Role; base: string 
         <Card>
           <CardHeader title="Top countries" />
           <div className="p-6">
-            <BarList data={byCountry.map((c) => ({ label: c.country, value: c._count, href: `${base}/buyers?country=${encodeURIComponent(c.country)}` }))} color="bg-tx-green" />
+            <BarList data={byCountry.map((c) => ({ label: `${c.country}${countryCode(c.country) ? ` (${countryCode(c.country)})` : ""}`, icon: <Flag country={c.country} />, value: c._count, href: `${base}/buyers?country=${encodeURIComponent(c.country)}` }))} color="bg-tx-green" />
           </div>
         </Card>
         <Card>

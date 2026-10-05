@@ -324,6 +324,27 @@ async function main() {
     }
   }
 
+  // Event days (two days, a month ahead), nodal officers, pavilions by first sector.
+  const d0 = new Date(Date.now() + 30 * day);
+  for (const [i, extra] of [0, 1].entries()) {
+    const date = new Date(d0.getTime() + extra * day).toISOString().slice(0, 10);
+    await prisma.eventDay.create({ data: { date, startTime: "09:30", endTime: i ? "16:30" : "17:30",
+      breaks: JSON.stringify([{ label: "Tea break", start: "11:10", end: "11:30" }, { label: "Lunch break", start: "13:00", end: "14:00" }]) } });
+  }
+  await prisma.matchSetting.createMany({ data: [{ key: "event.meetingMinutes", value: "30" }, { key: "event.bufferMinutes", value: "10" }, { key: "event.venue", value: "Kerala Trade Centre, Kochi" }] });
+  const officerNames = [["Anitha Kumari", "Deputy Director"], ["Biju Varghese", "Assistant Director"], ["Shameer Ali", "Industries Extension Officer"], ["Rekha Nair", "Assistant Director"]];
+  const officerIds: string[] = [];
+  for (const [i, [name, desig]] of officerNames.entries()) {
+    const u = await prisma.user.create({ data: { username: `nodal${String(i + 1).padStart(2, "0")}`, passwordHash: hash, role: "NODAL", displayName: name,
+      nodalOfficer: { create: { name, designation: desig, mobile: `94470${String(10001 + i * 111).padStart(5, "0")}`, email: `nodal${i + 1}@industries.kerala.example` } } }, include: { nodalOfficer: true } });
+    officerIds.push(u.nodalOfficer!.id);
+  }
+  const seated = await prisma.buyer.findMany({ where: { status: "APPROVED" }, orderBy: { approvedSeq: "asc" },
+    select: { id: true, approvedSeq: true, requirement: { select: { items: { where: { status: "APPROVED" }, orderBy: { sortOrder: "asc" }, select: { sector: { select: { name: true, sortOrder: true } } } } } } } });
+  seated.sort((a, b) => (a.requirement?.items[0]?.sector.sortOrder ?? 999) - (b.requirement?.items[0]?.sector.sortOrder ?? 999) || (a.approvedSeq ?? 0) - (b.approvedSeq ?? 0));
+  const per = Math.ceil(seated.length / officerIds.length);
+  for (const [i, b] of seated.entries()) await prisma.buyer.update({ where: { id: b.id }, data: { pavilionNo: i + 1, nodalOfficerId: officerIds[Math.floor(i / per)] } });
+
   console.log(`Loaded ${BUYERS.length} demo buyers (${approvedSeq} approved) and ${sSeq} demo sellers (${sApproved} approved; ${profiles} profiles completed; ${prefSellers} with buyer preferences). Demo password: pass@123`);
 }
 

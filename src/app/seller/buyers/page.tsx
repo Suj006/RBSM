@@ -8,6 +8,7 @@ import { getMatchState, loadPool } from "@/lib/matchmaking";
 import { fmtDateTime } from "@/lib/format";
 import { Alert, Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { BuyerDirectory } from "@/components/match/buyer-directory";
+import { CountryTag, Flag, UidPill } from "@/components/ids";
 
 export const metadata: Metadata = { title: "Buyers & preferences" };
 
@@ -15,7 +16,7 @@ export default async function Page() {
   const user = await requireUser("SELLER");
   const seller = await prisma.seller.findUnique({
     where: { userId: user.id },
-    include: { products: { select: { sectorId: true } }, preferences: { orderBy: { rank: "asc" }, include: { buyer: { select: { name: true, country: true } } } } },
+    include: { products: { select: { sectorId: true } }, preferences: { orderBy: { rank: "asc" }, include: { buyer: { select: { name: true, country: true, approvedNo: true } } } } },
   });
   if (!seller || seller.status !== "APPROVED") redirect("/seller");
   const state = await getMatchState();
@@ -34,7 +35,7 @@ export default async function Page() {
   ]);
   const mine = new Set(seller.products.map((p) => p.sectorId));
   const buyers = pool.buyers
-    .map((b) => ({ id: b.id, name: b.name, approvedNo: b.approvedNo, country: b.country, relevant: b.sectors.some((s) => mine.has(s.id)),
+    .map((b) => ({ id: b.id, name: b.name, approvedNo: b.approvedNo, country: b.country, flag: <CountryTag country={b.country} />, relevant: b.sectors.some((s) => mine.has(s.id)),
       sectors: b.sectors.map((s) => ({ id: s.id, name: s.name, products: s.products, specifications: s.specifications, certifications: s.certifications, quantity: s.quantity })) }))
     .sort((a, b) => Number(b.relevant) - Number(a.relevant) || a.name.localeCompare(b.name));
   const usedSectors = sectors.filter((s) => buyers.some((b) => b.sectors.some((x) => x.id === s.id)));
@@ -52,8 +53,8 @@ export default async function Page() {
             {seller.preferences.map((p) => (
               <li key={p.id} className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
                 <Badge tone="violet">#{p.rank}</Badge>
-                <div className="mt-1.5 font-semibold text-ink">{p.buyer.name}</div>
-                <div className="text-xs text-slate-500">{p.buyer.country}</div>
+                <div className="mt-1.5 flex items-center gap-1.5 font-semibold text-ink"><Flag country={p.buyer.country} /> {p.buyer.name}</div>
+                <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500"><UidPill id={p.buyer.approvedNo} tone="buyer" /> <CountryTag country={p.buyer.country} /></div>
               </li>
             ))}
           </ol>

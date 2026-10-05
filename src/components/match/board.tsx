@@ -5,6 +5,7 @@ import { loadBoard, matchChecks } from "@/lib/matchmaking";
 import { Badge, Button, Card, Input, PageHeader, Select } from "@/components/ui";
 import { DownloadButtons } from "@/components/staff/download-buttons";
 import { cn } from "@/lib/cn";
+import { CountryTag, UidPill, uid } from "@/components/ids";
 
 export type BoardFilters = { q?: string; show?: string };
 
@@ -62,7 +63,7 @@ export async function MatchBoard({ user, base, filters }: { user: User; base: st
                   <tr key={r.buyer.id} className="group hover:bg-brand-50/40">
                     <td className="px-4 py-2.5">
                       <Link href={`${base}/buyers/${r.buyer.id}`} className="font-semibold text-ink hover:text-brand-700">{r.buyer.name}</Link>
-                      <div className="text-xs text-slate-500">{r.buyer.country} · <span className="font-mono">{r.buyer.approvedNo}</span></div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500"><UidPill id={uid(r.buyer)} tone="buyer" /> <CountryTag country={r.buyer.country} name /></div>
                     </td>
                     <td className="max-w-56 px-3 py-2.5 text-xs text-slate-600">{r.buyer.sectors.map((s) => s.name).join(", ")}</td>
                     <td className="px-3 py-2.5">

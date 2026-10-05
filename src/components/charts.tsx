@@ -2,7 +2,7 @@ import { cn } from "@/lib/cn";
 
 /** Horizontal bar list — used for country / sector breakdowns. */
 export function BarList({ data, color = "bg-brand-500", empty = "No data yet." }: {
-  data: { label: string; value: number; href?: string }[]; color?: string; empty?: string;
+  data: { label: string; value: number; href?: string; icon?: React.ReactNode }[]; color?: string; empty?: string;
 }) {
   if (!data.length) return <p className="py-6 text-center text-sm text-slate-500">{empty}</p>;
   const max = Math.max(...data.map((d) => d.value), 1);
@@ -11,7 +11,7 @@ export function BarList({ data, color = "bg-brand-500", empty = "No data yet." }
       {data.map((d) => (
         <li key={d.label}>
           <div className="mb-1 flex justify-between gap-3 text-sm">
-            <span className="truncate text-slate-700" title={d.label}>{d.href ? <a href={d.href} className="hover:text-brand-700 hover:underline">{d.label}</a> : d.label}</span>
+            <span className="flex min-w-0 items-center gap-1.5 truncate text-slate-700" title={d.label}>{d.icon}{d.href ? <a href={d.href} className="hover:text-brand-700 hover:underline">{d.label}</a> : d.label}</span>
             <span className="font-semibold tabular-nums text-ink">{d.value}</span>
           </div>
           <div className="h-2 rounded-full bg-slate-100">

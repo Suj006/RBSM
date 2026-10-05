@@ -17,6 +17,7 @@ import { Composer } from "./composer";
 import { DocList, Thread } from "./thread";
 import { RecipientPicker } from "./recipient-picker";
 import { cn } from "@/lib/cn";
+import { Flag, UidPill, uid } from "@/components/ids";
 
 export type InboxFilters = { kind?: string; q?: string; show?: string; tab?: string };
 
@@ -124,14 +125,14 @@ export async function StaffInbox({ user, base, filters }: { user: User; base: st
   const where: Prisma.ConversationWhereInput = {
     AND: [
       filters.kind === "BUYER_SELLER" || filters.kind === "DESK_BUYER" || filters.kind === "DESK_SELLER" ? { kind: filters.kind } : {},
-      q ? { OR: [{ buyer: { name: { contains: q } } }, { seller: { name: { contains: q } } }, { messages: { some: { body: { contains: q } } } }, { messages: { some: { attachments: { some: { name: { contains: q } } } } } }] } : {},
+      q ? { OR: [{ buyer: { name: { contains: q } } }, { seller: { name: { contains: q } } }, { buyer: { approvedNo: { contains: q } } }, { buyer: { regNo: { contains: q } } }, { seller: { approvedNo: { contains: q } } }, { seller: { regNo: { contains: q } } }, { messages: { some: { body: { contains: q } } } }, { messages: { some: { attachments: { some: { name: { contains: q } } } } } }] } : {},
       filters.show === "closed" ? { closed: true } : {},
       filters.show === "unread" ? { id: { in: [...unread.keys()] } } : {},
     ],
   };
   const convs = await prisma.conversation.findMany({
     where, orderBy: { lastMessageAt: "desc" }, take: 300,
-    include: { buyer: { select: { name: true, country: true } }, seller: { select: { name: true, district: true } }, _count: { select: { messages: true } },
+    include: { buyer: { select: { name: true, country: true, approvedNo: true, regNo: true } }, seller: { select: { name: true, district: true, approvedNo: true, regNo: true } }, _count: { select: { messages: true } },
       messages: { orderBy: { createdAt: "desc" }, take: 1, include: { author: { select: { displayName: true } } } } },
   });
   return (
@@ -141,7 +142,7 @@ export async function StaffInbox({ user, base, filters }: { user: User; base: st
         <form action={`${base}/messages`} className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-[1.5fr_1fr_1fr_auto]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <Input name="q" defaultValue={filters.q} placeholder="Search buyer, seller, message or document…" className="pl-9" aria-label="Search" />
+            <Input name="q" defaultValue={filters.q} placeholder="Search buyer / seller name or ID, message, document…" className="pl-9" aria-label="Search" />
           </div>
           <Select name="kind" defaultValue={filters.kind ?? ""} aria-label="Type">
             <option value="">All conversations</option>
@@ -171,6 +172,10 @@ export async function StaffInbox({ user, base, filters }: { user: User; base: st
                         <Badge tone={KIND_TONE[c.kind]}>{KIND_LABEL[c.kind]}</Badge>
                         {c.closed && <Badge tone="slate">Closed</Badge>}
                       </div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                        {c.buyer && <><Flag country={c.buyer.country} /> <UidPill id={uid(c.buyer)} tone="buyer" /></>}
+                        {c.seller && <UidPill id={uid(c.seller)} tone="seller" />}
+                      </div>
                       <div className="truncate text-xs text-slate-500">
                         {last ? <>{last.author.displayName}: {last.hiddenAt ? "(withdrawn)" : last.body || "(document)"}</> : "No messages"} · {c._count.messages} message{c._count.messages === 1 ? "" : "s"}
                       </div>
@@ -194,7 +199,7 @@ export async function StaffConversation({ user, base, id, sent }: { user: User; 
   const v = await getViewer(user);
   const c = await prisma.conversation.findUnique({
     where: { id },
-    include: { buyer: { select: { id: true, name: true, country: true, approvedNo: true } }, seller: { select: { id: true, name: true, district: true, approvedNo: true } },
+    include: { buyer: { select: { id: true, name: true, country: true, approvedNo: true, regNo: true } }, seller: { select: { id: true, name: true, district: true, approvedNo: true, regNo: true } },
       messages: { orderBy: { createdAt: "asc" }, include: { author: { select: { displayName: true } }, attachments: { select: { id: true, name: true, mimeType: true, size: true } } } } },
   });
   if (!c) notFound();
@@ -209,7 +214,7 @@ export async function StaffConversation({ user, base, id, sent }: { user: User; 
     <>
       <PageHeader back={{ href: `${base}/messages`, label: "Back to messages" }} eyebrow={KIND_LABEL[c.kind]} title={title}
         subtitle={c.kind === "BUYER_SELLER"
-          ? `${c.buyer?.country} buyer and ${c.seller?.district} seller · ${published ? "matched in the published mapping" : "no longer in the published mapping"} · interaction ${state.interaction ? "enabled" : "not enabled"}`
+          ? `Buyer ${c.buyer ? uid(c.buyer) : ""} (${c.buyer?.country}) and seller ${c.seller ? uid(c.seller) : ""} (${c.seller?.district}) · ${published ? "matched in the published mapping" : "no longer in the published mapping"} · interaction ${state.interaction ? "enabled" : "not enabled"}`
           : "Programme desk — the participant and the Directorate / FIEO"}
         actions={<div className="flex flex-wrap items-center gap-2">
           {c.buyer && <Link href={`${staffBase}/buyers/${c.buyer.id}`} className="text-sm font-semibold text-brand-700 hover:underline">Buyer profile</Link>}

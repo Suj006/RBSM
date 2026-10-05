@@ -44,12 +44,13 @@ export const ROLE_LABEL: Record<Role, string> = {
   ADMIN: "Administrator",
   DISTRICT: "District Industries Centre",
   SELLER: "Seller",
+  NODAL: "Nodal officer",
 };
 
 /** Short label for the portal badge in the sidebar. */
 export const ROLE_BADGE: Record<Role, string> = {
   BUYER: "Buyer portal", FIEO: "FIEO portal", DIC: "Directorate portal", ADMIN: "Admin portal",
-  DISTRICT: "District office", SELLER: "Seller portal",
+  DISTRICT: "District office", SELLER: "Seller portal", NODAL: "Nodal officer",
 };
 
 export const ROLE_HOME: Record<Role, string> = {
@@ -59,6 +60,7 @@ export const ROLE_HOME: Record<Role, string> = {
   ADMIN: "/admin",
   DISTRICT: "/district",
   SELLER: "/seller",
+  NODAL: "/nodal",
 };
 
 // Registration journey (buyer level). Sector requirements then go through

@@ -11,6 +11,7 @@ import { AnnouncementForm } from "./announcement-form";
 import { Composer } from "./composer";
 import { DocList, Thread } from "./thread";
 import { cn } from "@/lib/cn";
+import { Flag, uid } from "@/components/ids";
 
 const MSG = { orderBy: { createdAt: "asc" as const }, include: { author: { select: { displayName: true } }, attachments: { select: { id: true, name: true, mimeType: true, size: true } } } };
 
@@ -40,17 +41,18 @@ export async function ParticipantInbox({ user, base }: { user: User; base: "/buy
     getMatchState(), unreadByConversation(v),
     prisma.conversation.findFirst({ where: isBuyer ? { kind: "DESK_BUYER", buyerId: v.buyerId } : { kind: "DESK_SELLER", sellerId: v.sellerId } }),
     prisma.conversation.findMany({ where: { kind: "BUYER_SELLER", ...(isBuyer ? { buyerId: v.buyerId } : { sellerId: v.sellerId }) },
-      include: { buyer: { select: { id: true, name: true, country: true } }, seller: { select: { id: true, name: true, district: true } } } }),
+      include: { buyer: { select: { id: true, name: true, country: true, approvedNo: true, regNo: true } }, seller: { select: { id: true, name: true, district: true, approvedNo: true, regNo: true } } } }),
     prisma.publishedMatch.findMany({ where: isBuyer ? { buyerId: v.buyerId! } : { sellerId: v.sellerId! }, orderBy: { slot: "asc" },
-      include: { buyer: { select: { id: true, name: true, country: true } }, seller: { select: { id: true, name: true, district: true } } } }),
+      include: { buyer: { select: { id: true, name: true, country: true, approvedNo: true, regNo: true } }, seller: { select: { id: true, name: true, district: true, approvedNo: true, regNo: true } } } }),
     prisma.announcementRecipient.findMany({ where: { userId: user.id }, orderBy: { announcement: { createdAt: "desc" } },
       include: { announcement: { include: { author: { select: { displayName: true } }, buyer: { select: { name: true } }, _count: { select: { attachments: true } } } } } }),
     isBuyer ? prisma.announcement.findMany({ where: { authorId: user.id }, orderBy: { createdAt: "desc" }, include: { _count: { select: { recipients: true } } } }) : [],
   ]);
   // Counterparts: matched in the published mapping, plus any earlier discussion.
-  const other = (x: { buyer: { id: string; name: string; country: string } | null; seller: { id: string; name: string; district: string } | null }) =>
-    isBuyer ? { id: x.seller!.id, name: x.seller!.name, sub: `${x.seller!.district}, Kerala` } : { id: x.buyer!.id, name: x.buyer!.name, sub: x.buyer!.country };
-  const people = new Map<string, { id: string; name: string; sub: string; conv?: (typeof convs)[number]; matched: boolean }>();
+  type Party = { id: string; name: string; approvedNo: string | null; regNo: string };
+  const other = (x: { buyer: Party & { country: string } | null; seller: Party & { district: string } | null }) =>
+    isBuyer ? { id: x.seller!.id, name: x.seller!.name, sub: `${uid(x.seller!)} · ${x.seller!.district}, Kerala`, country: "" } : { id: x.buyer!.id, name: x.buyer!.name, sub: `${uid(x.buyer!)} · ${x.buyer!.country}`, country: x.buyer!.country };
+  const people = new Map<string, { id: string; name: string; sub: string; country: string; conv?: (typeof convs)[number]; matched: boolean }>();
   for (const p of pairs) people.set(other(p).id, { ...other(p), matched: true });
   for (const c of convs) { const o = other(c); people.set(o.id, { ...(people.get(o.id) ?? { ...o, matched: false }), conv: c }); }
   const list = [...people.values()].sort((a, b) => (b.conv?.lastMessageAt?.getTime() ?? 0) - (a.conv?.lastMessageAt?.getTime() ?? 0) || a.name.localeCompare(b.name));
@@ -74,7 +76,7 @@ export async function ParticipantInbox({ user, base }: { user: User; base: "/buy
             {list.length ? (
               <ul className="divide-y divide-slate-100">
                 {list.map((p) => (
-                  <Row key={p.id} href={`${base}/messages/${isBuyer ? "seller" : "buyer"}/${p.id}`} title={p.name}
+                  <Row key={p.id} href={`${base}/messages/${isBuyer ? "seller" : "buyer"}/${p.id}`} title={p.name} icon={p.country ? <Flag country={p.country} className="text-lg" /> : undefined}
                     sub={`${p.sub}${p.matched ? "" : " · no longer in the published mapping"}${p.conv ? "" : " · no messages yet"}`}
                     unread={p.conv ? unread.get(p.conv.id) : 0} last={p.conv?.lastMessageAt} />
                 ))}
@@ -131,8 +133,8 @@ export async function ParticipantPairThread({ user, base, otherId }: { user: Use
   if (!v.buyerId && !v.sellerId) redirect(base);
   const buyerId = v.buyerId ?? otherId, sellerId = v.sellerId ?? otherId;
   const [buyer, seller, state, published, conv] = await Promise.all([
-    prisma.buyer.findUnique({ where: { id: buyerId }, select: { name: true, country: true, status: true } }),
-    prisma.seller.findUnique({ where: { id: sellerId }, select: { name: true, district: true } }),
+    prisma.buyer.findUnique({ where: { id: buyerId }, select: { name: true, country: true, status: true, approvedNo: true, regNo: true } }),
+    prisma.seller.findUnique({ where: { id: sellerId }, select: { name: true, district: true, approvedNo: true, regNo: true } }),
     getMatchState(),
     prisma.publishedMatch.findFirst({ where: { buyerId, sellerId }, select: { id: true } }),
     prisma.conversation.findFirst({ where: { kind: "BUYER_SELLER", buyerId, sellerId }, include: { messages: MSG } }),
@@ -140,7 +142,7 @@ export async function ParticipantPairThread({ user, base, otherId }: { user: Use
   if (!buyer || !seller || (!published && !conv)) notFound();
   if (conv) await markConversationRead(conv.id, user.id);
   const block = postBlock(v, { kind: "BUYER_SELLER", closed: conv?.closed ?? false }, { interaction: state.interaction, published: !!published });
-  const them = v.buyerId ? `${seller.name} · ${seller.district}, Kerala` : `${buyer.name} · ${buyer.country}`;
+  const them = v.buyerId ? `${seller.name} · ${uid(seller)} · ${seller.district}, Kerala` : `${buyer.name} · ${uid(buyer)} · ${buyer.country}`;
   return (
     <>
       <PageHeader back={{ href: `${base}/messages`, label: "Back to messages" }} eyebrow="Buyer–seller discussion" title={v.buyerId ? seller.name : buyer.name}

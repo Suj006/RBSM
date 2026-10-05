@@ -4,7 +4,7 @@ import type { BuyerStatus, ItemStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { buyerWhere, itemScope, scopeFor, type BuyerFilters } from "@/lib/buyer-query";
 import { ACTION_LABEL, ALL_ITEM_STATUSES, ALL_STATUSES, ITEM_META, ROLE_LABEL, STATUS_META } from "@/lib/status";
-import { parseCerts } from "@/lib/format";
+import { fmtDateTime, parseCerts } from "@/lib/format";
 import { EVENT } from "@/lib/config";
 import type { Column, Kpi, Report, Row, Table } from "./types";
 import { describeProfileFilters, sellerScope, sellerWhere, type SellerFilters } from "@/lib/seller-query";
@@ -16,6 +16,7 @@ import { getTargets } from "@/lib/targets";
 import { productDemand, sectorDemandSummary } from "@/lib/demand";
 import { AGE_BUCKETS, buildInsights } from "@/lib/insights";
 import { buildDecisionView } from "@/lib/decision";
+import { buyerPrimarySectors, fmtDay, fmtTime, getEventConfig, LIVE_META, liveStatus, unscheduledPairs, type Live } from "@/lib/event";
 import { sellerProfileStats } from "@/lib/seller-profile-stats";
 import { buyerNeeds, coverage, fit, getMatchState, loadPool, matchChecks, preferenceOutcomes, sellerOffers, SOURCE_LABEL, whyMatched } from "@/lib/matchmaking";
 
@@ -79,6 +80,14 @@ export const REPORTS = {
   "match-coverage": {
     title: "Matchmaking Results and Gaps",
     description: "Buyers below target, sellers without buyers, sector coverage, requested products not covered and district position.",
+  },
+  "event-schedule": {
+    title: "Meeting Schedule",
+    description: "Event days — every buyer–seller meeting by day, time and pavilion with ticket numbers; buyer-wise and seller-wise schedules; pavilions and nodal officers.",
+  },
+  "event-attendance": {
+    title: "Event Day Attendance",
+    description: "Event days — status of every meeting (completed, seller / buyer absent, not marked), day-wise summary, buyers' attendance and each nodal officer's marking.",
   },
   "communications": {
     title: "Communications Log",
@@ -574,6 +583,8 @@ export async function buildReport(id: ReportId, user: User, f: BuyerFilters & Se
     case "seller-preferences": return sellerPreferencesReport(user);
     case "match-buyer-directory": return buyerDirectoryReport(user);
     case "match-checks": return matchChecksReport(user);
+    case "event-schedule": return eventScheduleReport(user, (f as { v?: string }).v === "draft" && (user.role === "DIC" || user.role === "ADMIN"));
+    case "event-attendance": return eventAttendanceReport(user);
     case "communications": return communicationsReport(user, (f as { conversationId?: string }).conversationId);
     case "match-coverage": return matchCoverageReport(user, (f as { v?: string }).v === "draft" ? "draft" : "published");
   }
@@ -977,6 +988,103 @@ async function productDemandReport(user: User, f: BuyerFilters & { view?: string
         sellers: r.sellers.length ? r.sellers.map((s) => `${s.name} (${s.district})`).join("\n") : "NO SUPPLIER YET",
       })),
     }],
+  };
+}
+
+// ---------------------------------------------------------------- event days
+
+async function eventScheduleReport(user: User, draft: boolean): Promise<Report> {
+  const cfg = await getEventConfig();
+  const dayNo = new Map(cfg.days.map((d) => [d.date, d.n]));
+  const include = { buyer: { select: { name: true, country: true, pavilionNo: true, nodalOfficer: { select: { name: true, mobile: true } } } }, seller: { select: { name: true, district: true, contactName: true, contactMobile: true } } };
+  const rows = draft
+    ? (await prisma.meeting.findMany({ orderBy: [{ startAt: "asc" }], include })).map((m) => ({ ...m, ticketNo: "", pavilionNo: m.buyer.pavilionNo }))
+    : await prisma.scheduledMeeting.findMany({ orderBy: [{ startAt: "asc" }], include });
+  rows.sort((a, b) => a.startAt.getTime() - b.startAt.getTime() || (a.pavilionNo ?? 999) - (b.pavilionNo ?? 999));
+  const pav = await buyerPrimarySectors();
+  const unsched = draft ? await unscheduledPairs() : [];
+  const when = (m: { day: string; startAt: Date; endAt: Date }) => `D${dayNo.get(m.day) ?? "?"} ${fmtTime(m.startAt)}`;
+  const tables: Table[] = [
+    { name: "Schedule", heading: "1. Meetings by day and time",
+      columns: [{ key: "day", header: "Day", width: 17 }, { key: "time", header: "Time", width: 17 }, { key: "pav", header: "Pavilion", width: 8, kind: "number", align: "center" },
+        { key: "buyer", header: "Buyer", width: 24 }, { key: "country", header: "Country", width: 13 }, { key: "seller", header: "Seller", width: 24 }, { key: "district", header: "District", width: 13 },
+        ...(draft ? [] : [{ key: "ticket", header: "Ticket No.", width: 17, kind: "mono" as const }]), { key: "nodal", header: "Nodal Officer", width: 18 }],
+      rows: rows.map((m) => ({ day: `Day ${dayNo.get(m.day) ?? "?"} · ${fmtDay(m.day)}`, time: `${fmtTime(m.startAt)}–${fmtTime(m.endAt)}`, pav: m.pavilionNo ?? "",
+        buyer: m.buyer.name, country: m.buyer.country, seller: m.seller.name, district: m.seller.district, ticket: m.ticketNo, nodal: m.buyer.nodalOfficer?.name ?? "" })) },
+    { name: "By Buyer", heading: "2. Buyer-wise schedule",
+      columns: [{ key: "pav", header: "Pavilion", width: 8, kind: "number", align: "center" }, { key: "buyer", header: "Buyer", width: 26 }, { key: "nodal", header: "Nodal Officer", width: 20 },
+        { key: "n", header: "Meetings", width: 9, kind: "number", align: "right" }, { key: "list", header: "Meetings (day · time · seller)", width: 60 }],
+      rows: [...new Set(rows.map((m) => m.buyerId))].map((id) => { const ms = rows.filter((m) => m.buyerId === id); const b = ms[0].buyer;
+        return { pav: b.pavilionNo ?? "", buyer: b.name, nodal: b.nodalOfficer ? `${b.nodalOfficer.name} (${b.nodalOfficer.mobile})` : "", n: ms.length, list: ms.map((m) => `${when(m)} · ${m.seller.name}`).join("\n") }; })
+        .sort((a, b) => Number(a.pav || 999) - Number(b.pav || 999)) },
+    { name: "By Seller", heading: "3. Seller-wise schedule",
+      columns: [{ key: "seller", header: "Seller", width: 26 }, { key: "district", header: "District", width: 14 }, { key: "contact", header: "Promoter / Mobile", width: 22 },
+        { key: "n", header: "Meetings", width: 9, kind: "number", align: "right" }, { key: "list", header: "Meetings (day · time · pavilion · buyer)", width: 60 }],
+      rows: [...new Set(rows.map((m) => m.sellerId))].map((id) => { const ms = rows.filter((m) => m.sellerId === id); const s = ms[0].seller;
+        return { seller: s.name, district: s.district, contact: `${s.contactName} · ${fmtMobile(s.contactMobile)}`, n: ms.length, list: ms.map((m) => `${when(m)} · P${m.pavilionNo ?? "–"} ${m.buyer.name}`).join("\n") }; })
+        .sort((a, b) => a.seller.localeCompare(b.seller)) },
+    { name: "Pavilions", heading: "4. Pavilions and nodal officers",
+      columns: [{ key: "pav", header: "Pavilion", width: 8, kind: "number", align: "center" }, { key: "buyer", header: "Buyer", width: 28 }, { key: "country", header: "Country", width: 14 },
+        { key: "sector", header: "Seated by Sector", width: 26 }, { key: "nodal", header: "Nodal Officer", width: 24 }],
+      rows: pav.sort((a, b) => (a.pavilionNo ?? 999) - (b.pavilionNo ?? 999)).map((b) => ({ pav: b.pavilionNo ?? "", buyer: b.name, country: b.country, sector: b.primary?.name ?? "", nodal: "" })) },
+  ];
+  // nodal names for pavilions table
+  const officers = await prisma.nodalOfficer.findMany({ select: { id: true, name: true, mobile: true } });
+  tables[3].rows = tables[3].rows.map((r, i) => { const o = officers.find((x) => x.id === pav[i].nodalOfficerId); return { ...r, nodal: o ? `${o.name} (${o.mobile})` : "" }; });
+  if (draft) tables.push({ name: "Not Scheduled", heading: "5. Pairs not scheduled",
+    columns: [{ key: "pav", header: "Pavilion", width: 8, kind: "number", align: "center" }, { key: "buyer", header: "Buyer", width: 30 }, { key: "seller", header: "Seller", width: 30 }, { key: "district", header: "District", width: 16 }],
+    rows: unsched.map((p) => ({ pav: p.buyer.pavilionNo ?? "", buyer: p.buyer.name, seller: p.seller.name, district: p.seller.district })) });
+  const r = base("event-schedule", user, [draft ? "Draft (not published)" : cfg.version ? `Published version ${cfg.version}` : "Not published",
+    ...(cfg.days.length ? [`${fmtDay(cfg.days[0].date)} – ${fmtDay(cfg.days.at(-1)!.date)}`] : []), `${cfg.meetingMinutes}-minute meetings, ${cfg.bufferMinutes}-minute buffer`]);
+  return {
+    ...r, title: draft ? "Meeting Schedule — Draft" : r.title,
+    kpis: [
+      { label: "Meetings", value: rows.length, tone: "green" },
+      { label: "Buyers", value: new Set(rows.map((m) => m.buyerId)).size, tone: "blue" },
+      { label: "Sellers", value: new Set(rows.map((m) => m.sellerId)).size, tone: "violet" },
+      { label: draft ? "Not scheduled" : "Event days", value: draft ? unsched.length : cfg.days.length, tone: "yellow" },
+    ],
+    tables,
+  };
+}
+
+async function eventAttendanceReport(user: User): Promise<Report> {
+  const cfg = await getEventConfig();
+  const dayNo = new Map(cfg.days.map((d) => [d.date, d.n]));
+  const [ms, att] = await Promise.all([
+    prisma.scheduledMeeting.findMany({ orderBy: [{ startAt: "asc" }], include: { buyer: { select: { name: true, pavilionNo: true, nodalOfficer: { select: { name: true } } } }, seller: { select: { name: true, district: true } }, markedBy: { select: { displayName: true } } } }),
+    prisma.buyerDayAttendance.findMany({ include: { buyer: { select: { name: true, pavilionNo: true } }, markedBy: { select: { displayName: true } } } }),
+  ]);
+  const now = new Date();
+  const live = ms.map((m) => ({ m, s: liveStatus(m, now) }));
+  const by = (k: Live, day?: string) => live.filter((x) => x.s === k && (!day || x.m.day === day)).length;
+  const officers = [...new Set(ms.map((m) => m.buyer.nodalOfficer?.name ?? "Not assigned"))];
+  return {
+    ...base("event-attendance", user, [cfg.version ? `Published version ${cfg.version}` : "Not published", `As at ${fmtDateTime(now)}`]),
+    kpis: [
+      { label: "Meetings", value: ms.length, tone: "blue" },
+      { label: "Completed", value: by("completed"), tone: "green" },
+      { label: "Seller / buyer absent", value: by("no_show") + by("buyer_absent"), tone: "red" },
+      { label: "Not marked (past)", value: by("not_marked"), tone: "yellow" },
+    ],
+    tables: [
+      { name: "Summary", heading: "1. Day-wise summary",
+        columns: [{ key: "day", header: "Day", width: 24 }, ...(["completed", "in_meeting", "awaiting", "upcoming", "checked_in", "no_show", "buyer_absent", "not_marked", "cancelled"] as Live[]).map((k) => ({ key: k, header: LIVE_META[k].label, width: 11, kind: "number" as const, align: "right" as const })), { key: "total", header: "Total", width: 9, kind: "number", align: "right" }],
+        rows: cfg.days.map((d) => ({ day: `Day ${d.n} · ${fmtDay(d.date)}`, total: ms.filter((m) => m.day === d.date).length, ...Object.fromEntries((["completed", "in_meeting", "awaiting", "upcoming", "checked_in", "no_show", "buyer_absent", "not_marked", "cancelled"] as Live[]).map((k) => [k, by(k, d.date)])) })) },
+      { name: "Meetings", heading: "2. Every meeting",
+        columns: [{ key: "ticket", header: "Ticket No.", width: 17, kind: "mono" }, { key: "when", header: "Day · Time", width: 18 }, { key: "pav", header: "Pavilion", width: 8, kind: "number", align: "center" },
+          { key: "buyer", header: "Buyer", width: 22 }, { key: "seller", header: "Seller", width: 22 }, { key: "status", header: "Status", width: 16 }, { key: "by", header: "Marked By", width: 18 }, { key: "at", header: "Marked At", width: 16, kind: "datetime" }, { key: "note", header: "Note", width: 24, excelOnly: true }],
+        rows: live.map(({ m, s }) => ({ ticket: m.ticketNo, when: `D${dayNo.get(m.day)} ${fmtTime(m.startAt)}`, pav: m.pavilionNo ?? "", buyer: m.buyer.name, seller: `${m.seller.name} (${m.seller.district})`,
+          status: LIVE_META[s].label, by: m.markedBy?.displayName ?? "", at: m.markedAt, note: m.note ?? "" })) },
+      { name: "Buyer Attendance", heading: "3. Buyers' attendance by day",
+        columns: [{ key: "day", header: "Day", width: 22 }, { key: "pav", header: "Pavilion", width: 8, kind: "number", align: "center" }, { key: "buyer", header: "Buyer", width: 28 }, { key: "present", header: "Present", width: 9, align: "center" }, { key: "by", header: "Marked By", width: 20 }, { key: "at", header: "Marked At", width: 16, kind: "datetime" }],
+        rows: att.sort((a, b) => a.day.localeCompare(b.day) || (a.buyer.pavilionNo ?? 999) - (b.buyer.pavilionNo ?? 999)).map((a) => ({ day: `Day ${dayNo.get(a.day)} · ${fmtDay(a.day)}`, pav: a.buyer.pavilionNo ?? "", buyer: a.buyer.name, present: a.present ? "Yes" : "No", by: a.markedBy?.displayName ?? "", at: a.markedAt })) },
+      { name: "Nodal Officers", heading: "4. Nodal officers — meetings due and marked",
+        columns: [{ key: "name", header: "Nodal Officer", width: 26 }, { key: "buyers", header: "Buyers", width: 9, kind: "number", align: "right" }, { key: "meetings", header: "Meetings", width: 10, kind: "number", align: "right" },
+          { key: "due", header: "Due So Far", width: 10, kind: "number", align: "right" }, { key: "marked", header: "Marked", width: 10, kind: "number", align: "right" }],
+        rows: officers.map((o) => { const mine = ms.filter((m) => (m.buyer.nodalOfficer?.name ?? "Not assigned") === o); const due = mine.filter((m) => m.startAt <= now);
+          return { name: o, buyers: new Set(mine.map((m) => m.buyerId)).size, meetings: mine.length, due: due.length, marked: due.filter((m) => m.status !== "SCHEDULED").length }; }) },
+    ],
   };
 }
 

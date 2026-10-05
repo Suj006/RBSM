@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { DownloadButtons } from "./download-buttons";
+import { CountryTag } from "@/components/ids";
 
 export async function ApprovedListPage({ base }: { base: string }) {
   const rows = await prisma.buyer.findMany({
@@ -35,7 +36,7 @@ export async function ApprovedListPage({ base }: { base: string }) {
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-bold text-brand-700">{r.approvedNo}</td>
                     <td className="px-4 py-3"><Link href={`${base}/buyers/${r.id}`} className="font-semibold text-ink hover:text-brand-700">{r.name}</Link>
                       <div className="font-mono text-[11px] text-slate-500">{r.regNo}</div></td>
-                    <td className="px-4 py-3">{r.country}{r.requirement?.annualSourcingValue && <div className="text-xs text-slate-500">{r.requirement.annualSourcingValue}</div>}</td>
+                    <td className="px-4 py-3"><CountryTag country={r.country} /><div className="text-xs text-slate-500">{r.country}</div>{r.requirement?.annualSourcingValue && <div className="text-xs text-slate-500">{r.requirement.annualSourcingValue}</div>}</td>
                     <td className="px-4 py-3 text-xs"><div className="font-medium text-ink">{r.pocName}</div><div className="text-slate-500">{r.pocDesignation}</div>
                       <div className="text-slate-500">{r.pocEmail}</div><div className="whitespace-nowrap text-slate-500">{r.pocMobile}</div></td>
                     <td className="max-w-md px-4 py-3 text-xs">

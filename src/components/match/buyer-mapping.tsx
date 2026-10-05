@@ -9,6 +9,8 @@ import { Alert, Badge, Card, CardHeader, PageHeader } from "@/components/ui";
 import { ActionButton } from "./action-button";
 import { AddSellerForm } from "./add-seller-form";
 import { SourceBadges } from "./badges";
+import { Flag } from "@/components/ids";
+import { countryCode } from "@/lib/country-codes";
 
 /** One buyer: the sellers mapped, why, and what else would fit. */
 export async function BuyerMapping({ user, base, buyerId, staffBase }: { user: User; base: string; buyerId: string; staffBase: string }) {
@@ -33,8 +35,8 @@ export async function BuyerMapping({ user, base, buyerId, staffBase }: { user: U
 
   return (
     <>
-      <PageHeader back={{ href: `${base}/board`, label: "Back to mapping board" }} eyebrow={`Matchmaking · ${row.buyer.approvedNo}`} title={row.buyer.name}
-        subtitle={`${row.buyer.country} · ${row.matches.length} of ${pool.target} sellers mapped · preferred by ${row.preferredBy} seller${row.preferredBy === 1 ? "" : "s"}`}
+      <PageHeader back={{ href: `${base}/board`, label: "Back to mapping board" }} eyebrow={`Matchmaking · ${row.buyer.approvedNo}`} title={<span className="inline-flex items-center gap-2"><Flag country={row.buyer.country} /> {row.buyer.name}</span>}
+        subtitle={`${row.buyer.country} (${countryCode(row.buyer.country)}) · ${row.matches.length} of ${pool.target} sellers mapped · preferred by ${row.preferredBy} seller${row.preferredBy === 1 ? "" : "s"}`}
         actions={<Link href={`${staffBase}/buyers/${buyerId}`} className="text-sm font-semibold text-brand-700 hover:underline">Full buyer profile →</Link>} />
 
       {!editable && (

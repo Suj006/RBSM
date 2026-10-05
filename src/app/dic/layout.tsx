@@ -14,6 +14,7 @@ export default async function DicLayout({ children }: { children: React.ReactNod
   return (
     <AppShell role="DIC" user={user} nav={[
       { href: "/dic", label: "Dashboard", icon: "dashboard", exact: true },
+      { href: "/dic/find", label: "Find by ID", icon: "find" },
       { href: "/dic/buyers", label: "Buyers", icon: "buyers", badge: pending, group: "Buyers" },
       { href: "/dic/requirements", label: "Sector requirements", icon: "requirement", group: "Buyers" },
       { href: "/dic/approved", label: "RBSM buyer list", icon: "approved", group: "Buyers" },
@@ -25,6 +26,7 @@ export default async function DicLayout({ children }: { children: React.ReactNod
       { href: "/dic/targets", label: "Targets", icon: "target", group: "Programme" },
       { href: "/dic/reports", label: "Reports", icon: "reports", group: "Programme" },
       { href: "/dic/matchmaking", label: "Matchmaking", icon: "match", group: "Matchmaking" },
+      { href: "/dic/event", label: "Event days & schedule", icon: "calendar", group: "Matchmaking" },
       { href: "/dic/messages", label: "Messages", icon: "messages", badge: unread, group: "Communications" },
     ]}>{children}</AppShell>
   );

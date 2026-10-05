@@ -7,7 +7,7 @@ import { Alert, Badge, Button, Card, CardHeader, Input, Select } from "@/compone
 import { cn } from "@/lib/cn";
 
 export type DirectoryBuyer = {
-  id: string; name: string; approvedNo: string | null; country: string; relevant: boolean;
+  id: string; name: string; approvedNo: string | null; country: string; flag?: React.ReactNode; relevant: boolean;
   sectors: { id: string; name: string; products: string; specifications: string | null; certifications: string[]; quantity: string | null }[];
 };
 
@@ -24,7 +24,7 @@ export function BuyerDirectory({ buyers, canPick, sectors }: { buyers: Directory
   const byId = useMemo(() => new Map(buyers.map((b) => [b.id, b])), [buyers]);
   const list = buyers.filter((b) =>
     (!sector || b.sectors.some((s) => s.id === sector)) && (!onlyRelevant || b.relevant) &&
-    (!q || `${b.name} ${b.country} ${b.sectors.map((s) => s.products).join(" ")}`.toLowerCase().includes(q.toLowerCase())));
+    (!q || `${b.name} ${b.approvedNo ?? ""} ${b.country} ${b.sectors.map((s) => s.products).join(" ")}`.toLowerCase().includes(q.toLowerCase())));
   const move = (i: number, d: -1 | 1) => setPicked((p) => { const n = [...p]; [n[i], n[i + d]] = [n[i + d], n[i]]; return n; });
 
   if (state?.ok) return <Alert tone="green" title="Preferences submitted">{state.message}</Alert>;
@@ -34,7 +34,7 @@ export function BuyerDirectory({ buyers, canPick, sectors }: { buyers: Directory
       <div className="min-w-0 space-y-4">
         <Card className="p-4">
           <div className="grid gap-3 sm:grid-cols-[1.4fr_1.2fr_auto] sm:items-center">
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search buyer, country or product…" aria-label="Search" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search buyer, buyer ID, country or product…" aria-label="Search" />
             <Select value={sector} onChange={(e) => setSector(e.target.value)} aria-label="Sector">
               <option value="">All sectors</option>
               {sectors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -56,7 +56,7 @@ export function BuyerDirectory({ buyers, canPick, sectors }: { buyers: Directory
                     {b.relevant && <Badge tone="green">Your sector</Badge>}
                     {rank >= 0 && <Badge tone="violet">Preference #{rank + 1}</Badge>}
                   </div>
-                  <div className="text-sm text-slate-500">{b.country} · <span className="font-mono text-xs">{b.approvedNo}</span></div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-slate-500"><span className="rounded-md bg-sky-50 px-1.5 py-px font-mono text-[11px] font-semibold text-sky-800 ring-1 ring-sky-200">{b.approvedNo}</span> {b.flag} {b.country}</div>
                 </div>
                 {canPick && (rank >= 0
                   ? <Button type="button" variant="ghost" className="px-3 py-1.5 text-xs" onClick={() => setPicked((p) => p.filter((x) => x !== b.id))}><X className="size-3.5" /> Remove</Button>

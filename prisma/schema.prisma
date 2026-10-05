@@ -17,6 +17,7 @@ enum Role {
   ADMIN
   DISTRICT // District Industries Centre — one login per district
   SELLER // MSME seller, login allotted on Directorate approval
+  NODAL // Directorate nodal officer for a group of buyers on the event days
 }
 
 // Buyer registration stage. Sector requirements are approved one by one
@@ -91,6 +92,10 @@ model User {
   announcements   Announcement[]          @relation("AnnouncementAuthor")
   announcementsIn AnnouncementRecipient[]
   convReads       ConversationRead[]
+
+  nodalOfficer     NodalOfficer?
+  meetingsMarked   ScheduledMeeting[]   @relation("MeetingMarkedBy")
+  buyerDaysMarked  BuyerDayAttendance[]
 }
 
 model Session {
@@ -151,6 +156,14 @@ model Buyer {
 
   conversations Conversation[]
   announcements Announcement[]
+
+  // Event day: the buyer's pavilion (sellers come to it) and the Directorate nodal officer looking after the buyer.
+  pavilionNo       Int?                 @unique
+  nodalOfficerId   String?
+  nodalOfficer     NodalOfficer?        @relation(fields: [nodalOfficerId], references: [id], onDelete: SetNull)
+  meetings         Meeting[]
+  scheduled        ScheduledMeeting[]
+  dayAttendance    BuyerDayAttendance[]
   reviewLogs  ReviewLog[]
 
   @@index([status])
@@ -356,6 +369,8 @@ model Seller {
   logs     SellerLog[]
 
   conversations Conversation[]
+  meetings      Meeting[]
+  scheduled     ScheduledMeeting[]
 
   // Matchmaking: up to 5 preferred buyers, submitted once (cannot be changed afterwards).
   prefSubmittedAt  DateTime?
@@ -594,4 +609,90 @@ model Attachment {
   mimeType       String
   size           Int
   createdAt      DateTime      @default(now())
+}
+
+// ---------------------------------------------------------------- event days and meeting schedule
+
+// One row per event day (dates and hours set by the Directorate). Times are IST "HH:MM".
+model EventDay {
+  id        String @id @default(cuid())
+  date      String @unique // YYYY-MM-DD
+  startTime String // first meeting may start at
+  endTime   String // last meeting must end by
+  breaks    String @default("[]") // JSON [{ "label": "Lunch", "start": "13:00", "end": "14:00" }]
+}
+
+model NodalOfficer {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  designation String?
+  mobile      String
+  email       String
+  buyers      Buyer[]
+  createdAt   DateTime @default(now())
+}
+
+// Working (draft) schedule — seen only by the Directorate / FIEO / Admin until it is published.
+model Meeting {
+  id       String   @id @default(cuid())
+  buyerId  String
+  buyer    Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId String
+  seller   Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  day      String // YYYY-MM-DD
+  startAt  DateTime
+  endAt    DateTime
+  manual   Boolean  @default(false) // placed or moved by the Directorate (kept when the draft is regenerated)
+  updatedAt DateTime @updatedAt
+
+  @@unique([buyerId, sellerId])
+  @@index([day, startAt])
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  SELLER_PRESENT // ticket verified by the nodal officer
+  SELLER_ABSENT
+  BUYER_ABSENT
+  COMPLETED
+  CANCELLED
+}
+
+// Published schedule: what buyers, sellers, nodal officers and FIEO see. Each meeting has a ticket.
+model ScheduledMeeting {
+  id         String        @id @default(cuid())
+  ticketNo   String        @unique
+  buyerId    String
+  buyer      Buyer         @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId   String
+  seller     Seller        @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  day        String
+  startAt    DateTime
+  endAt      DateTime
+  pavilionNo Int?
+  status     MeetingStatus @default(SCHEDULED)
+  markedAt   DateTime?
+  markedById String?
+  markedBy   User?         @relation("MeetingMarkedBy", fields: [markedById], references: [id], onDelete: SetNull)
+  note       String?
+  version    Int
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@unique([buyerId, sellerId])
+  @@index([day, startAt])
+}
+
+model BuyerDayAttendance {
+  buyerId    String
+  buyer      Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  day        String
+  present    Boolean
+  markedById String?
+  markedBy   User?    @relation(fields: [markedById], references: [id], onDelete: SetNull)
+  markedAt   DateTime @default(now())
+
+  @@id([buyerId, day])
 }

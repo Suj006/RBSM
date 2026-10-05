@@ -5,6 +5,7 @@ import { getMatchState, publishedMatches } from "@/lib/matchmaking";
 import { fmtDateTime, parseCerts } from "@/lib/format";
 import { Badge, Card, CardHeader } from "@/components/ui";
 import { optLabel, UNIT_CATEGORIES, UNIT_TYPES } from "@/lib/config";
+import { CountryTag, Flag, UidPill, uid } from "@/components/ids";
 
 /** A seller's published buyer meetings (nothing is shown before the Directorate publishes). */
 export async function SellerMeetings({ sellerId }: { sellerId: string }) {
@@ -27,10 +28,10 @@ export async function SellerMeetings({ sellerId }: { sellerId: string }) {
             <li key={r.id} className="px-5 py-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-ink">{r.buyer.name}</span>
+                  <Flag country={r.buyer.country} /> <span className="font-bold text-ink">{r.buyer.name}</span> <UidPill id={uid(r.buyer)} tone="buyer" />
                   {rankOf.has(r.buyer.id) && <Badge tone="violet">Your preference #{rankOf.get(r.buyer.id)}</Badge>}
                 </div>
-                <span className="text-sm text-slate-500">{r.buyer.country}</span>
+                <CountryTag country={r.buyer.country} name flag={false} className="text-sm text-slate-500" />
               </div>
               {r.buyer.pocName && <div className="text-xs text-slate-500">Contact: {r.buyer.pocName}{r.buyer.pocDesignation ? `, ${r.buyer.pocDesignation}` : ""}</div>}
               {(() => { const common = (r.buyer.requirement?.items ?? []).map((i) => i.sector.name).filter((n) => mySectors.has(n));

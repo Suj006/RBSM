@@ -8,6 +8,7 @@ export default async function DistrictLayout({ children }: { children: React.Rea
   return (
     <AppShell role="DISTRICT" user={{ displayName: user.displayName, username: user.username }} nav={[
       { href: "/district", label: "Dashboard", icon: "dashboard", exact: true },
+      { href: "/district/find", label: "Find by ID", icon: "find" },
       { href: "/district/sellers", label: "Sellers", icon: "sellers", badge: pending },
       { href: "/district/sellers/new", label: "Add seller", icon: "add", exact: true },
       { href: "/district/upload", label: "Bulk upload", icon: "upload" },

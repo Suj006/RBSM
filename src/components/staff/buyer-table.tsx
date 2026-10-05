@@ -5,6 +5,7 @@ import { ItemChips } from "@/components/item-chips";
 import { StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
+import { CountryTag } from "@/components/ids";
 
 export type BuyerRow = {
   id: string; regNo: string; approvedNo: string | null; name: string; country: string; status: BuyerStatus;
@@ -41,7 +42,7 @@ export function BuyerTable({ rows, base }: { rows: BuyerRow[]; base: string }) {
                   <Link href={`${base}/${r.id}`} className="font-semibold text-ink hover:text-brand-700">{r.name}</Link>
                   <div className="text-xs text-slate-500">{r.pocName ? `${r.pocName} · ` : ""}{r.signupEmail}</div>
                 </td>
-                <td className="px-4 py-3 align-top text-slate-700">{r.country}</td>
+                <td className="px-4 py-3 align-top text-slate-700"><CountryTag country={r.country} /><div className="text-xs text-slate-500">{r.country}</div></td>
                 <td className="max-w-64 px-4 py-3 align-top text-xs text-slate-600">
                   <ItemChips items={r.requirement?.items ?? []} />
                 </td>

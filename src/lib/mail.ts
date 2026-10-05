@@ -223,3 +223,28 @@ ${from} has sent you a communication: "${subject}".
 Sign in to read it and any documents shared: ${APP_URL}${link}${signature}`,
   }),
 };
+
+export const eventMail = {
+  nodalLogin: (name: string, username: string, password: string) => ({
+    subject: `${EVENT.name} ${EVENT.short} — nodal officer login`,
+    text: `Dear ${name},
+
+You have been added as a nodal officer for the ${EVENT.programme}. You will look after a group of buyers on the event days:
+their meeting schedule, verifying sellers' meeting tickets and marking attendance.
+
+User name: ${username}
+Password: ${password}
+
+Sign in at ${APP_URL}/login. You will be asked to change your password on first login.${signature}`,
+  }),
+  schedule: (name: string, id: string, n: number, link: string, updated: boolean, seller: boolean) => ({
+    subject: `${EVENT.name} ${EVENT.short} — ${updated ? "your meeting schedule has been updated" : "your meeting schedule"}`,
+    text: `Dear ${name},
+
+${updated ? "Your meeting schedule has been updated." : "Your buyer–seller meeting schedule has been published."} You have ${n} meeting${n === 1 ? "" : "s"}.
+
+Your ID: ${id}
+
+${seller ? `See the dates, times, pavilions and your meeting tickets at ${APP_URL}${link}. Please bring the ticket (printed or on your phone) to each meeting and show it to the nodal officer at the pavilion.` : `See the dates, times, your pavilion and the sellers you will meet at ${APP_URL}${link}. Sellers come to your pavilion; your nodal officer verifies their tickets.`}${signature}`,
+  }),
+};

@@ -9,6 +9,7 @@ import { fmtDate, parseCerts } from "@/lib/format";
 import { Badge, Button, Card, EmptyState, Input, PageHeader, Select } from "@/components/ui";
 import { Pagination } from "./pagination";
 import { DownloadButtons } from "./download-buttons";
+import { CountryTag } from "@/components/ids";
 
 export type ReqFilters = { q?: string; item?: string; sector?: string; country?: string; page?: string };
 const PAGE_SIZE = 25;
@@ -90,7 +91,7 @@ export async function RequirementListPage({ role, base, buyerBase, filters }: { 
                       <td className="px-4 py-3 font-semibold text-ink">{r.sector.name}</td>
                       <td className="px-4 py-3">
                         <Link href={href} className="font-semibold text-ink hover:text-brand-700">{r.requirement.buyer.name}</Link>
-                        <div className="text-xs text-slate-500">{r.requirement.buyer.country}</div>
+                        <CountryTag country={r.requirement.buyer.country} name className="text-xs text-slate-500" />
                         <div className="whitespace-nowrap font-mono text-[11px] text-slate-500">{r.requirement.buyer.approvedNo ?? r.requirement.buyer.regNo}</div>
                       </td>
                       <td className="max-w-72 px-4 py-3 text-slate-700">{r.products}</td>

@@ -6,6 +6,7 @@ import { sectorDemandDetail, sectorDemandSummary } from "@/lib/demand";
 import { ITEM_META } from "@/lib/status";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, StatCard } from "@/components/ui";
 import { DownloadButtons } from "@/components/staff/download-buttons";
+import { CountryTag, UidPill } from "@/components/ids";
 
 export async function DemandSummaryPage({ user, base }: { user: User; base: string }) {
   const rows = await sectorDemandSummary(user);
@@ -129,7 +130,7 @@ export async function DemandDetailPage({ user, base, sectorId, buyerBase, seller
                 <tr key={b.itemId} className="align-top hover:bg-brand-50/40">
                   <td className="px-4 py-3">
                     <Link href={`${buyerBase}/${b.buyerId}#item-${b.itemId}`} className="font-semibold text-ink hover:text-brand-700">{b.name}</Link>
-                    <div className="text-xs text-slate-500">{b.country} · <span className="whitespace-nowrap font-mono">{b.approvedNo ?? b.regNo}</span></div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500"><UidPill id={b.approvedNo ?? b.regNo} tone="buyer" /> <CountryTag country={b.country} name /></div>
                   </td>
                   <td className="px-4 py-3 text-slate-800">{b.products}</td>
                   <td className="px-4 py-3 text-xs text-slate-600">{b.specifications || "—"}</td>

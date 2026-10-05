@@ -4,6 +4,7 @@ import { coverage } from "@/lib/matchmaking";
 import { Badge, Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
 import { DownloadButtons } from "@/components/staff/download-buttons";
 import { cn } from "@/lib/cn";
+import { CountryTag, UidPill, uid } from "@/components/ids";
 
 const STATUS_TONE = { "No buyer requirement": "blue", "No approved seller": "red", "Short of sellers": "amber", Covered: "green" } as const;
 
@@ -65,7 +66,7 @@ export async function MatchResults({ base, staffBase, which }: { base: string; s
               <tbody className="divide-y divide-slate-100">
                 {c.buyersBelow.map((b) => (
                   <tr key={b.id} className="align-top hover:bg-slate-50">
-                    <td className="px-4 py-2"><Link href={`${base}/buyers/${b.id}`} className="font-medium text-ink hover:text-brand-700">{b.name}</Link><div className="text-xs text-slate-500">{b.country}</div></td>
+                    <td className="px-4 py-2"><Link href={`${base}/buyers/${b.id}`} className="font-medium text-ink hover:text-brand-700">{b.name}</Link><div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500"><UidPill id={uid(b)} tone="buyer" /> <CountryTag country={b.country} /></div></td>
                     <td className="px-3 py-2 text-xs text-slate-600">{b.sectors.join(", ")}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{b.n}</td>
                     <td className="px-4 py-2 text-right font-bold tabular-nums text-tx-red">{b.shortfall}</td>

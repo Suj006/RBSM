@@ -10,6 +10,7 @@ export default async function FieoLayout({ children }: { children: React.ReactNo
   return (
     <AppShell role="FIEO" user={user} nav={[
       { href: "/fieo", label: "Dashboard", icon: "dashboard", exact: true },
+      { href: "/fieo/find", label: "Find by ID", icon: "find" },
       { href: "/fieo/buyers", label: "Buyer applications", icon: "buyers", badge: pending, group: "Buyers" },
       { href: "/fieo/requirements", label: "Sector requirements", icon: "requirement", group: "Buyers" },
       { href: "/fieo/approved", label: "RBSM buyer list", icon: "approved", group: "Buyers" },
@@ -17,6 +18,7 @@ export default async function FieoLayout({ children }: { children: React.ReactNo
       { href: "/fieo/demand", label: "Sector demand", icon: "demand", group: "Programme" },
       { href: "/fieo/products", label: "Product demand", icon: "products", group: "Programme" },
       { href: "/fieo/matches", label: "Buyer–seller mapping", icon: "match", group: "Programme" },
+      { href: "/fieo/event", label: "Event day monitor", icon: "calendar", group: "Programme" },
       { href: "/fieo/reports", label: "Reports", icon: "reports", group: "Programme" },
       { href: "/fieo/messages", label: "Messages", icon: "messages", badge: unread, group: "Communications" },
     ]}>{children}</AppShell>

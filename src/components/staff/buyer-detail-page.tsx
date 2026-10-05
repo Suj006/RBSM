@@ -15,6 +15,7 @@ import { ReviewPanel } from "./review-panel";
 import { ItemReview } from "./item-review";
 import { fmtDateTime, parseCerts } from "@/lib/format";
 import { parseSnapshot, type ItemSnapshot, type ProfileSnapshot } from "@/lib/item-snapshot";
+import { CountryTag, Flag } from "@/components/ids";
 
 /** Approved sectors being modified compare with the approved version; returned ones with what FIEO returned. */
 function baselineFor(i: { status: string; approvedSnapshot: string | null; returnedSnapshot: string | null }) {
@@ -58,8 +59,8 @@ export async function BuyerDetailPage({ role, id, base, extra }: { role: Role; i
       <PageHeader
         back={backFor(base, "Back to buyers")}
         eyebrow={<>{b.regNo}{b.approvedNo && <> · <span className="text-brand-700">{b.approvedNo}</span></>}</>}
-        title={b.name}
-        subtitle={`${b.country} · Login ${b.user.username}`}
+        title={<span className="inline-flex items-center gap-2"><Flag country={b.country} /> {b.name}</span>}
+        subtitle={<span className="inline-flex flex-wrap items-center gap-2"><CountryTag country={b.country} name flag={false} /> · Login {b.user.username}</span>}
         actions={<><StatusBadge status={b.status} /><DownloadButtons href={`/api/reports/buyer-profile?buyerId=${b.id}`} label="Buyer profile" compact /></>}
       />
       {(basicPending || pendingItems > 0) && (

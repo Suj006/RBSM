@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Users & logins" };
 
 export default async function Page() {
   const [staff, buyerCount, activeBuyers] = await Promise.all([
-    prisma.user.findMany({ where: { role: { in: ["ADMIN", "FIEO", "DIC", "DISTRICT"] } }, orderBy: [{ role: "asc" }, { username: "asc" }] }),
+    prisma.user.findMany({ where: { role: { in: ["ADMIN", "FIEO", "DIC", "DISTRICT", "NODAL"] } }, orderBy: [{ role: "asc" }, { username: "asc" }] }),
     prisma.user.count({ where: { role: "BUYER" } }),
     prisma.user.count({ where: { role: "BUYER", mustChangePassword: false } }),
   ]);

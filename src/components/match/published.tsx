@@ -6,6 +6,7 @@ import { fmtDateTime, parseCerts } from "@/lib/format";
 import { Badge, Card, EmptyState, PageHeader, StatCard } from "@/components/ui";
 import { DownloadButtons } from "@/components/staff/download-buttons";
 import { SourceBadges } from "./badges";
+import { CountryTag, Flag, UidPill, uid } from "@/components/ids";
 
 /** The published mapping for staff: buyer by buyer (FIEO, Directorate, Admin) or, for a district, its sellers. */
 export async function PublishedMapping({ user, staffBase, back }: { user: User; staffBase: string; back?: { href: string; label: string } }) {
@@ -42,7 +43,7 @@ export async function PublishedMapping({ user, staffBase, back }: { user: User; 
               <ul className="divide-y divide-slate-100">
                 {rows.filter((r) => r.seller.id === s.id).map((r) => (
                   <li key={r.id} className="grid gap-1 px-5 py-2.5 text-sm sm:grid-cols-[1fr_1.4fr]">
-                    <div><span className="font-medium text-ink">{r.buyer.name}</span> <span className="text-slate-500">· {r.buyer.country}</span></div>
+                    <div className="flex flex-wrap items-center gap-1.5"><Flag country={r.buyer.country} /> <span className="font-medium text-ink">{r.buyer.name}</span> <UidPill id={uid(r.buyer)} tone="buyer" /> <CountryTag country={r.buyer.country} flag={false} className="text-xs text-slate-500" /></div>
                     <div className="text-xs text-slate-600">{r.buyer.requirement?.items.map((i) => `${i.sector.name}: ${i.products}`).join(" · ")}</div>
                   </li>
                 ))}
@@ -72,7 +73,7 @@ export async function PublishedMapping({ user, staffBase, back }: { user: User; 
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
                 <div>
                   <Link href={`${staffBase}/buyers/${b.id}`} className="font-bold text-ink hover:text-brand-700">{b.name}</Link>
-                  <span className="ml-2 text-sm text-slate-500">{b.country} · <span className="font-mono text-xs">{b.approvedNo}</span></span>
+                  <span className="ml-2 inline-flex items-center gap-1.5 text-sm text-slate-500"><UidPill id={uid(b)} tone="buyer" /> <CountryTag country={b.country} name /></span>
                   <div className="text-xs text-slate-500">{b.requirement?.items.map((i) => i.sector.name).join(", ")}</div>
                 </div>
                 <Badge tone="green">{mine.length} sellers</Badge>

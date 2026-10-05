@@ -104,6 +104,51 @@ reasons but without seller preference ranks or fit points. Buyers and sellers se
 The Directorate and Admin work the module from one **Matchmaking** menu entry with tabs: Overview, Mapping
 board, Seller preferences, Checks, Results & gaps, Published.
 
+## Event days, meeting schedule and live monitor
+
+**Directorate → Event days & schedule** (FIEO and Admin: view only):
+
+1. **Dates & hours** — start and end dates (two days planned), each day's start and end time and up to three breaks;
+   meeting length (30 minutes) and buffer after each meeting (10 minutes); venue. Slots never run into a break.
+2. **Pavilions** — approved buyers are numbered 1…n, grouped by their first sector that has matched sellers (else their
+   first sector), in the sector master's order (e.g. agri buyers 1–10, then FMCG 11–15 …). Any number can be changed.
+3. **Nodal officers** — Directorate officers with their own login (`nodal01` …, e-mailed). Buyers are shared among them
+   in pavilion order (e.g. 60 buyers / 10 officers = 10 each) or assigned one by one.
+4. **Draft schedule** — every buyer–seller pair of the published mapping gets one slot; no buyer or seller is
+   double-booked and the buffer is kept. Pairs are placed round by round in pavilion order, each in the earliest slot
+   free for both. The Directorate can move a meeting (only slots free for both are offered), remove it, place a pair by
+   hand, fill gaps or rebuild (manual placements kept). Seen only by the Directorate, FIEO and Admin.
+5. **Publish** — buyers and sellers see **My meetings** (day, time, pavilion, the other party's name, ID and
+   details). **Sellers** get a **ticket** for each meeting (`TX-D1-P07-1030`: day, pavilion, time) with both IDs,
+   printable one by one or all together; buyers get no tickets (sellers come to their pavilion). Nodal officers see
+   their buyers' schedules. Republishing e-mails only those whose meetings changed.
+6. **Event day** — the nodal officer verifies the seller's ticket, or looks the seller up by ID (**Verify ticket /
+   seller ID**), and marks seller present /
+   absent, meeting completed, or the buyer absent for the day. **Live monitor** (Directorate, FIEO, Admin) refreshes
+   every 20 seconds: meetings today, completed, in meeting now, awaiting seller, upcoming, no-shows, not marked; buyers
+   in meeting / waiting / idle / done / absent; sellers in meeting / pending / finished; the pavilion × slot board in
+   colour; late check-ins with the nodal officer to call; each officer's marking. A **rehearsal** time can be entered
+   to see the board as at any time of an event day.
+
+Reports: **Meeting Schedule** (published or draft — by time, buyer, seller, pavilions and nodal officers) and
+**Event Day Attendance** (every meeting's status, day-wise summary, buyers' attendance, nodal officers' marking).
+
+## Unique IDs, country flags and Find by ID
+
+Every buyer and seller is identified by a unique ID wherever they appear — lists, dashboards, matchmaking, messages,
+schedules, the live board, nodal officers' pages and tickets:
+
+| | Approved number | Registration number | Login ID |
+|---|---|---|---|
+| Buyer | `RBSM-Buyer-2026007` | `RBSM-B-007` | `Tradex2027-007` |
+| Seller | `RBSM-Seller-2026012` | `RBSM-S-012` | `Tradex2027-S012` |
+
+Buyers carry their country's flag and ISO short code (🇦🇪 AE). **Find by ID** (Directorate, FIEO, Admin, districts —
+also the search box on the dashboard) takes any of these IDs, part of one, or a meeting ticket number and shows the
+participant's identity, status, sectors, matches, pavilion, nodal officer and every meeting, with links to the full
+profile, matchmaking and messages. Districts find only their own sellers. Buyer and seller lists and the messages list
+also search by ID.
+
 ## Communications
 
 **Messages** in every login (buyer, approved seller, FIEO, Directorate; Admin read only; district centres have no access).
@@ -153,6 +198,7 @@ A decision page built from live data, with an Excel / PDF report of every sectio
 | District offices (14) | `dic-tvm`, `dic-klm`, `dic-pta`, `dic-alp`, `dic-ktm`, `dic-idk`, `dic-ekm`, `dic-tsr`, `dic-pkd`, `dic-mlp`, `dic-kkd`, `dic-wyd`, `dic-knr`, `dic-ksd` | `pass@123` | Register sellers of their district (form / bulk Excel upload, up to 5 sectors per row), recommend or reject |
 | Buyer | `Tradex2027-NNN` | `pass@123` (must change on first login) | Own profile and requirement |
 | Seller | `Tradex2027-SNNN` (allotted on approval) | `pass@123` (must change on first login) | Own seller dashboard |
+| Nodal officer | `nodal01` … (created by the Directorate; demo: `nodal01`–`nodal04`) | `pass@123` | Their buyers' meeting schedules, ticket / seller-ID verification, attendance |
 
 Staff passwords can be changed from **Admin → Users & logins**.
 
