@@ -2,6 +2,7 @@
 // trying out dashboards and reports.   npm run db:demo
 // Refuses to run when buyers already exist.
 import "dotenv/config";
+import path from "node:path";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
 import type { ItemStatus, BuyerStatus } from "../src/generated/prisma/enums";
@@ -10,6 +11,7 @@ import { approvedBuyerNo, buyerRegNo, buyerUsername, CONSTITUTIONS, GENDERS, SOC
 import { BLOCKS, CORPORATIONS, MUNICIPALITIES } from "../src/lib/kerala";
 
 const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? "file:./dev.db" }) });
+const dbFile = () => path.resolve((process.env.DATABASE_URL ?? "file:./dev.db").replace(/^file:/, ""));
 
 const BUYERS: [string, string, string, string][] = [
   ["Gulf Fresh Trading LLC", "United Arab Emirates", "Ahmed Al Mansoori", "Head of Procurement"],
@@ -96,10 +98,11 @@ const PLAN: { status: BuyerStatus; items: ItemStatus[] }[] = [
 ];
 
 async function main() {
-  if (await prisma.buyer.count() || await prisma.seller.count()) { console.error("Buyers or sellers already exist — demo data is only loaded into an empty database."); process.exit(1); }
+  if (await prisma.buyer.count() || await prisma.seller.count()) { console.error(`Buyers or sellers already exist in ${dbFile()} — demo data is only loaded into an empty database.`); process.exit(1); }
   const sectors = await prisma.sector.findMany();
-  const fieo = await prisma.user.findUniqueOrThrow({ where: { username: "fieo" } });
-  const dic = await prisma.user.findUniqueOrThrow({ where: { username: "dic123" } });
+  const fieo = await prisma.user.findUnique({ where: { username: "fieo" } });
+  const dic = await prisma.user.findUnique({ where: { username: "dic123" } });
+  if (!fieo || !dic) { console.error(`No staff logins in ${dbFile()} — run \`npm run db:seed\` first, then \`npm run db:demo\`.`); process.exit(1); }
   const hash = await bcrypt.hash("pass@123", 10);
   const needSectors = Object.keys(NEEDS).map((n) => sectors.find((s) => s.name === n)).filter(Boolean) as typeof sectors;
   let approvedSeq = 0;

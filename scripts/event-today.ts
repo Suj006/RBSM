@@ -17,6 +17,7 @@
  * Run it again later in the day to move the event to the new time.
  */
 import "dotenv/config";
+import path from "node:path";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
 import type { MatchSource, MeetingStatus, MouStatus } from "../src/generated/prisma/enums";
@@ -24,6 +25,7 @@ import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { EVENT, pad3 } from "../src/lib/config";
 
 const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? "file:./dev.db" }) });
+const dbFile = path.resolve((process.env.DATABASE_URL ?? "file:./dev.db").replace(/^file:/, ""));
 
 /* ------------------------------------------------------------------ time (IST) */
 
@@ -63,6 +65,11 @@ function rng(seed: number) {
 const rand = rng(2026);
 const pick = <T,>(a: readonly T[]) => a[Math.floor(rand() * a.length)];
 
+function fail(message: string): never {
+  console.error(`\n${message}\n`);
+  process.exit(1);
+}
+
 async function setting(key: string, value: string) {
   await prisma.matchSetting.upsert({ where: { key }, create: { key, value }, update: { value } });
 }
@@ -75,12 +82,13 @@ async function main() {
   const nowMin = istMinutes(now);
 
   const [dic, fieo] = await Promise.all([prisma.user.findFirst({ where: { role: "DIC" } }), prisma.user.findFirst({ where: { role: "FIEO" } })]);
-  if (!dic || !fieo) throw new Error("Run `npm run db:seed` and `npm run db:demo` first.");
+  console.log(`Database: ${dbFile}`);
+  if (!dic || !fieo) fail("This database has no staff logins (dic123, fieo) — it looks new and empty. If you meant to use your existing data, copy your dev.db into this folder (next to package.json). Otherwise run `npm run db:seed`, then `npm run db:demo`, then this again.");
   const buyers = await prisma.buyer.findMany({ where: { status: "APPROVED" }, orderBy: { approvedSeq: "asc" },
     select: { id: true, name: true, approvedSeq: true, requirement: { select: { items: { where: { status: "APPROVED" }, orderBy: { sortOrder: "asc" }, select: { sectorId: true, sector: { select: { sortOrder: true } } } } } } } });
   const sellers = await prisma.seller.findMany({ where: { status: "APPROVED" }, orderBy: { approvedSeq: "asc" },
     select: { id: true, name: true, approvedSeq: true, products: { orderBy: { sortOrder: "asc" }, select: { sectorId: true, products: true } } } });
-  if (!buyers.length || !sellers.length) throw new Error("No approved buyers or sellers — run `npm run db:demo` first.");
+  if (!buyers.length || !sellers.length) fail("This database has no approved buyers or sellers. Copy your dev.db into this folder, or run `npm run db:demo` (on an empty database) and then this again.");
 
   // 1. Event days: today around the current time, tomorrow a normal day.
   const len = 30, buffer = 10;
