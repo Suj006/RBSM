@@ -130,7 +130,7 @@ function Hero({ s, now }: { s: MouStats; now: number }) {
             <div className="ml-auto pb-1 text-right"><div className="text-lg font-extrabold">{tr.lastHour}</div><div className="text-[11px] text-white/60">in the last hour</div></div>
           </div>
           <div className="mt-3"><Growth points={tr.cumulative} /></div>
-          <div className="flex justify-between text-[10px] text-white/50"><span>{tr.cumulative[0]?.key.slice(5)}</span><span>Running total of MoUs</span><span>{tr.cumulative.at(-1)?.key.slice(5)}</span></div>
+          <div className="flex justify-between text-[10px] text-white/50"><span>{tr.cumulative[0]?.label}</span><span>Running total of MoUs</span><span>{tr.cumulative.at(-1)?.label}</span></div>
         </div>
       </div>
       <Ticker rows={s.recent.filter((m) => m.status === "APPROVED" || m.status === "SUBMITTED")} now={now} />

@@ -57,14 +57,26 @@ export async function mouStats(scope: "signed" | "approved" = "signed") {
   const onDay = (d: string) => inScope.filter((m) => istDay(m.submittedAt) === d);
   const days = [...byDay.values()].sort((a, b) => a.key.localeCompare(b.key));
   let runCount = 0, runUsd = 0;
-  const cumulative = days.map((d) => ({ key: d.key, count: (runCount += d.count), usd: (runUsd += d.usd) }));
+  let cumulative = days.map((d) => ({ key: d.key, label: d.key.slice(5), count: (runCount += d.count), usd: (runUsd += d.usd) }));
+  if (cumulative.length < 2 && inScope.length) {
+    // All on one day (the event day): show the running total hour by hour instead.
+    const hour = (d: Date) => Math.floor(((d.getTime() / 60000 + 330) % 1440) / 60);
+    const hours = inScope.map((m) => hour(m.submittedAt));
+    const [first, last] = [Math.min(...hours), Math.max(...hours, hour(now))];
+    runCount = 0; runUsd = 0;
+    cumulative = Array.from({ length: last - first + 1 }, (_, i) => {
+      const h = first + i, at = inScope.filter((m) => hour(m.submittedAt) === h);
+      runCount += at.length; runUsd += at.reduce((n, m) => n + (m.money?.usd ?? 0), 0);
+      return { key: String(h), label: `${h % 12 || 12} ${h < 12 ? "AM" : "PM"}`, count: runCount, usd: runUsd };
+    });
+  }
   return {
     rate, scope, now: now.getTime(),
     trend: {
       today: { count: onDay(today).length, ...sum(onDay(today)) },
       yesterday: { count: onDay(yesterday).length, ...sum(onDay(yesterday)) },
       lastHour: inScope.filter((m) => now.getTime() - m.submittedAt.getTime() < 36e5).length,
-      lastAt: inScope[0]?.submittedAt ?? null,
+      lastAt: inScope.length ? new Date(Math.max(...inScope.map((m) => m.submittedAt.getTime()))) : null,
       cumulative,
     },
     totals: {

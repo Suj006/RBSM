@@ -299,6 +299,16 @@ npm run dev              # http://localhost:3000
 To try the dashboards and reports with sample data, run `npm run db:demo` on an empty database
 (loads 40 demo buyers and about 150 demo sellers at every stage; demo password `pass@123`).
 
+To see the event as if it were running **today**, run `npm run db:event-today` (after `db:demo`). It sets
+day 1 to today, with the hours placed around the current time (IST), and day 2 to tomorrow; publishes and
+locks the mapping and the schedule; and marks today's meetings as the nodal officers would — completed,
+in meeting now, awaiting the seller, seller / buyer absent, a few not marked, and a few absent sellers'
+slots filled with another seller. It also replaces the MoUs with ones filled after today's completed
+meetings (approved, with the reviewers, returned, withdrawn; the newest a few minutes old). Buyers,
+sellers and logins are kept; the mapping, schedule and MoUs are rebuilt each time. Run it again later in
+the day to move the event to the new time. Then open **Event days & schedule → Live monitor** and the
+**MoU dashboard** (Directorate `dic123`), or log in as a nodal officer (`nodal01`–`nodal04`, `pass@123`).
+
 After updating from an older version, run `npx prisma migrate deploy` (database changes) and
 `npm run db:seed` (adds new logins such as the district offices; existing data is kept). Once, run
 `npm run db:normalize` to re-format names already saved.
